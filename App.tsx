@@ -9,7 +9,8 @@ import OraclePanel from "./components/OraclePanel";
 import ConfidenceChart from "./components/ConfidenceChart";
 
 const App: React.FC = () => {
-  const [ticker, setTicker] = useState<string>("BBRI.JK");
+  const [ticker, setTicker] = useState<string>("BTC-USD");
+  const [searchInput, setSearchInput] = useState<string>("BTC-USD");
   const [timeframe, setTimeframe] = useState<TimeFrame>("3M");
   const [data, setData] = useState<IndicatorData[]>([]);
   const [analysis, setAnalysis] = useState<AIAnalysisResult | null>(null);
@@ -124,6 +125,18 @@ const App: React.FC = () => {
 
   const priceStats = getPriceChange();
 
+  const handleSearch = () => {
+    if (searchInput.trim()) {
+      setTicker(searchInput.toUpperCase());
+    }
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === "Enter") {
+      handleSearch();
+    }
+  };
+
   return (
     <div className="min-h-screen bg-terminal-black text-gray-200 font-sans selection:bg-green-900 selection:text-white pb-10">
       {/* Header */}
@@ -153,21 +166,25 @@ const App: React.FC = () => {
         {/* Controls Bar */}
         <div className="grid grid-cols-1 md:grid-cols-12 gap-4 mb-6">
           {/* Sidebar / Input Area */}
-          <div className="col-span-12 md:col-span-3 space-y-4">
+          <div className="col-span-12 md:col-span-3 space-y-4 flex flex-col">
             <div className="bg-terminal-gray border border-gray-800 p-4 rounded-lg">
               <label className="block text-xs font-mono text-gray-500 mb-1">
-                ASSET TICKER
+                ASSET TICKER (Gunakan .JK untuk saham IHSG)
               </label>
-              <div className="relative">
+              <div className="relative flex gap-2">
                 <input
                   type="text"
-                  value={ticker}
-                  onChange={(e) => setTicker(e.target.value.toUpperCase())}
-                  className="w-full bg-black border border-gray-700 text-white px-3 py-2 rounded focus:outline-none focus:border-profit-green font-mono font-bold"
+                  value={searchInput}
+                  onChange={(e) => setSearchInput(e.target.value)}
+                  onKeyDown={handleKeyDown}
+                  className="w-full bg-black border border-gray-700 text-white px-3 py-2 rounded focus:outline-none focus:border-profit-green font-mono font-bold uppercase"
                 />
-                <div className="absolute right-3 top-2 text-xs text-gray-600">
-                  JKSE
-                </div>
+                <button 
+                  onClick={handleSearch}
+                  className="bg-gray-800 hover:bg-gray-700 text-white px-3 rounded border border-gray-700"
+                >
+                  GO
+                </button>
               </div>
             </div>
 
@@ -249,11 +266,13 @@ const App: React.FC = () => {
             </div>
 
             {/* New Confidence Chart in Sidebar */}
-            <ConfidenceChart data={data} />
+            <div className="flex-1 flex flex-col">
+               <ConfidenceChart data={data} />
+            </div>
           </div>
 
           {/* Main Chart Area */}
-          <div className="col-span-12 md:col-span-9 space-y-4">
+          <div className="col-span-12 md:col-span-9 space-y-4 flex flex-col">
             {/* Top Stats */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               <StatCard
