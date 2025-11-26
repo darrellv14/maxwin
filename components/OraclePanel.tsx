@@ -71,7 +71,9 @@ const OraclePanel: React.FC<OraclePanelProps> = ({ analysis, loading, onAnalyze 
                 <div className="text-sm font-bold text-loss-red">{analysis.stopLoss}</div>
              </div>
              <div className="bg-gray-900/50 p-2 rounded border border-gray-700/50">
-                <div className="text-xs text-gray-500 font-mono">TARGETS</div>
+                <div className="text-xs text-gray-500 font-mono">
+                  {analysis.signal === 'SELL' && analysis.takeProfit1 !== 'N/A' ? 'TARGETS (DOWN)' : 'TARGETS'}
+                </div>
                 <div className="text-sm font-bold text-profit-green">
                    TP1: {analysis.takeProfit1}<br/>
                    TP2: {analysis.takeProfit2}

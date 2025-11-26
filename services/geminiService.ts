@@ -16,6 +16,16 @@ export const analyzeStockWithGemini = async (
   const recentData = data.slice(-5);
   const latest = recentData[recentData.length - 1];
 
+  const isIndonesian = ticker.toUpperCase().endsWith('.JK') || ticker.toUpperCase() === '^JKSE';
+  
+  const strategyPrompt = isIndonesian 
+    ? `1. **Strategy:** LONG-ONLY (Spot Market). Do NOT suggest Short Selling.
+       - If Bearish: Signal 'SELL' (Exit holdings) or 'WAIT'. Set Entry/TP/SL to 'N/A' or describe support levels to watch.
+       - If Bullish: Signal 'BUY'. Provide Entry, SL, TP.`
+    : `1. **Strategy:** LONG & SHORT (Margin/Futures Market).
+       - If Bullish: Signal 'BUY'. Entry < TP.
+       - If Bearish: Signal 'SELL' (Short Sell). Entry > TP. Label targets clearly as 'Target (Downside)'.`;
+
   const prompt = `
     You are "The Oracle", a ruthless Wall Street Quantitative Developer and Senior Trader.
     Analyze the following technical indicators for the asset: ${ticker}.
@@ -32,9 +42,7 @@ export const analyzeStockWithGemini = async (
     - Bollinger Band Squeeze: ${((latest.bbUpper || 0) - (latest.bbLower || 0)) / latest.close < 0.05 ? 'YES' : 'NO'}
 
     IMPORTANT CONSTRAINTS:
-    1. **Strategy:** LONG-ONLY (Spot Market). Do NOT suggest Short Selling.
-       - If Bearish: Signal 'SELL' (Exit holdings) or 'WAIT'. Set Entry/TP/SL to 'N/A' or describe support levels to watch.
-       - If Bullish: Signal 'BUY'. Provide Entry, SL, TP.
+    ${strategyPrompt}
     2. **Pattern Recognition:** Search for Cup and Handle, Head and Shoulders, Double Bottom/Top, Flags, Triangles. 
        - ONLY report a pattern if you are >80% confident.
        - Fallback: If no clear pattern, focus on Trend and Support/Resistance. Do NOT hallucinate.
