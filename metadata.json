@@ -1,0 +1,4 @@
+{
+  "name": "Stock Profit Hunter AI",
+  "description": "A quantitative analysis dashboard using Gemini AI to predict stock movements based on RSI, MACD, and Bollinger Bands."
+}

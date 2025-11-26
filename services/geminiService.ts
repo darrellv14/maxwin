@@ -1,0 +1,93 @@
+import { GoogleGenAI } from "@google/genai";
+import { IndicatorData, AIAnalysisResult, SignalType } from '../types';
+
+export const analyzeStockWithGemini = async (
+  ticker: string, 
+  data: IndicatorData[]
+): Promise<AIAnalysisResult> => {
+  const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
+  if (!apiKey) {
+    throw new Error("API Key not found in environment variables.");
+  }
+
+  const ai = new GoogleGenAI({ apiKey });
+  
+  // Get the last 3 data points for trend analysis
+  const recentData = data.slice(-5);
+  const latest = recentData[recentData.length - 1];
+
+  const prompt = `
+    You are "The Oracle", a ruthless Wall Street Quantitative Developer and Senior Trader.
+    Analyze the following technical indicators for the asset: ${ticker}.
+
+    Recent Data (Last 5 periods):
+    ${recentData.map(d => 
+      `Date: ${d.date} | Close: ${d.close.toFixed(2)} | RSI: ${d.rsi?.toFixed(2)} | MACD Hist: ${d.macdHistogram?.toFixed(4)} | BB Pos: ${d.close > (d.bbUpper || 0) ? 'Over Upper' : d.close < (d.bbLower || 0) ? 'Below Lower' : 'Inside'}`
+    ).join('\n')}
+
+    Current Indicators:
+    - RSI (14): ${latest.rsi?.toFixed(2)}
+    - MACD Histogram: ${latest.macdHistogram?.toFixed(4)}
+    - Price vs SMA50: ${latest.close > (latest.sma50 || 0) ? 'Bullish' : 'Bearish'}
+    - Bollinger Band Squeeze: ${((latest.bbUpper || 0) - (latest.bbLower || 0)) / latest.close < 0.05 ? 'YES' : 'NO'}
+
+    Task:
+    Provide a trading signal, "Win Rate Probability", and a concrete trade plan (Entry, SL, TP).
+    Output purely in JSON format without markdown code blocks. PASTIKAN HASILNYA DALAM BAHASA INDONESIA PADA BAGIAN THE VERDICT ATAU REASONING
+    
+    JSON Schema:
+    {
+      "signal": "BUY" | "SELL" | "HOLD",
+      "confidence": number, // 0-100
+      "entryArea": "string range, e.g., '150.00 - 152.50'",
+      "stopLoss": "string value, e.g., '145.00'",
+      "takeProfit1": "string value, e.g., '160.00'",
+      "takeProfit2": "string value, e.g., '175.00'",
+      "predictionTime": "string value, e.g., 'Next 2-3 Days'",
+      "reasoning": "A short, sharp, professional paragraph explaining why. Use financial jargon like 'divergence', 'overbought', 'momentum', 'consolidation'."
+    }
+  `;
+
+  try {
+    const response = await ai.models.generateContent({
+      model: 'gemini-2.5-flash',
+      contents: prompt,
+      config: {
+        responseMimeType: "application/json"
+      }
+    });
+
+    const text = response.text;
+    if (!text) throw new Error("No response from Gemini");
+
+    const result = JSON.parse(text);
+
+    let signalEnum = SignalType.HOLD;
+    if (result.signal === 'BUY') signalEnum = SignalType.BUY;
+    if (result.signal === 'SELL') signalEnum = SignalType.SELL;
+
+    return {
+      signal: signalEnum,
+      confidence: result.confidence,
+      reasoning: result.reasoning,
+      entryArea: result.entryArea || 'N/A',
+      stopLoss: result.stopLoss || 'N/A',
+      takeProfit1: result.takeProfit1 || 'N/A',
+      takeProfit2: result.takeProfit2 || 'N/A',
+      predictionTime: result.predictionTime || 'Unknown'
+    };
+
+  } catch (error) {
+    console.error("Gemini Error:", error);
+    return {
+      signal: SignalType.HOLD,
+      confidence: 0,
+      reasoning: "The Oracle is currently offline. Unable to connect to neural markets.",
+      entryArea: "---",
+      stopLoss: "---",
+      takeProfit1: "---",
+      takeProfit2: "---",
+      predictionTime: "---"
+    };
+  }
+};
