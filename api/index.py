@@ -13,6 +13,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+
 @app.get("/api/history")
 def get_stock_history(ticker: str, period: str = "3mo"):
     try:
@@ -23,24 +24,26 @@ def get_stock_history(ticker: str, period: str = "3mo"):
             yf_period = "3mo"
         if yf_period == "6m":
             yf_period = "6mo"
-        
+
         stock = yf.Ticker(ticker)
         hist = stock.history(period=yf_period)
-        
+
         if hist.empty:
             raise HTTPException(status_code=404, detail="No data found")
-            
+
         data = []
         for date, row in hist.iterrows():
-            data.append({
-                "date": date.strftime('%Y-%m-%d'),
-                "open": row['Open'],
-                "high": row['High'],
-                "low": row['Low'],
-                "close": row['Close'],
-                "volume": row['Volume']
-            })
-            
+            data.append(
+                {
+                    "date": date.strftime("%Y-%m-%d"),
+                    "open": row["Open"],
+                    "high": row["High"],
+                    "low": row["Low"],
+                    "close": row["Close"],
+                    "volume": row["Volume"],
+                }
+            )
+
         return data
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -53,19 +56,19 @@ def get_stock_quote(ticker: str):
         price = stock.fast_info.last_price
         prev_close = stock.fast_info.previous_close
         open_price = stock.fast_info.open
-        
+
         if not price:
-            hist = stock.history(period='1d')
+            hist = stock.history(period="1d")
             if not hist.empty:
                 last = hist.iloc[-1]
-                price = last['Close']
-                open_price = last['Open']
-                 
+                price = last["Close"]
+                open_price = last["Open"]
+
         return {
             "symbol": ticker,
             "price": price,
             "open": open_price,
-            "prevClose": prev_close
+            "prevClose": prev_close,
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

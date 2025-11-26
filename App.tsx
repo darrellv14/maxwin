@@ -132,8 +132,8 @@ const App: React.FC = () => {
           <div className="flex items-center gap-2">
             <div className="w-3 h-3 bg-profit-green rounded-full shadow-[0_0_10px_#00ff9d]"></div>
             <h1 className="text-xl font-bold tracking-tight text-white font-mono">
-              PROFIT<span className="text-profit-green">HUNTER</span>
-              <span className="text-gray-600 text-sm ml-1">v2.1</span>
+              MOO<span className="text-profit-green">CUAN</span>
+              <span className="text-gray-600 text-sm ml-1">v1.0</span>
             </h1>
           </div>
           <div className="flex items-center gap-4">
