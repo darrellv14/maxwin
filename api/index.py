@@ -17,9 +17,12 @@ app.add_middleware(
 def get_stock_history(ticker: str, period: str = "3mo"):
     try:
         yf_period = period.lower()
-        if yf_period == "1m": yf_period = "1mo"
-        if yf_period == "3m": yf_period = "3mo"
-        if yf_period == "6m": yf_period = "6mo"
+        if yf_period == "1m":
+            yf_period = "1mo"
+        if yf_period == "3m":
+            yf_period = "3mo"
+        if yf_period == "6m":
+            yf_period = "6mo"
         
         stock = yf.Ticker(ticker)
         hist = stock.history(period=yf_period)
@@ -42,6 +45,7 @@ def get_stock_history(ticker: str, period: str = "3mo"):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+
 @app.get("/api/quote")
 def get_stock_quote(ticker: str):
     try:
@@ -51,11 +55,11 @@ def get_stock_quote(ticker: str):
         open_price = stock.fast_info.open
         
         if not price:
-             hist = stock.history(period='1d')
-             if not hist.empty:
-                 last = hist.iloc[-1]
-                 price = last['Close']
-                 open_price = last['Open']
+            hist = stock.history(period='1d')
+            if not hist.empty:
+                last = hist.iloc[-1]
+                price = last['Close']
+                open_price = last['Open']
                  
         return {
             "symbol": ticker,
