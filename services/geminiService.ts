@@ -31,6 +31,14 @@ export const analyzeStockWithGemini = async (
     - Price vs SMA50: ${latest.close > (latest.sma50 || 0) ? 'Bullish' : 'Bearish'}
     - Bollinger Band Squeeze: ${((latest.bbUpper || 0) - (latest.bbLower || 0)) / latest.close < 0.05 ? 'YES' : 'NO'}
 
+    IMPORTANT CONSTRAINTS:
+    1. **Strategy:** LONG-ONLY (Spot Market). Do NOT suggest Short Selling.
+       - If Bearish: Signal 'SELL' (Exit holdings) or 'WAIT'. Set Entry/TP/SL to 'N/A' or describe support levels to watch.
+       - If Bullish: Signal 'BUY'. Provide Entry, SL, TP.
+    2. **Pattern Recognition:** Search for Cup and Handle, Head and Shoulders, Double Bottom/Top, Flags, Triangles. 
+       - ONLY report a pattern if you are >80% confident.
+       - Fallback: If no clear pattern, focus on Trend and Support/Resistance. Do NOT hallucinate.
+
     Task:
     Provide a trading signal, "Win Rate Probability", and a concrete trade plan (Entry, SL, TP).
     Output purely in JSON format without markdown code blocks. PASTIKAN HASILNYA DALAM BAHASA INDONESIA PADA BAGIAN THE VERDICT ATAU REASONING
