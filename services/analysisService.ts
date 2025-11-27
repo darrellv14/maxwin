@@ -1,4 +1,4 @@
-import { AIAnalysisResult } from '../types';
+import { AIAnalysisResult } from "../types";
 
 export interface AnalysisRecord {
   id: number;
@@ -18,17 +18,20 @@ export interface AnalysisRecord {
 const parsePrice = (priceStr: string): number => {
   const match = priceStr.match(/[\d,.]+/);
   if (match) {
-    return parseFloat(match[0].replace(/,/g, ''));
+    return parseFloat(match[0].replace(/,/g, ""));
   }
   return 0;
 };
 
-export const saveAnalysis = async (analysis: AIAnalysisResult, ticker: string) => {
+export const saveAnalysis = async (
+  analysis: AIAnalysisResult,
+  ticker: string
+) => {
   try {
-    const response = await fetch('/_svc/analysis', {
-      method: 'POST',
+    const response = await fetch("/api/save", {
+      method: "POST",
       headers: {
-        'Content-Type': 'application/json',
+        "Content-Type": "application/json",
       },
       body: JSON.stringify({
         ticker,
@@ -40,42 +43,52 @@ export const saveAnalysis = async (analysis: AIAnalysisResult, ticker: string) =
         reasoning: analysis.reasoning,
       }),
     });
-    
+
     if (!response.ok) {
-      throw new Error('Failed to save analysis');
+      throw new Error("Failed to save analysis");
     }
-    
+
     return await response.json();
   } catch (error) {
-    console.error('Error saving analysis:', error);
+    console.error("Error saving analysis:", error);
     throw error;
   }
 };
 
-export const getAnalysisHistory = async (limit: number = 5, offset: number = 0): Promise<AnalysisRecord[]> => {
+export const getAnalysisHistory = async (
+  limit: number = 5,
+  offset: number = 0
+): Promise<AnalysisRecord[]> => {
   try {
-    const response = await fetch(`/_svc/analysis?limit=${limit}&offset=${offset}`);
+    const response = await fetch(
+      `/api/history?limit=${limit}&offset=${offset}`
+    );
     if (!response.ok) {
-      throw new Error('Failed to fetch history');
+      throw new Error("Failed to fetch history");
     }
     return await response.json();
   } catch (error) {
-    console.error('Error fetching history:', error);
+    console.error("Error fetching history:", error);
     throw error;
   }
 };
 
-export const updateAnalysisStatus = async (): Promise<{ message: string, updated_count: number }> => {
+export const updateAnalysisStatus = async (): Promise<{
+  message: string;
+  updated_count: number;
+}> => {
   try {
-    const response = await fetch('/_svc/update-status', {
-      method: 'POST',
+    // DULU: const response = await fetch("/_svc/update-status", { method: "POST" });
+    const response = await fetch("/api/update-status", {
+      method: "POST",
     });
+
     if (!response.ok) {
-      throw new Error('Failed to update status');
+      throw new Error("Failed to update status");
     }
     return await response.json();
   } catch (error) {
-    console.error('Error updating status:', error);
+    console.error("Error updating status:", error);
     throw error;
   }
 };

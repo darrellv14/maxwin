@@ -1,9 +1,7 @@
 from fastapi import FastAPI, HTTPException, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
-from pydantic import BaseModel
-from typing import List
-from datetime import datetime
+
 import os
 import tempfile
 import sys
@@ -44,60 +42,10 @@ app.add_middleware(
 )
 
 
-class AnalysisCreate(BaseModel):
-    ticker: str
-    signal: str
-    entry_price: float
-    tp1: float
-    tp2: float
-    stop_loss: float
-    reasoning: str
+# Models removed as they are handled by Node.js now
 
 
-class AnalysisResponse(AnalysisCreate):
-    id: int
-    date_created: datetime
-    status: str
-    highest_price: float
-    lowest_price: float
-
-    class Config:
-        orm_mode = True
-
-
-@app.post("/_svc/analysis", response_model=AnalysisResponse)
-def create_analysis(analysis: AnalysisCreate, db: Session = Depends(get_db)):
-    db_analysis = AnalysisHistory(
-        ticker=analysis.ticker,
-        signal=analysis.signal,
-        entry_price=analysis.entry_price,
-        tp1=analysis.tp1,
-        tp2=analysis.tp2,
-        stop_loss=analysis.stop_loss,
-        reasoning=analysis.reasoning,
-        highest_price=analysis.entry_price,
-        lowest_price=analysis.entry_price,
-    )
-    db.add(db_analysis)
-    db.commit()
-    db.refresh(db_analysis)
-    return db_analysis
-
-
-@app.get("/_svc/analysis", response_model=List[AnalysisResponse])
-def get_analysis_history(
-    limit: int = 5, 
-    offset: int = 0, 
-    db: Session = Depends(get_db)
-):
-    # Just return the data, don't update prices here (too slow)
-    return (
-        db.query(AnalysisHistory)
-        .order_by(AnalysisHistory.date_created.desc())
-        .limit(limit)
-        .offset(offset)
-        .all()
-    )
+# Endpoints removed as they are handled by Node.js now
 
 
 @app.post("/_svc/update-status")
@@ -151,44 +99,7 @@ def update_analysis_status(db: Session = Depends(get_db)):
     return {"message": "Status updated", "updated_count": updated_count}
 
 
-@app.get("/_svc/data")
-def get_stock_history(ticker: str, period: str = "3mo"):
-    try:
-        # Map frontend timeframe to yfinance period
-        yf_period = period.lower()
-        if yf_period == "1m":
-            yf_period = "1mo"
-        if yf_period == "3m":
-            yf_period = "3mo"
-        if yf_period == "6m":
-            yf_period = "6mo"
-
-        stock = yf.Ticker(ticker)
-        hist = stock.history(period=yf_period)
-
-        if hist.empty:
-            raise HTTPException(status_code=404, detail="No data found")
-
-        data = []
-        for date, row in hist.iterrows():
-            data.append(
-                {
-                    "date": date.strftime("%Y-%m-%d"),
-                    "open": row["Open"],
-                    "high": row["High"],
-                    "low": row["Low"],
-                    "close": row["Close"],
-                    "volume": row["Volume"],
-                }
-            )
-
-        return data
-    except Exception as e:
-        print(f"Error fetching stock data: {e}")
-        # Return the error message to the client for debugging
-        raise HTTPException(
-            status_code=500, detail=f"Stock data error: {str(e)}"
-        )
+# Stock history endpoint removed (replaced by api/market.js)
 
 
 @app.get("/_svc/live")

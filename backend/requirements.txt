@@ -1,8 +1,0 @@
-fastapi
-uvicorn
-yfinance
-sqlalchemy
-psycopg2-binary
-python-dotenv
-lxml
-requests
