@@ -244,7 +244,8 @@ const Dashboard: React.FC = () => {
                       style: "currency",
                       currency: "IDR",
                     })
-                    .replace("Rp", "") || "0"
+                    .replace("Rp", "")
+                    .trim() || "0"
                 }
                 subValue={`${priceStats.val} (${priceStats.percent})`}
                 trend={priceStats.trend}

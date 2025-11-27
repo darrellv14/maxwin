@@ -12,7 +12,7 @@ const StatCard: React.FC<StatCardProps> = ({ label, value, subValue, trend, colo
   return (
     <div className="bg-terminal-gray border border-gray-800 p-4 rounded-lg shadow-lg">
       <div className="text-gray-400 text-xs font-mono uppercase tracking-wider mb-1">{label}</div>
-      <div className={`text-2xl font-bold font-mono ${color ? color : 'text-white'}`}>
+      <div className={`text-2xl font-bold font-mono truncate ${color ? color : 'text-white'}`} title={String(value)}>
         {value}
       </div>
       {subValue && (
