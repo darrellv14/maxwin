@@ -297,36 +297,30 @@ export default async function handler(req, res) {
           interval: "1d",
         });
 
-        const timestamps = chartRes?.timestamp || chartRes?.timestamps;
-        const quote = chartRes?.indicators?.quote?.[0];
+        // FIX: Gunakan properti .quotes dari yahoo-finance2 (bukan raw indicators)
+        const quotes = chartRes?.quotes;
+        
+        if (!Array.isArray(quotes) || quotes.length < 60) continue;
 
-        if (!Array.isArray(timestamps) || !quote || !quote.close) continue;
-
-        const stockData = timestamps
-          .map((ts, idx) => {
-            const close = quote.close[idx];
-            const open = quote.open?.[idx];
-            const high = quote.high?.[idx];
-            const low = quote.low?.[idx];
-            const volume = quote.volume?.[idx];
-
+        const stockData = quotes
+          .map((q) => {
             if (
-              close == null ||
-              open == null ||
-              high == null ||
-              low == null ||
-              volume == null
+              q.close == null ||
+              q.open == null ||
+              q.high == null ||
+              q.low == null ||
+              q.volume == null
             ) {
               return null;
             }
 
             return {
-              date: new Date(ts * 1000).toISOString().slice(0, 10),
-              open,
-              high,
-              low,
-              close,
-              volume,
+              date: q.date instanceof Date ? q.date.toISOString().slice(0, 10) : new Date(q.date).toISOString().slice(0, 10),
+              open: q.open,
+              high: q.high,
+              low: q.low,
+              close: q.close,
+              volume: q.volume,
             };
           })
           .filter(Boolean);
