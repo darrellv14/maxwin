@@ -275,16 +275,14 @@ export default async function handler(req, res) {
       ...new Set(
         quotes
           .map((q) => q.symbol)
-          .filter(
-            (s) => typeof s === "string" && s.length > 0 && s.endsWith(".JK")
-          )
+          .filter((s) => typeof s === "string" && s.length > 0)
       ),
     ].slice(0, 40);
 
     console.log(
       "[AI-SCREENER] total quotes:",
       quotes.length,
-      "| symbols .JK:",
+      "| symbols:",
       symbols.length
     );
 
