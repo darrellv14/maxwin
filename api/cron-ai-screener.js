@@ -363,7 +363,7 @@ export default async function handler(req, res) {
         allLastSnapshots.push({ symbol, last });
 
         // ✅ Filter awal: hanya yang technicalConfidence >= 70
-        if (last.technicalConfidence < 70) continue;
+        if (last.technicalConfidence < 55) continue;
 
         candidates.push({
           ticker: symbol,
@@ -384,7 +384,7 @@ export default async function handler(req, res) {
     console.log(
       "[AI-SCREENER] allLastSnapshots:",
       allLastSnapshots.length,
-      "| candidates (techConf>=70):",
+      "| candidates (techConf>=55):",
       candidates.length
     );
 
@@ -393,7 +393,7 @@ export default async function handler(req, res) {
     let effectiveCandidates = candidates;
     if (!effectiveCandidates.length && allLastSnapshots.length) {
       console.warn(
-        "[AI-SCREENER] No candidates with technicalConfidence>=70, falling back to top 10."
+        "[AI-SCREENER] No candidates with technicalConfidence>=55, falling back to top 10."
       );
       effectiveCandidates = allLastSnapshots
         .map(({ symbol, last }) => ({
@@ -467,7 +467,7 @@ export default async function handler(req, res) {
       PENTING:
       - Hanya berikan output JSON murni.
       - Pastikan harga Entry, TP, SL logis sesuai fraksi harga saham Indonesia.
-      - Hanya sertakan saham dengan confidence > 70.
+      - Hanya sertakan saham dengan confidence > 55.
     `;
 
     const model = genAI.getGenerativeModel({
@@ -515,7 +515,7 @@ export default async function handler(req, res) {
         }
 
         // ✅ Filter: hanya BUY, confidence >= 70
-        if (p.signal !== "BUY" || (p.confidence ?? 0) < 70) continue;
+        if (p.signal !== "BUY" || (p.confidence ?? 0) < 55) continue;
 
         const rawTicker = String(p.ticker || "")
           .toUpperCase()
