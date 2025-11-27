@@ -1,13 +1,17 @@
-from fastapi import FastAPI, HTTPException, Depends
-from fastapi.middleware.cors import CORSMiddleware
-from sqlalchemy.orm import Session
-from pydantic import BaseModel
-from typing import List
-from datetime import datetime
-import yfinance as yf
-import uvicorn
 import os
-from database import init_db, get_db, AnalysisHistory
+from datetime import datetime
+from typing import List
+
+import uvicorn
+import yfinance as yf
+from database import AnalysisHistory, get_db, init_db
+from fastapi import Depends, FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
+from sqlalchemy.orm import Session
+
+# Set cache directory for yfinance to /tmp for serverless environments
+os.environ["XDG_CACHE_HOME"] = "/tmp/cache"
 
 app = FastAPI()
 
@@ -64,7 +68,7 @@ def create_analysis(analysis: AnalysisCreate, db: Session = Depends(get_db)):
         stop_loss=analysis.stop_loss,
         reasoning=analysis.reasoning,
         highest_price=analysis.entry_price,
-        lowest_price=analysis.entry_price
+        lowest_price=analysis.entry_price,
     )
     db.add(db_analysis)
     db.commit()
@@ -75,9 +79,9 @@ def create_analysis(analysis: AnalysisCreate, db: Session = Depends(get_db)):
 @app.get("/_svc/analysis", response_model=List[AnalysisResponse])
 def get_analysis_history(db: Session = Depends(get_db)):
     # Fetch all active analysis to update their status
-    active_analyses = db.query(AnalysisHistory).filter(
-        AnalysisHistory.status == "ACTIVE"
-    ).all()
+    active_analyses = (
+        db.query(AnalysisHistory).filter(AnalysisHistory.status == "ACTIVE").all()
+    )
 
     for analysis in active_analyses:
         try:
@@ -122,9 +126,7 @@ def get_analysis_history(db: Session = Depends(get_db)):
             print(f"Error updating analysis {analysis.id}: {e}")
             continue
 
-    return db.query(AnalysisHistory).order_by(
-        AnalysisHistory.date_created.desc()
-    ).all()
+    return db.query(AnalysisHistory).order_by(AnalysisHistory.date_created.desc()).all()
 
 
 @app.get("/_svc/data")

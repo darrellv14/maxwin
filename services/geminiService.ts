@@ -61,7 +61,6 @@ export const analyzeStockWithGemini = async (
   `;
 
   try {
-    // Use the user requested model or fallback to standard flash
     const model = genAI.getGenerativeModel({ model: "gemini-2.5-pro" });
     
     const result = await model.generateContent(prompt);

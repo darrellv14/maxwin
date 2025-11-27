@@ -4,8 +4,12 @@ from sqlalchemy.orm import Session
 from pydantic import BaseModel
 from typing import List
 from datetime import datetime
-import yfinance as yf
 import os
+
+# Set cache directory for yfinance to /tmp for serverless environments
+os.environ['XDG_CACHE_HOME'] = '/tmp/cache'
+
+import yfinance as yf
 from database import init_db, get_db, AnalysisHistory
 
 app = FastAPI()
@@ -152,7 +156,9 @@ def get_stock_history(ticker: str, period: str = "3mo"):
 
         return data
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        print(f"Error fetching stock data: {e}")
+        # Return the error message to the client for debugging
+        raise HTTPException(status_code=500, detail=f"Stock data error: {str(e)}")
 
 
 @app.get("/_svc/live")
@@ -177,4 +183,5 @@ def get_stock_quote(ticker: str):
             "prevClose": prev_close,
         }
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        print(f"Error fetching live quote: {e}")
+        raise HTTPException(status_code=500, detail=f"Live quote error: {str(e)}")
