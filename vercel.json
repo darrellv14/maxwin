@@ -1,5 +1,6 @@
 {
   "rewrites": [
-    { "source": "/_svc/(.*)", "destination": "/api/index.py" }
+    { "source": "/_svc/(.*)", "destination": "/api/index.py" },
+    { "source": "/(.*)", "destination": "/index.html" }
   ]
 }
