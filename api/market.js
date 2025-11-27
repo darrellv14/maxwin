@@ -1,16 +1,15 @@
 import YahooFinance from "yahoo-finance2";
 
-const yf = new YahooFinance(); // ← pakai instance, bukan default function
+const yahooFinance = new YahooFinance();
 
 export default async function handler(req, res) {
   const { ticker, period = "3M" } = req.query;
 
-  if (!ticker) {
+  if (!ticker || typeof ticker !== "string") {
     return res.status(400).json({ error: "Ticker is required" });
   }
 
   try {
-    // Calculate start date based on period
     const startDate = new Date();
     switch (period) {
       case "1M":
@@ -26,31 +25,34 @@ export default async function handler(req, res) {
         startDate.setFullYear(startDate.getFullYear() - 1);
         break;
       default:
-        startDate.setMonth(startDate.getMonth() - 3); // Default 3M
+        startDate.setMonth(startDate.getMonth() - 3);
     }
 
-    // Fetch data from Yahoo Finance (pakai instance)
-    const result = await yf.historical(ticker, {
-      period1: startDate.toISOString().split("T")[0], // YYYY-MM-DD
+    const result = await yahooFinance.chart(ticker, {
+      period1: startDate,
       interval: "1d",
     });
 
-    // Format data ke bentuk yang frontend harapkan
-    const formattedData = result.map((quote) => ({
-      date: quote.date.toISOString().split("T")[0],
-      open: quote.open,
-      high: quote.high,
-      low: quote.low,
-      close: quote.close,
-      volume: quote.volume,
+    const quotes = result.quotes ?? [];
+
+    const formattedData = quotes.map((q) => ({
+      date: q.date.toISOString().split("T")[0],
+      open: q.open,
+      high: q.high,
+      low: q.low,
+      close: q.close,
+      volume: q.volume,
     }));
 
-    // Cache untuk 60 detik
     res.setHeader("Cache-Control", "s-maxage=60, stale-while-revalidate");
 
     return res.status(200).json(formattedData);
   } catch (error) {
     console.error("Node API Error:", error);
-    return res.status(500).json({ error: error.message });
+    return res
+      .status(500)
+      .json({
+        error: error instanceof Error ? error.message : "Unknown error",
+      });
   }
 }
