@@ -176,7 +176,7 @@ const calculateIndicators = (stockData) => {
     if (rsiVal > 55) techScore += 5;
     else if (rsiVal < 45) techScore -= 5;
 
-    // Breakout / breakdown
+    // Breakout / breakdown (Bollinger)
     if (upper != null && close > upper) techScore += 5;
     if (lower != null && close < lower) techScore -= 5;
 
@@ -204,20 +204,74 @@ const calculateIndicators = (stockData) => {
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "");
 
-// Normalisasi shape screener (quotes kadang di root, kadang di finance.result[0])
-const normalizeQuotes = (screenerRes) => {
-  if (!screenerRes) return [];
-  if (Array.isArray(screenerRes.quotes)) return screenerRes.quotes;
-  if (
-    screenerRes.finance &&
-    screenerRes.finance.result &&
-    screenerRes.finance.result[0] &&
-    Array.isArray(screenerRes.finance.result[0].quotes)
-  ) {
-    return screenerRes.finance.result[0].quotes;
-  }
-  return [];
-};
+// =======================
+//  IDX UNIVERSE (KONGLO + FUNDA)
+// =======================
+// Semua harus .JK karena ini ticker Yahoo untuk IHSG
+const IDX_UNIVERSE = [
+  // Big banks
+  "BBCA.JK",
+  "BBRI.JK",
+  "BMRI.JK",
+  "BBNI.JK",
+  "BTPS.JK",
+  "BNGA.JK",
+
+  // Consumer & FMCG
+  "UNVR.JK",
+  "ICBP.JK",
+  "INDF.JK",
+  "MYOR.JK",
+
+  // Cigarette
+  "HMSP.JK",
+  "GGRM.JK",
+
+  // Telco
+  "TLKM.JK",
+  "ISAT.JK",
+  "EXCL.JK",
+
+  // Energy, coal, O&G (konglo & big boys)
+  "ADRO.JK",
+  "PTBA.JK",
+  "ITMG.JK",
+  "HRUM.JK",
+  "INDY.JK",
+  "BSSR.JK",
+  "MBAP.JK",
+  "MEDC.JK",
+  "PGAS.JK",
+
+  // Prajogo group (Barito, renewables)
+  "BREN.JK",
+  "BRPT.JK",
+  "TPIA.JK",
+
+  // Metals & mining
+  "ANTM.JK",
+  "INCO.JK",
+  "MDKA.JK",
+  "PSAB.JK",
+
+  // Poultry / protein / "raja ratu mina" vibes
+  "CPIN.JK",
+  "JPFA.JK",
+  "MAIN.JK",
+  "PMMP.JK",
+
+  // Conglomerates & property
+  "ASII.JK",
+  "BSDE.JK",
+  "CTRA.JK",
+  "PWON.JK",
+  "SMRA.JK",
+  "PANI.JK",
+
+  // Infra / logistics
+  "JSMR.JK",
+  "TMAS.JK",
+];
 
 // =======================
 //  MAIN HANDLER
@@ -245,52 +299,9 @@ export default async function handler(req, res) {
 
     const yf = new YahooFinance();
 
-    // 1) Ambil kandidat dari Yahoo Screener (INDONESIA)
-    const screenerRes1 = await yf.screener({
-      scrIds: "day_gainers",
-      count: 30,
-      region: "JK",
-      lang: "id-ID",
-    });
-
-    const screenerRes2 = await yf.screener({
-      scrIds: "most_actives",
-      count: 30,
-      region: "JK",
-      lang: "id-ID",
-    });
-
-    const quotes1 = normalizeQuotes(screenerRes1);
-    const quotes2 = normalizeQuotes(screenerRes2);
-
-    // Map untuk dedupe symbol
-    const uniqueQuotesMap = new Map();
-    [...quotes1, ...quotes2].forEach((q) => {
-      if (q && q.symbol) uniqueQuotesMap.set(q.symbol, q);
-    });
-
-    const quotes = Array.from(uniqueQuotesMap.values());
-
-    // 🔥 HANYA saham IHSG (ticker Yahoo harus berakhiran .JK)
-    const symbols = [
-      ...new Set(
-        quotes
-          .map((q) => q.symbol)
-          .filter(
-            (s) =>
-              typeof s === "string" &&
-              s.length > 0 &&
-              s.toUpperCase().endsWith(".JK")
-          )
-      ),
-    ].slice(0, 40);
-
-    console.log(
-      "[AI-SCREENER] total quotes:",
-      quotes.length,
-      "| symbols(.JK only):",
-      symbols.length
-    );
+    // 1) Universe: list saham konglo + funda (IDX_UNIVERSE)
+    const symbols = IDX_UNIVERSE;
+    console.log("[AI-SCREENER] universe size:", symbols.length);
 
     const candidates = [];
     const allLastSnapshots = [];
@@ -309,13 +320,11 @@ export default async function handler(req, res) {
 
         const q = chartRes?.quotes ?? [];
 
-        // Kalau kosong / nggak ada OHLC, skip
         if (!Array.isArray(q) || q.length === 0) {
-          console.warn("No quotes for", symbol);
+          console.warn("[AI-SCREENER] No quotes for", symbol);
           continue;
         }
 
-        // Mapping ke bentuk StockData
         const stockData = q
           .map((row) => {
             if (
@@ -334,7 +343,7 @@ export default async function handler(req, res) {
                 : new Date(row.date ?? Date.now());
 
             return {
-              date: d.toISOString().slice(0, 10), // YYYY-MM-DD
+              date: d.toISOString().slice(0, 10),
               open: row.open,
               high: row.high,
               low: row.low,
@@ -344,10 +353,9 @@ export default async function handler(req, res) {
           })
           .filter(Boolean);
 
-        // Butuh minimal 60 bar untuk indikator lebih stabil
         if (stockData.length < 60) {
           console.warn(
-            "Not enough data for",
+            "[AI-SCREENER] Not enough data for",
             symbol,
             "bars:",
             stockData.length
@@ -362,7 +370,7 @@ export default async function handler(req, res) {
 
         allLastSnapshots.push({ symbol, last });
 
-        // ✅ Filter awal: hanya yang technicalConfidence >= 70
+        // Prefilter: buang yang teknikalnya jelek banget (threshold 55)
         if (last.technicalConfidence < 55) continue;
 
         candidates.push({
@@ -377,7 +385,7 @@ export default async function handler(req, res) {
           technicalConfidence: last.technicalConfidence,
         });
       } catch (err) {
-        console.error("Error processing symbol", symbol, err);
+        console.error("[AI-SCREENER] Error processing symbol", symbol, err);
       }
     }
 
@@ -388,12 +396,12 @@ export default async function handler(req, res) {
       candidates.length
     );
 
-    // Kalau bener-bener nggak ada yang lolos filter >=70 tapi data ada,
-    // fallback: pakai top 10 berdasarkan technicalConfidence.
+    // Kalau nggak ada yang lolos filter teknikal tapi data ada,
+    // fallback: ambil top 10 berdasarkan technicalConfidence dari semua snapshots.
     let effectiveCandidates = candidates;
     if (!effectiveCandidates.length && allLastSnapshots.length) {
       console.warn(
-        "[AI-SCREENER] No candidates with technicalConfidence>=55, falling back to top 10."
+        "[AI-SCREENER] No candidates with technicalConfidence>=55, falling back to top 10 from universe."
       );
       effectiveCandidates = allLastSnapshots
         .map(({ symbol, last }) => ({
@@ -415,11 +423,10 @@ export default async function handler(req, res) {
     }
 
     if (!effectiveCandidates.length) {
-      // Ini baru bener-bener kosong (nggak dapat data sama sekali)
       return res.status(200).json({
-        message: "No candidates found (no usable data from screener/quotes).",
-        quotes: quotes.length,
-        symbols: symbols.length,
+        message: "No candidates found from IDX_UNIVERSE (no usable OHLC).",
+        universeSize: symbols.length,
+        snapshots: allLastSnapshots.length,
       });
     }
 
@@ -443,9 +450,8 @@ export default async function handler(req, res) {
       4. Hindari saham gorengan yang tidak likuid jika memungkinkan.
       
       SANGAT PENTING:
-      - Hanya boleh memilih saham Indonesia yang kodenya di Yahoo Finance berakhiran ".JK".
+      - Semua ticker yang diberikan sudah dalam format Yahoo Finance (".JK").
       - Jangan pernah mengeluarkan ticker luar negeri (seperti AAPL, TSLA, NVDA, dll).
-      - Jika ingin memilih BBCA misalnya, gunakan "BBCA.JK" sebagai ticker.
       
       Input Data Kandidat:
       ${JSON.stringify(topCandidates)}
@@ -456,10 +462,10 @@ export default async function handler(req, res) {
           "ticker": "KODE.JK",
           "signal": "BUY",
           "confidence": number (0-100),
-          "entry": number (Harga Entry Ideal),
-          "tp1": number (Target Profit 1),
-          "tp2": number (Target Profit 2),
-          "stopLoss": number (Stop Loss),
+          "entry": number,
+          "tp1": number,
+          "tp2": number,
+          "stopLoss": number,
           "reasoning": "Alasan singkat padat dalam Bahasa Indonesia, gunakan istilah teknikal."
         }
       ]
@@ -467,7 +473,7 @@ export default async function handler(req, res) {
       PENTING:
       - Hanya berikan output JSON murni.
       - Pastikan harga Entry, TP, SL logis sesuai fraksi harga saham Indonesia.
-      - Hanya sertakan saham dengan confidence > 55.
+      - Hanya sertakan saham dengan confidence >= 70.
     `;
 
     const model = genAI.getGenerativeModel({
@@ -492,7 +498,7 @@ export default async function handler(req, res) {
         }
       }
     } catch (e) {
-      console.error("Failed to parse Gemini JSON", e, text);
+      console.error("[AI-SCREENER] Failed to parse Gemini JSON", e, text);
       return res
         .status(500)
         .json({ error: "Gemini JSON parse error", raw: text });
@@ -514,14 +520,14 @@ export default async function handler(req, res) {
           continue;
         }
 
-        // ✅ Filter: hanya BUY, confidence >= 70
-        if (p.signal !== "BUY" || (p.confidence ?? 0) < 55) continue;
+        // Hanya BUY, confidence >= 70
+        if (p.signal !== "BUY" || (p.confidence ?? 0) < 70) continue;
 
         const rawTicker = String(p.ticker || "")
           .toUpperCase()
           .trim();
 
-        // ✅ HARD FILTER: hanya ticker .JK yang kita terima
+        // HARD FILTER: hanya ticker .JK yang kita terima
         if (!rawTicker.endsWith(".JK")) {
           console.warn("[AI-SCREENER] Skip non-JK ticker from AI:", rawTicker);
           continue;
@@ -550,17 +556,16 @@ export default async function handler(req, res) {
         await pool.query(query, values);
         inserted++;
       } catch (e) {
-        console.error("Failed inserting pick", p, e);
+        console.error("[AI-SCREENER] Failed inserting pick", p, e);
       }
     }
 
     return res.status(200).json({
       message: "AI screener run complete",
       inserted,
+      universeSize: symbols.length,
       totalCandidatesAfterFilter: effectiveCandidates.length,
       totalRawSnapshots: allLastSnapshots.length,
-      totalQuotes: quotes.length,
-      totalSymbols: symbols.length,
     });
   } catch (error) {
     console.error("cron-ai-screener error:", error);
