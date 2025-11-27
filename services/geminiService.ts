@@ -23,7 +23,7 @@ export const analyzeStockWithGemini = async (
        - If Bearish: Signal 'SELL' (Short Sell). Entry > TP. Label targets clearly as 'Target (Downside)'.`;
 
   const prompt = `
-    You are "The Oracle", a ruthless Wall Street Quantitative Developer and Senior Trader.
+    You are "The Oracle", a ruthless Wall Street Quantitative Developer and Senior Trader with BNSP Certified Technical Analyst and a Masters degree on Finance.
     Analyze the following technical indicators for the asset: ${ticker}.
 
     Recent Data (Last 5 periods):
