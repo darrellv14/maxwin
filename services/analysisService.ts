@@ -92,3 +92,16 @@ export const updateAnalysisStatus = async (): Promise<{
     throw error;
   }
 };
+
+export const getAIPicks = async (): Promise<AnalysisRecord[]> => {
+  try {
+    const response = await fetch("/api/ai-picks");
+    if (!response.ok) {
+      throw new Error("Failed to fetch AI picks");
+    }
+    return await response.json();
+  } catch (error) {
+    console.error("Error fetching AI picks:", error);
+    return [];
+  }
+};

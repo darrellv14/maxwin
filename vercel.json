@@ -1,6 +1,18 @@
 {
+  "crons": [
+    {
+      "path": "/api/cron-ai-screener",
+      "schedule": "0 10 * * 1-5"
+    }
+  ],
   "rewrites": [
-    { "source": "/api/(.*)", "destination": "/api/$1.js" },
-    { "source": "/(.*)", "destination": "/index.html" }
+    {
+      "source": "/api/(.*)",
+      "destination": "/api/$1.js"
+    },
+    {
+      "source": "/(.*)",
+      "destination": "/index.html"
+    }
   ]
 }

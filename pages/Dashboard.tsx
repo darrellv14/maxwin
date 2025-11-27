@@ -114,6 +114,13 @@ const Dashboard: React.FC = () => {
 
           <div className="flex items-center gap-4">
             <Link
+              to="/screener"
+              className="text-xs font-mono bg-gray-900 px-3 py-1 rounded-full border border-gray-800 hover:bg-gray-800 text-profit-green transition-colors flex items-center gap-2"
+            >
+              <span className="w-2 h-2 bg-profit-green rounded-full animate-pulse"></span>
+              AI SCREENER
+            </Link>
+            <Link
               to="/history"
               className="text-xs font-mono bg-gray-900 px-3 py-1 rounded-full border border-gray-800 hover:bg-gray-800 text-gray-300 transition-colors"
             >
