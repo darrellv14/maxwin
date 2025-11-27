@@ -209,68 +209,80 @@ const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "");
 // =======================
 // Semua harus .JK karena ini ticker Yahoo untuk IHSG
 const IDX_UNIVERSE = [
-  // Big banks
+  // --- 1. BIG BANKS (The Movers) ---
   "BBCA.JK",
   "BBRI.JK",
   "BMRI.JK",
   "BBNI.JK",
-  "BTPS.JK",
-  "BNGA.JK",
+  "BNGA.JK", // Tier 2 Dividend Play
 
-  // Consumer & FMCG
-  "UNVR.JK",
+  // --- 2. DIGITAL BANKS (Tech & Volatile) ---
+  "ARTO.JK", // GoTo Ecosystem (Jerry Ng)
+  "BBHI.JK", // Allo Bank (Chairul Tanjung)
+  "BBYB.JK", // Akulaku (Sering volatile)
+  "BANK.JK", // Aladin (Syariah digital)
+
+  // --- 3. PRAJOGO PANGESTU (The "Barito Boys" - High Beta) ---
+  "BREN.JK", // Renewable Energy (Market Cap Giant)
+  "BRPT.JK", // Induk Barito
+  "TPIA.JK", // Petrochemical
+  "CUAN.JK", // Coal mining (Sering terbang tinggi)
+  "PTRO.JK", // Konstruksi tambang (Baru diakuisisi Prajogo)
+  "CDIA.JK", // Petrosea (Holding)
+
+  // --- 4. BAKRIE x SALIM (Mineral & Gold - "Harta Karun") ---
+  "BRMS.JK", // Emas (Trending kuat akhir 2024 - 2025)
+  "BUMI.JK", // Coal (The legend of retail)
+  "AMMN.JK", // Tembaga/Emas (Salim & Medco - Monster IPO)
+  "DEWA.JK", // Konstruksi (Sering digoreng isunya)
+  "ENRG.JK", // Oil & Gas Bakrie
+
+  // --- 5. AGUAN / AGUNG SEDAYU / PIK (Property & Infra) ---
+  "PANI.JK", // PIK 2 (Primadona Property Aguan)
+  "NICE.JK", // Nikel (Sempat hype, sering volatile)
+  "BSDE.JK", // BSD City (Fundamental Property)
+  "SMRA.JK", // Summarecon
+  "CTRA.JK", // Ciputra
+  "ASRI.JK", // Alam Sutera
+  "CBDK.JK", // Alam Sutera
+
+  // --- 6. HAJI ISAM & COAL TRADING (Kalimantan Power) ---
+  "JARR.JK", // Jhonlin Agro (Sawit Haji Isam)
+  "SGER.JK", // Coal Trading (Sering ARA/ARB, hati-hati)
+  "ADRO.JK", // Adaro (Mau spin off AADI, lagi hot)
+
+  // --- 7. CONSUMER, RETAIL & POULTRY ---
   "ICBP.JK",
-  "INDF.JK",
   "MYOR.JK",
+  "AMRT.JK", // Alfamart (Defensive growth)
+  "MIDI.JK", // Alfamidi
+  "CPIN.JK", // Charoen
+  "JPFA.JK", // Japfa
 
-  // Cigarette
-  "HMSP.JK",
-  "GGRM.JK",
+  // --- 8. GORENGAN PREMIUM / TRENDING / IPO BARU ---
+  "DAAZ.JK", // Data center/Tech services (Trending IPO late 2024)
+  "MLPT.JK", // Multipolar (Grup Lippo, sempat terbang gila-gilaan)
+  "AWAN.JK", // Tech/Cloud (Small cap volatile)
+  "PYFA.JK", // Pharma (Sering bergerak liar)
+  "INET.JK", // ISP (Gorengan receh)
+  "BOAT.JK", // Shipping (Sering main di running trade)
+  "DATA.JK", // Data center play
 
-  // Telco
+  // --- 9. TECH & TELCO ---
+  "GOTO.JK", // Ecosystem play (Patrick Walujo)
   "TLKM.JK",
   "ISAT.JK",
   "EXCL.JK",
+  "RATU.JK",
+  "MINA.JK",
+  "RAJA.JK",
 
-  // Energy, coal, O&G (konglo & big boys)
-  "ADRO.JK",
-  "PTBA.JK",
-  "ITMG.JK",
-  "HRUM.JK",
-  "INDY.JK",
-  "BSSR.JK",
-  "MBAP.JK",
-  "MEDC.JK",
+  // --- 10. COMMODITY & ENERGY OTHERS ---
+  "MEDC.JK", // Oil & Gas (Panigoro)
   "PGAS.JK",
-
-  // Prajogo group (Barito, renewables)
-  "BREN.JK",
-  "BRPT.JK",
-  "TPIA.JK",
-
-  // Metals & mining
-  "ANTM.JK",
-  "INCO.JK",
-  "MDKA.JK",
-  "PSAB.JK",
-
-  // Poultry / protein / "raja ratu mina" vibes
-  "CPIN.JK",
-  "JPFA.JK",
-  "MAIN.JK",
-  "PMMP.JK",
-
-  // Conglomerates & property
-  "ASII.JK",
-  "BSDE.JK",
-  "CTRA.JK",
-  "PWON.JK",
-  "SMRA.JK",
-  "PANI.JK",
-
-  // Infra / logistics
-  "JSMR.JK",
-  "TMAS.JK",
+  "ANTM.JK", // Emas/Nikel BUMN
+  "MDKA.JK", // Saratogo/Boy Thohir
+  "INKP.JK", // Pulp & Paper (Sinarmas)
 ];
 
 // =======================
