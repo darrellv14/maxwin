@@ -6,10 +6,15 @@ from typing import List
 from datetime import datetime
 import os
 import tempfile
+import sys
+
+sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 # Set cache directory for yfinance to a writable location
 cache_dir = os.path.join(tempfile.gettempdir(), "yfinance_cache")
-os.environ['XDG_CACHE_HOME'] = cache_dir
+os.environ["XDG_CACHE_HOME"] = cache_dir
+
+# Add current directory to sys.path to fix import issues on Vercel
 
 import yfinance as yf  # noqa: E402
 from database import init_db, get_db, AnalysisHistory  # noqa: E402
@@ -71,7 +76,7 @@ def create_analysis(analysis: AnalysisCreate, db: Session = Depends(get_db)):
         stop_loss=analysis.stop_loss,
         reasoning=analysis.reasoning,
         highest_price=analysis.entry_price,
-        lowest_price=analysis.entry_price
+        lowest_price=analysis.entry_price,
     )
     db.add(db_analysis)
     db.commit()
@@ -82,9 +87,11 @@ def create_analysis(analysis: AnalysisCreate, db: Session = Depends(get_db)):
 @app.get("/_svc/analysis", response_model=List[AnalysisResponse])
 def get_analysis_history(db: Session = Depends(get_db)):
     # Fetch all active analysis to update their status
-    active_analyses = db.query(AnalysisHistory).filter(
-        AnalysisHistory.status == "ACTIVE"
-    ).all()
+    active_analyses = (
+        db.query(AnalysisHistory)
+        .filter(AnalysisHistory.status == "ACTIVE")
+        .all()
+    )
 
     for analysis in active_analyses:
         try:
@@ -123,9 +130,11 @@ def get_analysis_history(db: Session = Depends(get_db)):
             print(f"Error updating analysis {analysis.id}: {e}")
             continue
 
-    return db.query(AnalysisHistory).order_by(
-        AnalysisHistory.date_created.desc()
-    ).all()
+    return (
+        db.query(AnalysisHistory)
+        .order_by(AnalysisHistory.date_created.desc())
+        .all()
+    )
 
 
 @app.get("/_svc/data")
@@ -164,8 +173,7 @@ def get_stock_history(ticker: str, period: str = "3mo"):
         print(f"Error fetching stock data: {e}")
         # Return the error message to the client for debugging
         raise HTTPException(
-            status_code=500,
-            detail=f"Stock data error: {str(e)}"
+            status_code=500, detail=f"Stock data error: {str(e)}"
         )
 
 
@@ -193,6 +201,5 @@ def get_stock_quote(ticker: str):
     except Exception as e:
         print(f"Error fetching live quote: {e}")
         raise HTTPException(
-            status_code=500,
-            detail=f"Live quote error: {str(e)}"
+            status_code=500, detail=f"Live quote error: {str(e)}"
         )
