@@ -85,8 +85,13 @@ def create_analysis(analysis: AnalysisCreate, db: Session = Depends(get_db)):
 
 
 @app.get("/_svc/analysis", response_model=List[AnalysisResponse])
-def get_analysis_history(db: Session = Depends(get_db)):
+def get_analysis_history(
+    limit: int = 5, 
+    offset: int = 0, 
+    db: Session = Depends(get_db)
+):
     # Fetch all active analysis to update their status
+    # Note: In a production app, this should be a background job
     active_analyses = (
         db.query(AnalysisHistory)
         .filter(AnalysisHistory.status == "ACTIVE")
@@ -133,6 +138,8 @@ def get_analysis_history(db: Session = Depends(get_db)):
     return (
         db.query(AnalysisHistory)
         .order_by(AnalysisHistory.date_created.desc())
+        .limit(limit)
+        .offset(offset)
         .all()
     )
 

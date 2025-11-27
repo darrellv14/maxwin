@@ -52,9 +52,9 @@ export const saveAnalysis = async (analysis: AIAnalysisResult, ticker: string) =
   }
 };
 
-export const getAnalysisHistory = async (): Promise<AnalysisRecord[]> => {
+export const getAnalysisHistory = async (limit: number = 5, offset: number = 0): Promise<AnalysisRecord[]> => {
   try {
-    const response = await fetch('/_svc/analysis');
+    const response = await fetch(`/_svc/analysis?limit=${limit}&offset=${offset}`);
     if (!response.ok) {
       throw new Error('Failed to fetch history');
     }
