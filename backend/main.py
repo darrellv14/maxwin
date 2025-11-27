@@ -7,7 +7,6 @@ from datetime import datetime
 import yfinance as yf
 import uvicorn
 import os
-import google.generativeai as genai
 from database import init_db, get_db, AnalysisHistory
 
 app = FastAPI()
@@ -15,9 +14,6 @@ app = FastAPI()
 
 # Initialize Database
 init_db()
-
-# Configure Gemini
-genai.configure(api_key=os.getenv("VITE_GEMINI_API_KEY"))
 
 # Allow CORS for local development & Production
 origins = [
@@ -46,10 +42,6 @@ class AnalysisCreate(BaseModel):
     reasoning: str
 
 
-class AnalysisRequest(BaseModel):
-    prompt: str
-
-
 class AnalysisResponse(AnalysisCreate):
     id: int
     date_created: datetime
@@ -59,16 +51,6 @@ class AnalysisResponse(AnalysisCreate):
 
     class Config:
         orm_mode = True
-
-
-@app.post("/_svc/generate")
-def generate_ai_content(request: AnalysisRequest):
-    try:
-        model = genai.GenerativeModel('gemini-2.5-flash')
-        response = model.generate_content(request.prompt)
-        return {"text": response.text}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
 
 
 @app.post("/_svc/analysis", response_model=AnalysisResponse)

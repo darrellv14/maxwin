@@ -1,4 +1,8 @@
 import { IndicatorData, AIAnalysisResult, SignalType } from '../types';
+import { GoogleGenerativeAI } from "@google/generative-ai";
+
+// Initialize Gemini API
+const genAI = new GoogleGenerativeAI(import.meta.env.VITE_GEMINI_API_KEY || "");
 
 export const analyzeStockWithGemini = async (
   ticker: string, 
@@ -57,42 +61,32 @@ export const analyzeStockWithGemini = async (
   `;
 
   try {
-    const response = await fetch('/_svc/generate', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        prompt: prompt
-      })
-    });
-
-    if (!response.ok) {
-      throw new Error('Failed to generate analysis');
-    }
-
-    const data = await response.json();
-    const text = data.text;
+    // Use the user requested model or fallback to standard flash
+    const model = genAI.getGenerativeModel({ model: "gemini-2.5-pro" });
+    
+    const result = await model.generateContent(prompt);
+    const response = await result.response;
+    const text = response.text();
     
     if (!text) throw new Error("No response from Gemini");
 
     // Clean up markdown code blocks if present
     const cleanText = text.replace(/```json\n?|\n?```/g, '').trim();
-    const result = JSON.parse(cleanText);
+    const parsedResult = JSON.parse(cleanText);
 
     let signalEnum = SignalType.HOLD;
-    if (result.signal === 'BUY') signalEnum = SignalType.BUY;
-    if (result.signal === 'SELL') signalEnum = SignalType.SELL;
+    if (parsedResult.signal === 'BUY') signalEnum = SignalType.BUY;
+    if (parsedResult.signal === 'SELL') signalEnum = SignalType.SELL;
 
     return {
       signal: signalEnum,
-      confidence: result.confidence,
-      reasoning: result.reasoning,
-      entryArea: result.entryArea || 'N/A',
-      stopLoss: result.stopLoss || 'N/A',
-      takeProfit1: result.takeProfit1 || 'N/A',
-      takeProfit2: result.takeProfit2 || 'N/A',
-      predictionTime: result.predictionTime || 'Unknown'
+      confidence: parsedResult.confidence,
+      reasoning: parsedResult.reasoning,
+      entryArea: parsedResult.entryArea || 'N/A',
+      stopLoss: parsedResult.stopLoss || 'N/A',
+      takeProfit1: parsedResult.takeProfit1 || 'N/A',
+      takeProfit2: parsedResult.takeProfit2 || 'N/A',
+      predictionTime: parsedResult.predictionTime || 'Unknown'
     };
 
   } catch (error) {
