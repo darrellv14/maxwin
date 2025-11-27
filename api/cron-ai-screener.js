@@ -227,18 +227,32 @@ export default async function handler(req, res) {
 
     // 1) Ambil kandidat dari Yahoo Screener (INDONESIA)
     //    Region: ID, Lang: id-ID
-    const screenerRes = await yf.screener({
-      scrIds: ["day_gainers", "most_actives"],
-      count: 60,
+    //    NOTE: scrIds harus string satu per satu, tidak bisa array sekaligus.
+    const screenerRes1 = await yf.screener({
+      scrIds: "day_gainers",
+      count: 30,
       region: "ID",
       lang: "id-ID",
     });
 
-    // Struktur tergantung versi lib → paksa ke bentuk aman
-    const quotes =
-      Array.isArray(screenerRes?.quotes) && screenerRes.quotes.length
-        ? screenerRes.quotes
-        : screenerRes?.finance?.result?.[0]?.quotes ?? [];
+    const screenerRes2 = await yf.screener({
+      scrIds: "most_actives",
+      count: 30,
+      region: "ID",
+      lang: "id-ID",
+    });
+
+    // Gabungkan hasil dan deduplikasi
+    const quotes1 = screenerRes1?.quotes || [];
+    const quotes2 = screenerRes2?.quotes || [];
+    
+    // Map untuk deduplikasi berdasarkan symbol
+    const uniqueQuotesMap = new Map();
+    [...quotes1, ...quotes2].forEach(q => {
+      if (q.symbol) uniqueQuotesMap.set(q.symbol, q);
+    });
+
+    const quotes = Array.from(uniqueQuotesMap.values());
 
     const symbols = [
       ...new Set(
