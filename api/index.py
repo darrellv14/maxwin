@@ -5,9 +5,11 @@ from pydantic import BaseModel
 from typing import List
 from datetime import datetime
 import os
+import tempfile
 
-# Set cache directory for yfinance to /tmp for serverless environments
-os.environ['XDG_CACHE_HOME'] = '/tmp/cache'
+# Set cache directory for yfinance to a writable location
+cache_dir = os.path.join(tempfile.gettempdir(), "yfinance_cache")
+os.environ['XDG_CACHE_HOME'] = cache_dir
 
 import yfinance as yf  # noqa: E402
 from database import init_db, get_db, AnalysisHistory  # noqa: E402

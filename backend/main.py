@@ -9,9 +9,11 @@ from fastapi import Depends, FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
+import tempfile
 
-# Set cache directory for yfinance to /tmp for serverless environments
-os.environ["XDG_CACHE_HOME"] = "/tmp/cache"
+# Set cache directory for yfinance to a writable location
+cache_dir = os.path.join(tempfile.gettempdir(), "yfinance_cache")
+os.environ["XDG_CACHE_HOME"] = cache_dir
 
 app = FastAPI()
 
