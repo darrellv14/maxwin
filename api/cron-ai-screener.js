@@ -249,14 +249,14 @@ export default async function handler(req, res) {
     const screenerRes1 = await yf.screener({
       scrIds: "day_gainers",
       count: 30,
-      region: "ID",
+      region: "JK",
       lang: "id-ID",
     });
 
     const screenerRes2 = await yf.screener({
       scrIds: "most_actives",
       count: 30,
-      region: "ID",
+      region: "JK",
       lang: "id-ID",
     });
 
