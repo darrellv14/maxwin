@@ -289,33 +289,47 @@ export default async function handler(req, res) {
     const candidates = [];
     const allLastSnapshots = [];
 
-    // 2) Untuk tiap symbol → ambil OHLC 6 bulan + hitung indikator
+    // 2) Untuk tiap symbol → ambil OHLC ~6 bulan + hitung indikator
     for (const symbol of symbols) {
       try {
+        // 6 bulan ke belakang
+        const sixMonthsAgo = new Date();
+        sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
+
         const chartRes = await yf.chart(symbol, {
-          range: "6mo",
+          // docs: period1 & period2, tidak ada "range"
+          // period1 boleh Date atau string "YYYY-MM-DD"
+          period1: sixMonthsAgo,
           interval: "1d",
+          // default return = "array" → result.quotes[]
         });
 
-        // FIX: Gunakan properti .quotes dari yahoo-finance2 (bukan raw indicators)
-        const quotes = chartRes?.quotes;
-        
-        if (!Array.isArray(quotes) || quotes.length < 60) continue;
+        const quotes = chartRes?.quotes ?? [];
 
+        // Kalau kosong / nggak ada OHLC, skip
+        if (!Array.isArray(quotes) || quotes.length === 0) {
+          console.warn("No quotes for", symbol);
+          continue;
+        }
+
+        // Mapping ke bentuk StockData
         const stockData = quotes
           .map((q) => {
             if (
-              q.close == null ||
               q.open == null ||
               q.high == null ||
               q.low == null ||
+              q.close == null ||
               q.volume == null
             ) {
               return null;
             }
 
             return {
-              date: q.date instanceof Date ? q.date.toISOString().slice(0, 10) : new Date(q.date).toISOString().slice(0, 10),
+              date:
+                q.date instanceof Date
+                  ? q.date.toISOString().slice(0, 10)
+                  : new Date(q.date).toISOString().slice(0, 10), // YYYY-MM-DD
               open: q.open,
               high: q.high,
               low: q.low,
@@ -325,7 +339,16 @@ export default async function handler(req, res) {
           })
           .filter(Boolean);
 
-        if (stockData.length < 60) continue;
+        // Butuh minimal 60 bar untuk indikator lebih stabil
+        if (stockData.length < 60) {
+          console.warn(
+            "Not enough data for",
+            symbol,
+            "bars:",
+            stockData.length
+          );
+          continue;
+        }
 
         const indicators = calculateIndicators(stockData);
         const last = indicators[indicators.length - 1];
@@ -334,8 +357,8 @@ export default async function handler(req, res) {
 
         allLastSnapshots.push({ symbol, last });
 
-        // Filter awal: hanya yang technicalConfidence > 55
-        if (last.technicalConfidence < 55) continue;
+        // Filter awal: hanya yang technicalConfidence > 30
+        if (last.technicalConfidence < 30) continue;
 
         candidates.push({
           ticker: symbol,
