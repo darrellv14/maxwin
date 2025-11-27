@@ -17,7 +17,10 @@ app = FastAPI()
 
 
 # Initialize Database
-init_db()
+try:
+    init_db()
+except Exception as e:
+    print(f"Database initialization failed: {e}")
 
 # Allow CORS for local development & Production
 origins = [
@@ -80,7 +83,9 @@ def create_analysis(analysis: AnalysisCreate, db: Session = Depends(get_db)):
 def get_analysis_history(db: Session = Depends(get_db)):
     # Fetch all active analysis to update their status
     active_analyses = (
-        db.query(AnalysisHistory).filter(AnalysisHistory.status == "ACTIVE").all()
+        db.query(AnalysisHistory)
+        .filter(AnalysisHistory.status == "ACTIVE")
+        .all()
     )
 
     for analysis in active_analyses:
@@ -126,7 +131,11 @@ def get_analysis_history(db: Session = Depends(get_db)):
             print(f"Error updating analysis {analysis.id}: {e}")
             continue
 
-    return db.query(AnalysisHistory).order_by(AnalysisHistory.date_created.desc()).all()
+    return (
+        db.query(AnalysisHistory)
+        .order_by(AnalysisHistory.date_created.desc())
+        .all()
+    )
 
 
 @app.get("/_svc/data")

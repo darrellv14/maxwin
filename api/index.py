@@ -9,14 +9,17 @@ import os
 # Set cache directory for yfinance to /tmp for serverless environments
 os.environ['XDG_CACHE_HOME'] = '/tmp/cache'
 
-import yfinance as yf
-from database import init_db, get_db, AnalysisHistory
+import yfinance as yf  # noqa: E402
+from database import init_db, get_db, AnalysisHistory  # noqa: E402
 
 app = FastAPI()
 
 
 # Initialize Database
-init_db()
+try:
+    init_db()
+except Exception as e:
+    print(f"Database initialization failed: {e}")
 
 # Allow CORS - Restricted to your domain
 origins = [
@@ -158,7 +161,10 @@ def get_stock_history(ticker: str, period: str = "3mo"):
     except Exception as e:
         print(f"Error fetching stock data: {e}")
         # Return the error message to the client for debugging
-        raise HTTPException(status_code=500, detail=f"Stock data error: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Stock data error: {str(e)}"
+        )
 
 
 @app.get("/_svc/live")
@@ -184,4 +190,7 @@ def get_stock_quote(ticker: str):
         }
     except Exception as e:
         print(f"Error fetching live quote: {e}")
-        raise HTTPException(status_code=500, detail=f"Live quote error: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Live quote error: {str(e)}"
+        )
