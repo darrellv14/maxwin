@@ -254,20 +254,31 @@ export default async function handler(req, res) {
 
     const quotes = Array.from(uniqueQuotesMap.values());
 
+    // DEBUG: Log raw quotes count
+    console.log(`[AI-SCREENER] Raw quotes found: ${quotes.length}`);
+
     const symbols = [
       ...new Set(
         quotes
           .map((q) => q.symbol)
           .filter(
-            (s) => typeof s === "string" && s.length > 0 && s.endsWith(".JK")
-          ) // Pastikan saham Indo
+            (s) => typeof s === "string" && s.length > 0
+          )
+          // Pastikan format .JK (kadang Yahoo balikin tanpa .JK kalau region ID, tapi biasanya pakai)
+          // Kita akan append .JK jika belum ada, khusus untuk screener ID
+          .map(s => s.endsWith(".JK") ? s : `${s}.JK`)
       ),
     ].slice(0, 40); // batasi supaya nggak kebanyakan
 
+    console.log(`[AI-SCREENER] Processing ${symbols.length} symbols: ${symbols.join(", ")}`);
+
     const candidates = [];
+    let processedCount = 0;
+    let passedTechCount = 0;
 
     // 2) Untuk tiap symbol → ambil OHLC 6 bulan + hitung indikator
     for (const symbol of symbols) {
+      processedCount++;
       try {
         const chartRes = await yf.chart(symbol, {
           range: "6mo",
@@ -318,6 +329,7 @@ export default async function handler(req, res) {
         // Filter awal: Hanya yang confidence teknikalnya lumayan (>55)
         if (last.technicalConfidence < 55) continue;
 
+        passedTechCount++;
         candidates.push({
           ticker: symbol,
           lastClose: last.close,
@@ -335,7 +347,15 @@ export default async function handler(req, res) {
     }
 
     if (!candidates.length) {
-      return res.status(200).json({ message: "No candidates found" });
+      return res.status(200).json({ 
+        message: "No candidates found", 
+        debug: {
+          rawQuotes: quotes.length,
+          processedSymbols: symbols.length,
+          processedCount,
+          passedTechCount
+        }
+      });
     }
 
     // Sort lokal dulu by technicalConfidence, ambil top 15 buat AI
@@ -381,7 +401,7 @@ export default async function handler(req, res) {
     `;
 
     const model = genAI.getGenerativeModel({
-      model: "gemini-2.5-flash",
+      model: "gemini-1.5-flash",
       generationConfig: {
         responseMimeType: "application/json",
       },
