@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
-import { getAnalysisHistory, AnalysisRecord } from '../services/analysisService';
+import { getAnalysisHistory, updateAnalysisStatus, AnalysisRecord } from '../services/analysisService';
 import { Link } from 'react-router-dom';
-import { ChevronDown, Loader2 } from 'lucide-react';
+import { ChevronDown, Loader2, RefreshCw } from 'lucide-react';
 
 const ITEMS_PER_PAGE = 5;
 
@@ -9,6 +9,7 @@ const History: React.FC = () => {
   const [history, setHistory] = useState<AnalysisRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
+  const [updatingStatus, setUpdatingStatus] = useState(false);
   const [offset, setOffset] = useState(0);
   const [hasMore, setHasMore] = useState(true);
 
@@ -45,6 +46,21 @@ const History: React.FC = () => {
     fetchHistory(newOffset, true);
   };
 
+  const handleRefreshStatus = async () => {
+    setUpdatingStatus(true);
+    try {
+      await updateAnalysisStatus();
+      // Reload history after update
+      setOffset(0);
+      setHasMore(true);
+      await fetchHistory(0, false);
+    } catch (error) {
+      console.error("Failed to update status", error);
+    } finally {
+      setUpdatingStatus(false);
+    }
+  };
+
   const getStatusColor = (status: string) => {
     if (status.includes("TP")) return "text-profit-green";
     if (status.includes("SL")) return "text-loss-red";
@@ -58,9 +74,19 @@ const History: React.FC = () => {
           <h1 className="text-2xl font-bold font-mono text-white">
             ANALYSIS <span className="text-profit-green">HISTORY</span>
           </h1>
-          <Link to="/" className="bg-gray-800 hover:bg-gray-700 text-white px-4 py-2 rounded border border-gray-700 font-mono text-sm">
-            ← BACK TO TERMINAL
-          </Link>
+          <div className="flex gap-3">
+            <button 
+              onClick={handleRefreshStatus}
+              disabled={updatingStatus || loading}
+              className="flex items-center gap-2 bg-gray-800 hover:bg-gray-700 text-white px-4 py-2 rounded border border-gray-700 font-mono text-sm transition-all disabled:opacity-50"
+            >
+              <RefreshCw className={`w-4 h-4 ${updatingStatus ? 'animate-spin' : ''}`} />
+              {updatingStatus ? 'UPDATING...' : 'REFRESH PRICES'}
+            </button>
+            <Link to="/" className="bg-gray-800 hover:bg-gray-700 text-white px-4 py-2 rounded border border-gray-700 font-mono text-sm">
+              ← BACK TO TERMINAL
+            </Link>
+          </div>
         </div>
 
         <div className="bg-terminal-gray border border-gray-800 rounded-lg overflow-hidden mb-8">

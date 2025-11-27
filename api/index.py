@@ -90,14 +90,26 @@ def get_analysis_history(
     offset: int = 0, 
     db: Session = Depends(get_db)
 ):
+    # Just return the data, don't update prices here (too slow)
+    return (
+        db.query(AnalysisHistory)
+        .order_by(AnalysisHistory.date_created.desc())
+        .limit(limit)
+        .offset(offset)
+        .all()
+    )
+
+
+@app.post("/_svc/update-status")
+def update_analysis_status(db: Session = Depends(get_db)):
     # Fetch all active analysis to update their status
-    # Note: In a production app, this should be a background job
     active_analyses = (
         db.query(AnalysisHistory)
         .filter(AnalysisHistory.status == "ACTIVE")
         .all()
     )
 
+    updated_count = 0
     for analysis in active_analyses:
         try:
             # Fetch current price and day's high/low
@@ -131,17 +143,12 @@ def get_analysis_history(
                     analysis.status = "SL HIT"
 
             db.commit()
+            updated_count += 1
         except Exception as e:
             print(f"Error updating analysis {analysis.id}: {e}")
             continue
-
-    return (
-        db.query(AnalysisHistory)
-        .order_by(AnalysisHistory.date_created.desc())
-        .limit(limit)
-        .offset(offset)
-        .all()
-    )
+            
+    return {"message": "Status updated", "updated_count": updated_count}
 
 
 @app.get("/_svc/data")

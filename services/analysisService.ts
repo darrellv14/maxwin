@@ -64,3 +64,18 @@ export const getAnalysisHistory = async (limit: number = 5, offset: number = 0):
     throw error;
   }
 };
+
+export const updateAnalysisStatus = async (): Promise<{ message: string, updated_count: number }> => {
+  try {
+    const response = await fetch('/_svc/update-status', {
+      method: 'POST',
+    });
+    if (!response.ok) {
+      throw new Error('Failed to update status');
+    }
+    return await response.json();
+  } catch (error) {
+    console.error('Error updating status:', error);
+    throw error;
+  }
+};
