@@ -1,9 +1,10 @@
 import { StockData, IndicatorData, TimeFrame } from '../types';
 
-// Fetch real stock data from Python Backend (yfinance)
+// Fetch real stock data from Node.js Backend (yahoo-finance2)
 export const fetchStockData = async (ticker: string, timeframe: TimeFrame): Promise<StockData[]> => {
   try {
-    const response = await fetch(`/_svc/data?ticker=${ticker}&period=${timeframe}`);
+    // Use the new Node.js endpoint
+    const response = await fetch(`/api/market?ticker=${ticker}&period=${timeframe}`);
     if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
     }
