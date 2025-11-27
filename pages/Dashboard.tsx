@@ -2,7 +2,12 @@ import React, { useState, useEffect, useMemo } from "react";
 import { fetchStockData, calculateIndicators } from "../services/stockService";
 import { analyzeStockWithGemini } from "../services/geminiService";
 import { saveAnalysis } from "../services/analysisService";
-import { StockData, IndicatorData, TimeFrame, AIAnalysisResult } from "../types";
+import {
+  StockData,
+  IndicatorData,
+  TimeFrame,
+  AIAnalysisResult,
+} from "../types";
 import FinancialChart from "../components/FinancialChart";
 import StatCard from "../components/StatCard";
 import OraclePanel from "../components/OraclePanel";
@@ -103,10 +108,15 @@ const Dashboard: React.FC = () => {
             <h1 className="text-xl font-bold tracking-tight text-white font-mono">
               MOO<span className="text-profit-green">CUAN</span>
               <span className="text-gray-600 text-sm ml-1">v1.0</span>
+              <span className="text-gray-500 text-xs ml-3">by Darrell</span>
             </h1>
           </div>
+
           <div className="flex items-center gap-4">
-            <Link to="/history" className="text-xs font-mono bg-gray-900 px-3 py-1 rounded-full border border-gray-800 hover:bg-gray-800 text-gray-300 transition-colors">
+            <Link
+              to="/history"
+              className="text-xs font-mono bg-gray-900 px-3 py-1 rounded-full border border-gray-800 hover:bg-gray-800 text-gray-300 transition-colors"
+            >
               VIEW HISTORY
             </Link>
           </div>
@@ -130,7 +140,7 @@ const Dashboard: React.FC = () => {
                   onKeyDown={handleKeyDown}
                   className="w-full bg-black border border-gray-700 text-white px-3 py-2 rounded focus:outline-none focus:border-profit-green font-mono font-bold uppercase"
                 />
-                <button 
+                <button
                   onClick={handleSearch}
                   className="bg-gray-800 hover:bg-gray-700 text-white px-3 rounded border border-gray-700"
                 >
@@ -218,7 +228,7 @@ const Dashboard: React.FC = () => {
 
             {/* New Confidence Chart in Sidebar */}
             <div className="flex-1 flex flex-col">
-               <ConfidenceChart data={data} />
+              <ConfidenceChart data={data} />
             </div>
           </div>
 
