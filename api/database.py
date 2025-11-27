@@ -1,6 +1,7 @@
 from sqlalchemy import (
     create_engine, Column, Integer, String, Float, DateTime, Text
 )
+from sqlalchemy.pool import NullPool
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 from datetime import datetime
@@ -16,7 +17,13 @@ load_dotenv(dotenv_path=env_path)
 DATABASE_URL = os.getenv("DATABASE_URL")
 
 if DATABASE_URL:
-    engine = create_engine(DATABASE_URL)
+    # Use NullPool for Supabase Transaction Pooler in Serverless environment
+    # This prevents "pool-within-a-pool" issues and connection exhaustion
+    engine = create_engine(
+        DATABASE_URL,
+        pool_pre_ping=True,
+        poolclass=NullPool
+    )
     SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 else:
     # Fallback for build/test environments without DB
