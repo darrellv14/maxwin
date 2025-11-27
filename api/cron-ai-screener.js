@@ -31,6 +31,7 @@ const calculateEMA = (closes, period) => {
 
   const k = 2 / (period + 1);
 
+  // seed EMA dengan SMA
   let sum = 0;
   for (let i = 0; i < period; i++) {
     sum += closes[i];
@@ -161,17 +162,21 @@ const calculateIndicators = (stockData) => {
     const upper = bbUpper[i];
     const lower = bbLower[i];
 
+    // Trend: MA50
     if (sma50Val != null) {
       if (close > sma50Val) techScore += 10;
       else techScore -= 10;
     }
 
+    // Momentum: MACD histogram
     if (macdHist > 0) techScore += 5;
     else if (macdHist < 0) techScore -= 5;
 
+    // RSI
     if (rsiVal > 55) techScore += 5;
     else if (rsiVal < 45) techScore -= 5;
 
+    // Breakout / breakdown
     if (upper != null && close > upper) techScore += 5;
     if (lower != null && close < lower) techScore -= 5;
 
@@ -199,6 +204,21 @@ const calculateIndicators = (stockData) => {
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "");
 
+// Normalisasi shape screener (quotes kadang di root, kadang di finance.result[0])
+const normalizeQuotes = (screenerRes) => {
+  if (!screenerRes) return [];
+  if (Array.isArray(screenerRes.quotes)) return screenerRes.quotes;
+  if (
+    screenerRes.finance &&
+    screenerRes.finance.result &&
+    screenerRes.finance.result[0] &&
+    Array.isArray(screenerRes.finance.result[0].quotes)
+  ) {
+    return screenerRes.finance.result[0].quotes;
+  }
+  return [];
+};
+
 // =======================
 //  MAIN HANDLER
 // =======================
@@ -206,7 +226,7 @@ const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "");
 export default async function handler(req, res) {
   try {
     // =========================
-    //  Cron Auth pakai CRON_SECRET
+    //  Cron Auth pakai CRON_SECRET (Authorization header)
     // =========================
     const secret = process.env.CRON_SECRET;
 
@@ -226,8 +246,6 @@ export default async function handler(req, res) {
     const yf = new YahooFinance();
 
     // 1) Ambil kandidat dari Yahoo Screener (INDONESIA)
-    //    Region: ID, Lang: id-ID
-    //    NOTE: scrIds harus string satu per satu, tidak bisa array sekaligus.
     const screenerRes1 = await yf.screener({
       scrIds: "day_gainers",
       count: 30,
@@ -242,43 +260,39 @@ export default async function handler(req, res) {
       lang: "id-ID",
     });
 
-    // Gabungkan hasil dan deduplikasi
-    const quotes1 = screenerRes1?.quotes || [];
-    const quotes2 = screenerRes2?.quotes || [];
-    
-    // Map untuk deduplikasi berdasarkan symbol
+    const quotes1 = normalizeQuotes(screenerRes1);
+    const quotes2 = normalizeQuotes(screenerRes2);
+
+    // Map untuk dedupe symbol
     const uniqueQuotesMap = new Map();
-    [...quotes1, ...quotes2].forEach(q => {
-      if (q.symbol) uniqueQuotesMap.set(q.symbol, q);
+    [...quotes1, ...quotes2].forEach((q) => {
+      if (q && q.symbol) uniqueQuotesMap.set(q.symbol, q);
     });
 
     const quotes = Array.from(uniqueQuotesMap.values());
-
-    // DEBUG: Log raw quotes count
-    console.log(`[AI-SCREENER] Raw quotes found: ${quotes.length}`);
 
     const symbols = [
       ...new Set(
         quotes
           .map((q) => q.symbol)
           .filter(
-            (s) => typeof s === "string" && s.length > 0
+            (s) => typeof s === "string" && s.length > 0 && s.endsWith(".JK")
           )
-          // Pastikan format .JK (kadang Yahoo balikin tanpa .JK kalau region ID, tapi biasanya pakai)
-          // Kita akan append .JK jika belum ada, khusus untuk screener ID
-          .map(s => s.endsWith(".JK") ? s : `${s}.JK`)
       ),
-    ].slice(0, 40); // batasi supaya nggak kebanyakan
+    ].slice(0, 40);
 
-    console.log(`[AI-SCREENER] Processing ${symbols.length} symbols: ${symbols.join(", ")}`);
+    console.log(
+      "[AI-SCREENER] total quotes:",
+      quotes.length,
+      "| symbols .JK:",
+      symbols.length
+    );
 
     const candidates = [];
-    let processedCount = 0;
-    let passedTechCount = 0;
+    const allLastSnapshots = [];
 
     // 2) Untuk tiap symbol → ambil OHLC 6 bulan + hitung indikator
     for (const symbol of symbols) {
-      processedCount++;
       try {
         const chartRes = await yf.chart(symbol, {
           range: "6mo",
@@ -326,10 +340,11 @@ export default async function handler(req, res) {
 
         if (!last || last.technicalConfidence == null) continue;
 
-        // Filter awal: Hanya yang confidence teknikalnya lumayan (>55)
+        allLastSnapshots.push({ symbol, last });
+
+        // Filter awal: hanya yang technicalConfidence > 55
         if (last.technicalConfidence < 55) continue;
 
-        passedTechCount++;
         candidates.push({
           ticker: symbol,
           lastClose: last.close,
@@ -346,20 +361,50 @@ export default async function handler(req, res) {
       }
     }
 
-    if (!candidates.length) {
-      return res.status(200).json({ 
-        message: "No candidates found", 
-        debug: {
-          rawQuotes: quotes.length,
-          processedSymbols: symbols.length,
-          processedCount,
-          passedTechCount
-        }
+    console.log(
+      "[AI-SCREENER] allLastSnapshots:",
+      allLastSnapshots.length,
+      "| candidates (techConf>55):",
+      candidates.length
+    );
+
+    // Kalau bener-bener nggak ada yang lolos filter >55 tapi data ada,
+    // fallback: pakai top 10 berdasarkan technicalConfidence.
+    let effectiveCandidates = candidates;
+    if (!effectiveCandidates.length && allLastSnapshots.length) {
+      console.warn(
+        "[AI-SCREENER] No candidates with technicalConfidence>55, falling back to top 10."
+      );
+      effectiveCandidates = allLastSnapshots
+        .map(({ symbol, last }) => ({
+          ticker: symbol,
+          lastClose: last.close,
+          rsi: last.rsi,
+          macdHistogram: last.macdHistogram,
+          sma20: last.sma20,
+          sma50: last.sma50,
+          bbUpper: last.bbUpper,
+          bbLower: last.bbLower,
+          technicalConfidence: last.technicalConfidence ?? 0,
+        }))
+        .filter((c) => Number.isFinite(c.lastClose))
+        .sort(
+          (a, b) => (b.technicalConfidence ?? 0) - (a.technicalConfidence ?? 0)
+        )
+        .slice(0, 10);
+    }
+
+    if (!effectiveCandidates.length) {
+      // Ini baru bener-bener kosong (nggak dapat data sama sekali)
+      return res.status(200).json({
+        message: "No candidates found (no usable data from screener/quotes).",
+        quotes: quotes.length,
+        symbols: symbols.length,
       });
     }
 
-    // Sort lokal dulu by technicalConfidence, ambil top 15 buat AI
-    const topCandidates = candidates
+    // Sort lokal lagi by technicalConfidence, ambil top 15 buat AI
+    const topCandidates = effectiveCandidates
       .filter((c) => Number.isFinite(c.lastClose))
       .sort(
         (a, b) => (b.technicalConfidence ?? 0) - (a.technicalConfidence ?? 0)
@@ -408,14 +453,13 @@ export default async function handler(req, res) {
     });
 
     const result = await model.generateContent(prompt);
-    const response = await result.response;
-    const text = response.text();
+    const responseAI = await result.response;
+    const text = responseAI.text();
 
     let picks;
     try {
       picks = JSON.parse(text);
       if (!Array.isArray(picks)) {
-        // Kadang Gemini bungkus di object { "picks": [...] }
         if (picks.picks && Array.isArray(picks.picks)) {
           picks = picks.picks;
         } else {
@@ -445,7 +489,6 @@ export default async function handler(req, res) {
           continue;
         }
 
-        // Validasi tambahan
         if (p.signal !== "BUY" || (p.confidence ?? 0) < 70) continue;
 
         const ticker = p.ticker.toUpperCase();
@@ -478,7 +521,10 @@ export default async function handler(req, res) {
     return res.status(200).json({
       message: "AI screener run complete",
       inserted,
-      candidates: candidates.length,
+      totalCandidatesAfterFilter: effectiveCandidates.length,
+      totalRawSnapshots: allLastSnapshots.length,
+      totalQuotes: quotes.length,
+      totalSymbols: symbols.length,
     });
   } catch (error) {
     console.error("cron-ai-screener error:", error);
