@@ -9,17 +9,23 @@ export default defineConfig(({ mode }) => {
         port: 3000,
         host: '0.0.0.0',
         proxy: {
-          '/api': {
+          '/_svc': {
+            target: 'http://127.0.0.1:8000',
+            changeOrigin: true,
+          },
+        },
+      },
+      preview: {
+        port: 4173,
+        host: '0.0.0.0',
+        proxy: {
+          '/_svc': {
             target: 'http://127.0.0.1:8000',
             changeOrigin: true,
           },
         },
       },
       plugins: [react()],
-      define: {
-        'process.env.API_KEY': JSON.stringify(env.VITE_GEMINI_API_KEY),
-        'process.env.GEMINI_API_KEY': JSON.stringify(env.VITE_GEMINI_API_KEY)
-      },
       resolve: {
         alias: {
           '@': path.resolve(__dirname, '.'),

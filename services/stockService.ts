@@ -3,7 +3,7 @@ import { StockData, IndicatorData, TimeFrame } from '../types';
 // Fetch real stock data from Python Backend (yfinance)
 export const fetchStockData = async (ticker: string, timeframe: TimeFrame): Promise<StockData[]> => {
   try {
-    const response = await fetch(`/api/history?ticker=${ticker}&period=${timeframe}`);
+    const response = await fetch(`/_svc/data?ticker=${ticker}&period=${timeframe}`);
     if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
     }

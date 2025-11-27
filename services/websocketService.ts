@@ -24,7 +24,7 @@ class MockWebSocketService {
 
   private async pollRealData() {
       try {
-        const response = await fetch(`/api/quote?ticker=${this.ticker}`);
+        const response = await fetch(`/_svc/live?ticker=${this.ticker}`);
         const result = await response.json();
         
         if (result && result.price) {

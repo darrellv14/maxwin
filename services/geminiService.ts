@@ -1,17 +1,9 @@
-import { GoogleGenAI } from "@google/genai";
 import { IndicatorData, AIAnalysisResult, SignalType } from '../types';
 
 export const analyzeStockWithGemini = async (
   ticker: string, 
   data: IndicatorData[]
 ): Promise<AIAnalysisResult> => {
-  const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
-  if (!apiKey) {
-    throw new Error("API Key not found in environment variables.");
-  }
-
-  const ai = new GoogleGenAI({ apiKey });
-  
   // Get the last 3 data points for trend analysis
   const recentData = data.slice(-5);
   const latest = recentData[recentData.length - 1];
@@ -65,18 +57,28 @@ export const analyzeStockWithGemini = async (
   `;
 
   try {
-    const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash',
-      contents: prompt,
-      config: {
-        responseMimeType: "application/json"
-      }
+    const response = await fetch('/_svc/generate', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        prompt: prompt
+      })
     });
 
-    const text = response.text;
+    if (!response.ok) {
+      throw new Error('Failed to generate analysis');
+    }
+
+    const data = await response.json();
+    const text = data.text;
+    
     if (!text) throw new Error("No response from Gemini");
 
-    const result = JSON.parse(text);
+    // Clean up markdown code blocks if present
+    const cleanText = text.replace(/```json\n?|\n?```/g, '').trim();
+    const result = JSON.parse(cleanText);
 
     let signalEnum = SignalType.HOLD;
     if (result.signal === 'BUY') signalEnum = SignalType.BUY;
