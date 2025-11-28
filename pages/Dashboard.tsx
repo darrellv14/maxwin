@@ -247,7 +247,7 @@ const Dashboard: React.FC = () => {
                 label="Last Price"
                 value={
                   current?.close
-                    .toLocaleString("id-ID", {
+                    ?.toLocaleString("id-ID", {
                       style: "currency",
                       currency: "IDR",
                     })
@@ -332,7 +332,7 @@ const Dashboard: React.FC = () => {
                           {d.rsi?.toFixed(1)}
                         </td>
                         <td className="py-2 text-right text-gray-400">
-                          {d.volume.toLocaleString()}
+                          {d.volume?.toLocaleString() ?? '0'}
                         </td>
                       </tr>
                     ))}

@@ -16,11 +16,11 @@ interface ConfidenceChartProps {
 
 const ConfidenceChart: React.FC<ConfidenceChartProps> = ({ data }) => {
   return (
-    <div className="h-full w-full bg-terminal-dark rounded-lg p-4 border border-gray-800 flex flex-col">
+    <div className="h-[300px] w-full bg-terminal-dark rounded-lg p-4 border border-gray-800 flex flex-col">
       <h3 className="text-xs font-mono text-gray-400 mb-2 uppercase tracking-wider">
         AI Confidence / Win Rate History
       </h3>
-      <div className="flex-1 min-h-[150px]">
+      <div className="flex-1 min-h-0">
         <ResponsiveContainer width="100%" height="100%" minWidth={0}>
           <AreaChart data={data}>
           <defs>
