@@ -319,7 +319,7 @@ const Dashboard: React.FC = () => {
                         className="border-b border-gray-800/50 hover:bg-gray-800/50 transition-colors"
                       >
                         <td className="py-2 text-gray-500">{d.date}</td>
-                        <td className="py-2 font-bold">{d.close.toFixed(0)}</td>
+                        <td className="py-2 font-bold">{d.close?.toFixed(0) ?? '-'}</td>
                         <td
                           className={`py-2 ${
                             (d.rsi || 50) > 70

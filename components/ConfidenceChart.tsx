@@ -21,7 +21,7 @@ const ConfidenceChart: React.FC<ConfidenceChartProps> = ({ data }) => {
         AI Confidence / Win Rate History
       </h3>
       <div className="flex-1 min-h-[150px]">
-        <ResponsiveContainer width="100%" height="100%">
+        <ResponsiveContainer width="100%" height="100%" minWidth={0}>
           <AreaChart data={data}>
           <defs>
             <linearGradient id="colorConfidence" x1="0" y1="0" x2="0" y2="1">
@@ -47,7 +47,10 @@ const ConfidenceChart: React.FC<ConfidenceChartProps> = ({ data }) => {
             contentStyle={{ backgroundColor: '#111', borderColor: '#333', color: '#eee' }}
             itemStyle={{ fontSize: '12px' }}
             labelStyle={{ color: '#888', marginBottom: '5px' }}
-            formatter={(value: number) => [`${value.toFixed(1)}%`, 'Win Rate']}
+            formatter={(value: number) => [
+              `${value?.toFixed ? value.toFixed(1) : '0.0'}%`,
+              'Win Rate'
+            ]}
           />
           <Area 
             type="monotone" 
