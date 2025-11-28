@@ -283,7 +283,9 @@ const Dashboard: React.FC = () => {
               />
             </div>
 
-            <FinancialChart data={data} />
+            <div className="flex-1 flex flex-col">
+              <FinancialChart data={data} />
+            </div>
           </div>
         </div>
 

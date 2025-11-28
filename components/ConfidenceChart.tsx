@@ -16,7 +16,7 @@ interface ConfidenceChartProps {
 
 const ConfidenceChart: React.FC<ConfidenceChartProps> = ({ data }) => {
   return (
-    <div className="h-[300px] w-full bg-terminal-dark rounded-lg p-4 border border-gray-800 flex flex-col">
+    <div className="h-full min-h-[300px] w-full bg-terminal-dark rounded-lg p-4 border border-gray-800 flex flex-col">
       <h3 className="text-xs font-mono text-gray-400 mb-2 uppercase tracking-wider">
         AI Confidence / Win Rate History
       </h3>

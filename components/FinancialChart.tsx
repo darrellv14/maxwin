@@ -155,7 +155,7 @@ const FinancialChart: React.FC<FinancialChartProps> = ({ data }) => {
   };
 
   return (
-    <div className="h-[566.5px] w-full bg-terminal-dark rounded-lg p-4 border border-gray-800">
+    <div className="h-full min-h-[500px] w-full bg-terminal-dark rounded-lg p-4 border border-gray-800">
       <ResponsiveContainer width="100%" height="100%" minWidth={0}>
         <ComposedChart data={processedData}>
           <defs>
