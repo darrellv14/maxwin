@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   MessageCircle,
@@ -19,6 +19,125 @@ import { getOptimizedLogoUrl } from "../constants/logo";
 const LOGO_SM = getOptimizedLogoUrl(24, 24);
 const LOGO_MD = getOptimizedLogoUrl(32, 32);
 const LOGO_LG = getOptimizedLogoUrl(48, 48);
+
+// Simple markdown renderer for chat messages
+const renderMarkdown = (text: string): React.ReactNode => {
+  // Split by lines for processing
+  const lines = text.split('\n');
+  const elements: React.ReactNode[] = [];
+  let listItems: string[] = [];
+  let listType: 'ul' | 'ol' | null = null;
+  
+  const flushList = () => {
+    if (listItems.length > 0 && listType) {
+      const ListTag = listType === 'ul' ? 'ul' : 'ol';
+      elements.push(
+        <ListTag key={`list-${elements.length}`} className={listType === 'ul' ? 'list-disc list-inside my-1 space-y-0.5' : 'list-decimal list-inside my-1 space-y-0.5'}>
+          {listItems.map((item, i) => (
+            <li key={i} className="text-xs sm:text-sm">{processInlineMarkdown(item)}</li>
+          ))}
+        </ListTag>
+      );
+      listItems = [];
+      listType = null;
+    }
+  };
+
+  const processInlineMarkdown = (line: string): React.ReactNode => {
+    // Process inline markdown: **bold**, *italic*, `code`
+    const parts: React.ReactNode[] = [];
+    let remaining = line;
+    let key = 0;
+
+    while (remaining.length > 0) {
+      // Bold: **text** or __text__
+      const boldMatch = remaining.match(/^(.*?)(\*\*|__)(.+?)\2(.*)$/s);
+      if (boldMatch) {
+        if (boldMatch[1]) parts.push(<span key={key++}>{boldMatch[1]}</span>);
+        parts.push(<strong key={key++} className="font-semibold text-white">{processInlineMarkdown(boldMatch[3])}</strong>);
+        remaining = boldMatch[4];
+        continue;
+      }
+
+      // Italic: *text* or _text_ (single)
+      const italicMatch = remaining.match(/^(.*?)(\*|_)([^*_]+)\2(.*)$/s);
+      if (italicMatch && !italicMatch[1].endsWith('*') && !italicMatch[4].startsWith('*')) {
+        if (italicMatch[1]) parts.push(<span key={key++}>{italicMatch[1]}</span>);
+        parts.push(<em key={key++} className="italic text-gray-300">{processInlineMarkdown(italicMatch[3])}</em>);
+        remaining = italicMatch[4];
+        continue;
+      }
+
+      // Code: `text`
+      const codeMatch = remaining.match(/^(.*?)`([^`]+)`(.*)$/s);
+      if (codeMatch) {
+        if (codeMatch[1]) parts.push(<span key={key++}>{codeMatch[1]}</span>);
+        parts.push(<code key={key++} className="bg-gray-700 px-1 py-0.5 rounded text-terminal-green text-xs font-mono">{codeMatch[2]}</code>);
+        remaining = codeMatch[3];
+        continue;
+      }
+
+      // No more matches, add remaining text
+      parts.push(<span key={key++}>{remaining}</span>);
+      break;
+    }
+
+    return parts.length === 1 ? parts[0] : <>{parts}</>;
+  };
+
+  lines.forEach((line, index) => {
+    // Check for unordered list (*, -, •)
+    const ulMatch = line.match(/^[\s]*[-*•]\s+(.+)$/);
+    if (ulMatch) {
+      if (listType !== 'ul') flushList();
+      listType = 'ul';
+      listItems.push(ulMatch[1]);
+      return;
+    }
+
+    // Check for ordered list (1., 2., etc)
+    const olMatch = line.match(/^[\s]*\d+\.\s+(.+)$/);
+    if (olMatch) {
+      if (listType !== 'ol') flushList();
+      listType = 'ol';
+      listItems.push(olMatch[1]);
+      return;
+    }
+
+    // Not a list item, flush any pending list
+    flushList();
+
+    // Check for headers (### Header)
+    const headerMatch = line.match(/^(#{1,6})\s+(.+)$/);
+    if (headerMatch) {
+      const level = headerMatch[1].length;
+      const text = headerMatch[2];
+      const className = level <= 2 
+        ? 'text-sm sm:text-base font-bold text-white mt-2 mb-1' 
+        : 'text-xs sm:text-sm font-semibold text-gray-200 mt-1.5 mb-0.5';
+      elements.push(<div key={`h-${index}`} className={className}>{processInlineMarkdown(text)}</div>);
+      return;
+    }
+
+    // Empty line
+    if (line.trim() === '') {
+      elements.push(<div key={`br-${index}`} className="h-2" />);
+      return;
+    }
+
+    // Regular paragraph
+    elements.push(
+      <p key={`p-${index}`} className="text-xs sm:text-sm">
+        {processInlineMarkdown(line)}
+      </p>
+    );
+  });
+
+  // Flush any remaining list
+  flushList();
+
+  return <div className="space-y-1">{elements}</div>;
+};
 
 interface Message {
   id: string;
@@ -221,7 +340,11 @@ const AIChatAssistant: React.FC<AIChatAssistantProps> = ({ currentTicker, curren
                         : "bg-gray-800 text-gray-200 rounded-tl-md"
                     }`}
                   >
-                    <p className="text-xs sm:text-sm whitespace-pre-wrap">{message.content}</p>
+                    {message.role === "user" ? (
+                      <p className="text-xs sm:text-sm whitespace-pre-wrap">{message.content}</p>
+                    ) : (
+                      renderMarkdown(message.content)
+                    )}
                     <p className="text-[10px] sm:text-xs mt-1 opacity-50">
                       {message.timestamp.toLocaleTimeString("id-ID", {
                         hour: "2-digit",
