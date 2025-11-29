@@ -223,14 +223,15 @@ export default async function handler(req, res) {
 
   const url = new URL(req.url, `http://${req.headers.host}`);
   const path = url.pathname.replace("/api/ai", "");
+  const action = url.searchParams.get("action");
 
-  // Route: POST /api/ai/analyze - stock analysis
-  if (path === "/analyze") {
+  // Route: POST /api/ai?action=analyze or /api/ai/analyze - stock analysis
+  if (action === "analyze" || path === "/analyze") {
     return analyzeStock(req, res);
   }
 
-  // Route: POST /api/ai/chat - chat with AI
-  if (path === "/chat" || path === "" || path === "/") {
+  // Route: POST /api/ai?action=chat or /api/ai/chat - chat with AI
+  if (action === "chat" || path === "/chat" || path === "" || path === "/") {
     return chat(req, res);
   }
 
