@@ -142,7 +142,6 @@ const Dashboard: React.FC = () => {
             <img src={MOOCUAN_LOGO} alt="MooCuan" className="w-8 h-8 sm:w-10 sm:h-10 object-contain" />
             <h1 className="text-base sm:text-xl font-bold tracking-tight text-white font-mono">
               MOO<span className="text-profit-green">CUAN</span>
-              <span className="text-gray-600 text-xs sm:text-sm ml-1 hidden xs:inline">v1.0</span>
             </h1>
           </div>
 
@@ -386,7 +385,7 @@ const Dashboard: React.FC = () => {
                   />
                 </div>
                 <AIChatAssistant />
-                <FinancialChart data={data} />
+                <FinancialChart data={data} ticker={ticker} />
               </>
             )}
           </div>
