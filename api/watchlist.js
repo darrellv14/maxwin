@@ -27,6 +27,13 @@ const initDb = async () => {
         UNIQUE(user_id, ticker)
       )
     `);
+    
+    // Add name column if it doesn't exist (for existing tables)
+    await pool.query(`
+      ALTER TABLE watchlist 
+      ADD COLUMN IF NOT EXISTS name VARCHAR(255)
+    `);
+    
     console.log("Watchlist table initialized");
   } catch (error) {
     console.error("Error initializing watchlist table:", error);
