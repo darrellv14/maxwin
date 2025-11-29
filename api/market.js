@@ -3,8 +3,34 @@ import { setSecurityHeaders, sanitizeInput } from "./security.js";
 
 const yahooFinance = new YahooFinance();
 
-export default async function handler(req, res) {
-  setSecurityHeaders(res);
+// ============ LIVE QUOTE ============
+async function getLiveQuote(req, res) {
+  const { ticker } = req.query;
+
+  if (!ticker || typeof ticker !== "string") {
+    return res.status(400).json({ error: "Ticker is required" });
+  }
+
+  try {
+    const quote = await yahooFinance.quote(ticker);
+    const price = quote.regularMarketPrice ?? quote.postMarketPrice ?? quote.preMarketPrice;
+    const open = quote.regularMarketOpen;
+    const prevClose = quote.regularMarketPreviousClose;
+
+    return res.status(200).json({
+      symbol: quote.symbol,
+      price: price,
+      open: open,
+      prevClose: prevClose,
+    });
+  } catch (error) {
+    console.error("Live quote error:", error);
+    return res.status(500).json({ error: "Failed to fetch live quote" });
+  }
+}
+
+// ============ HISTORICAL DATA ============
+async function getHistoricalData(req, res) {
   const { ticker, period = "3M" } = req.query;
 
   if (!ticker || typeof ticker !== "string") {
@@ -170,4 +196,33 @@ export default async function handler(req, res) {
       error: error instanceof Error ? error.message : "Unknown error",
     });
   }
+}
+
+// ============ MAIN HANDLER ============
+export default async function handler(req, res) {
+  setSecurityHeaders(res);
+  res.setHeader("Access-Control-Allow-Origin", "*");
+  res.setHeader("Access-Control-Allow-Methods", "GET, OPTIONS");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+
+  if (req.method === "OPTIONS") {
+    return res.status(200).end();
+  }
+
+  if (req.method !== "GET") {
+    return res.status(405).json({ error: "Method not allowed" });
+  }
+
+  const url = new URL(req.url, `http://${req.headers.host}`);
+  const path = url.pathname.replace("/api/market", "");
+  const action = url.searchParams.get("action");
+
+  // Route: GET /api/market?action=live&ticker=XXX - get live quote
+  // Also support: GET /api/market/live?ticker=XXX (legacy path-based)
+  if (action === "live" || path === "/live") {
+    return getLiveQuote(req, res);
+  }
+
+  // Route: GET /api/market?ticker=XXX&period=3M - get historical data (default)
+  return getHistoricalData(req, res);
 }

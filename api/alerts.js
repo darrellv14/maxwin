@@ -58,7 +58,7 @@ async function checkAlerts(req, res) {
     for (const ticker of tickers) {
       try {
         const priceResponse = await fetch(
-          `${process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "http://localhost:3000"}/api/live?ticker=${ticker}`
+          `${process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "http://localhost:3000"}/api/market?action=live&ticker=${ticker}`
         );
         
         if (!priceResponse.ok) continue;

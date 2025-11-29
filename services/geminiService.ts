@@ -9,7 +9,7 @@ interface ChatParams {
 export const analyzeWithGemini = async ({ prompt, type }: ChatParams): Promise<string> => {
   try {
     // Route through backend API to hide Gemini
-    const response = await fetch("/api/chat", {
+    const response = await fetch("/api/ai?action=chat", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ message: prompt }),
@@ -33,7 +33,7 @@ export const analyzeStockWithGemini = async (
 ): Promise<AIAnalysisResult> => {
   try {
     // Route through backend API to hide Gemini
-    const response = await fetch("/api/analyze", {
+    const response = await fetch("/api/ai?action=analyze", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ ticker, data }),
