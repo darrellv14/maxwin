@@ -9,13 +9,13 @@
   "orientation": "portrait-primary",
   "icons": [
     {
-      "src": "https://res.cloudinary.com/drvu0dpry/image/upload/w_192,h_192,c_fit/v1764410228/moocuan-logo_ya5ous.png",
+      "src": "https://res.cloudinary.com/drvu0dpry/image/upload/f_auto,q_auto,w_192,h_192,c_fit/v1764410228/moocuan-logo_ya5ous",
       "sizes": "192x192",
       "type": "image/png",
       "purpose": "any maskable"
     },
     {
-      "src": "https://res.cloudinary.com/drvu0dpry/image/upload/w_512,h_512,c_fit/v1764410228/moocuan-logo_ya5ous.png",
+      "src": "https://res.cloudinary.com/drvu0dpry/image/upload/f_auto,q_auto,w_512,h_512,c_fit/v1764410228/moocuan-logo_ya5ous",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any maskable"

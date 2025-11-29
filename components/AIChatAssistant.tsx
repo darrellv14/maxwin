@@ -13,8 +13,12 @@ import {
   AlertCircle,
 } from "lucide-react";
 import { chatApi } from "../services/apiService";
+import { getOptimizedLogoUrl } from "../constants/logo";
 
-const MOOCUAN_LOGO = "https://res.cloudinary.com/drvu0dpry/image/upload/v1764410228/moocuan-logo_ya5ous.png";
+// Optimized logo sizes for chat
+const LOGO_SM = getOptimizedLogoUrl(24, 24);
+const LOGO_MD = getOptimizedLogoUrl(32, 32);
+const LOGO_LG = getOptimizedLogoUrl(48, 48);
 
 interface Message {
   id: string;
@@ -134,7 +138,7 @@ const AIChatAssistant: React.FC<AIChatAssistantProps> = ({ currentTicker, curren
               hover:shadow-green-400/70 hover:from-green-300 hover:via-emerald-400 hover:to-teal-400 
               transition-all duration-300 border-2 border-white/20 p-2"
           >
-            <img src={MOOCUAN_LOGO} alt="MooCuan" className="w-full h-full object-contain drop-shadow-lg" />
+            <img src={LOGO_LG} alt="MooCuan AI Assistant" className="w-full h-full object-contain drop-shadow-lg" />
             <span className="absolute -top-1 -right-1 w-4 h-4 sm:w-5 sm:h-5 bg-red-500 rounded-full flex items-center justify-center
               border-2 border-white shadow-lg animate-pulse">
               <Sparkles className="w-2 h-2 sm:w-3 sm:h-3 text-white" />
@@ -161,7 +165,7 @@ const AIChatAssistant: React.FC<AIChatAssistantProps> = ({ currentTicker, curren
             <div className="flex items-center justify-between px-3 sm:px-4 py-2.5 sm:py-3 bg-gray-800/50 border-b border-gray-700">
               <div className="flex items-center gap-2">
                 <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-linear-to-br from-terminal-green to-emerald-600 flex items-center justify-center p-1">
-                  <img src={MOOCUAN_LOGO} alt="MooCuan" className="w-full h-full object-contain" />
+                  <img src={LOGO_MD} alt="MooCuan" className="w-full h-full object-contain" />
                 </div>
                 <div>
                   <h3 className="font-mono font-bold text-white text-xs sm:text-sm">MooCuan AI</h3>
@@ -207,7 +211,7 @@ const AIChatAssistant: React.FC<AIChatAssistantProps> = ({ currentTicker, curren
                     {message.role === "user" ? (
                       <User className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-white" />
                     ) : (
-                      <img src={MOOCUAN_LOGO} alt="MooCuan" className="w-5 h-5 sm:w-6 sm:h-6 object-contain" />
+                      <img src={LOGO_SM} alt="MooCuan" className="w-5 h-5 sm:w-6 sm:h-6 object-contain" />
                     )}
                   </div>
                   <div
@@ -235,7 +239,7 @@ const AIChatAssistant: React.FC<AIChatAssistantProps> = ({ currentTicker, curren
                   className="flex gap-2 sm:gap-3"
                 >
                   <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-linear-to-br from-terminal-green to-emerald-600 flex items-center justify-center p-1">
-                    <img src={MOOCUAN_LOGO} alt="MooCuan" className="w-full h-full object-contain" />
+                    <img src={LOGO_MD} alt="MooCuan" className="w-full h-full object-contain" />
                   </div>
                   <div className="bg-gray-800 rounded-2xl rounded-tl-md px-3 sm:px-4 py-2.5 sm:py-3">
                     <div className="flex items-center gap-2">

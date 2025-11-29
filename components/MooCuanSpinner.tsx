@@ -1,7 +1,6 @@
 import React from "react";
 import { motion } from "framer-motion";
-
-const MOOCUAN_LOGO = "https://res.cloudinary.com/drvu0dpry/image/upload/v1764410228/moocuan-logo_ya5ous.png";
+import { LOGO_SIZES, getOptimizedLogoUrl } from "../constants/logo";
 
 interface MooCuanSpinnerProps {
   size?: "sm" | "md" | "lg";
@@ -18,6 +17,13 @@ export const MooCuanSpinner: React.FC<MooCuanSpinnerProps> = ({
     sm: "w-12 h-12",
     md: "w-20 h-20",
     lg: "w-32 h-32",
+  };
+
+  // Use appropriately sized logo for each size
+  const logoUrls = {
+    sm: getOptimizedLogoUrl(48, 48),
+    md: getOptimizedLogoUrl(80, 80),
+    lg: getOptimizedLogoUrl(128, 128),
   };
 
   const content = (
@@ -39,11 +45,13 @@ export const MooCuanSpinner: React.FC<MooCuanSpinnerProps> = ({
         
         {/* Logo */}
         <motion.img
-          src={MOOCUAN_LOGO}
-          alt="Loading..."
+          src={logoUrls[size]}
+          alt="MooCuan Loading"
           className={`${sizeClasses[size]} object-contain relative z-10`}
           animate={{ scale: [1, 1.05, 1] }}
           transition={{ duration: 1.5, repeat: Infinity, ease: "easeInOut" }}
+          loading="eager"
+          fetchPriority="high"
         />
       </div>
       
@@ -77,8 +85,8 @@ export const MooCuanSpinner: React.FC<MooCuanSpinnerProps> = ({
 // Simple inline spinner with logo (for buttons, etc)
 export const MooCuanInlineSpinner: React.FC<{ className?: string }> = ({ className = "" }) => (
   <motion.img
-    src={MOOCUAN_LOGO}
-    alt="Loading..."
+    src={getOptimizedLogoUrl(20, 20)}
+    alt="Loading"
     className={`w-5 h-5 object-contain ${className}`}
     animate={{ rotate: [0, 360] }}
     transition={{ duration: 1, repeat: Infinity, ease: "linear" }}

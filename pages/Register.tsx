@@ -15,8 +15,7 @@ import {
 } from "lucide-react";
 import { register } from "../services/authService";
 import { useToast } from "../components/ToastProvider";
-
-const MOOCUAN_LOGO = "https://res.cloudinary.com/drvu0dpry/image/upload/v1764410228/moocuan-logo_ya5ous.png";
+import { LOGO_SIZES, getOptimizedLogoUrl } from "../constants/logo";
 
 const Register: React.FC = () => {
   const navigate = useNavigate();
@@ -82,7 +81,7 @@ const Register: React.FC = () => {
               className="w-16 h-16 sm:w-24 sm:h-24 mx-auto mb-4 sm:mb-6 relative"
             >
               <div className="absolute inset-0 bg-profit-green/20 rounded-full blur-xl animate-pulse" />
-              <img src={MOOCUAN_LOGO} alt="MooCuan" className="w-full h-full object-contain relative z-10" />
+              <img src={getOptimizedLogoUrl(96)} alt="MooCuan Logo" className="w-full h-full object-contain relative z-10" />
               <CheckCircle className="absolute -bottom-1 -right-1 w-6 h-6 sm:w-8 sm:h-8 text-profit-green bg-terminal-gray rounded-full" />
             </motion.div>
 
@@ -120,7 +119,7 @@ const Register: React.FC = () => {
       <div className="hidden lg:flex lg:w-1/2 bg-terminal-dark border-r border-gray-800 flex-col p-6 xl:p-12">
         <div>
           <div className="flex items-center gap-2 xl:gap-3 mb-4">
-            <img src={MOOCUAN_LOGO} alt="MooCuan" className="w-10 h-10 xl:w-14 xl:h-14 object-contain" />
+            <img src={getOptimizedLogoUrl(56)} alt="MooCuan Logo" className="w-10 h-10 xl:w-14 xl:h-14 object-contain" />
             <h1 className="text-xl xl:text-2xl font-bold tracking-tight text-white font-mono">
               MOO<span className="text-profit-green">CUAN</span>
             </h1>
@@ -200,7 +199,7 @@ const Register: React.FC = () => {
           {/* Mobile Logo */}
           <div className="text-center mb-4 sm:mb-6 lg:hidden">
             <div className="flex flex-col items-center gap-2 mb-3 sm:mb-4">
-              <img src={MOOCUAN_LOGO} alt="MooCuan" className="w-16 h-16 sm:w-20 sm:h-20 object-contain" />
+              <img src={LOGO_SIZES.md} alt="MooCuan Logo" className="w-16 h-16 sm:w-20 sm:h-20 object-contain" />
               <span className="text-xl sm:text-2xl font-bold text-white font-mono">
                 MOO<span className="text-profit-green">CUAN</span>
               </span>

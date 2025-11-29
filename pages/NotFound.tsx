@@ -2,8 +2,7 @@ import React from "react";
 import { Link } from "react-router-dom";
 import { Home, TrendingDown } from "lucide-react";
 import { motion } from "framer-motion";
-
-const MOOCUAN_LOGO = "https://res.cloudinary.com/drvu0dpry/image/upload/v1764410228/moocuan-logo_ya5ous.png";
+import { getOptimizedLogoUrl } from "../constants/logo";
 
 const NotFound: React.FC = () => {
   return (
@@ -32,7 +31,7 @@ const NotFound: React.FC = () => {
           >
             <div className="absolute -inset-3 sm:-inset-4 bg-profit-green/20 rounded-full blur-2xl animate-pulse" />
             <img
-              src={MOOCUAN_LOGO}
+              src={getOptimizedLogoUrl(128)}
               alt="MooCuan Logo"
               className="w-20 h-20 sm:w-32 sm:h-32 object-contain relative z-10 grayscale opacity-50"
             />

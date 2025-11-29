@@ -16,8 +16,7 @@ import { useWatchlistStore } from "../stores/watchlistStore";
 import { logout, isAdmin, getUser } from "../services/authService";
 import AIChatAssistant from "@/components/AIChatAssistant";
 import { ChartSkeleton, StatCardSkeleton } from "../components/Skeleton";
-
-const MOOCUAN_LOGO = "https://res.cloudinary.com/drvu0dpry/image/upload/v1764410228/moocuan-logo_ya5ous.png";
+import { LOGO_SIZES, getOptimizedLogoUrl } from "../constants/logo";
 
 const Dashboard: React.FC = () => {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -139,7 +138,14 @@ const Dashboard: React.FC = () => {
       <header className="border-b border-gray-800 bg-terminal-dark/50 backdrop-blur sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-3 sm:px-4 py-2 sm:py-3 flex justify-between items-center 2xl:max-w-none">
           <div className="flex items-center gap-2 sm:gap-3">
-            <img src={MOOCUAN_LOGO} alt="MooCuan" className="w-8 h-8 sm:w-10 sm:h-10 object-contain" />
+            <img 
+              src={LOGO_SIZES.sm}
+              srcSet={`${LOGO_SIZES.sm} 1x, ${LOGO_SIZES.smRetina} 2x`}
+              alt="MooCuan Logo" 
+              className="w-8 h-8 sm:w-10 sm:h-10 object-contain" 
+              width="40"
+              height="40"
+            />
             <h1 className="text-base sm:text-xl font-bold tracking-tight text-white font-mono">
               MOO<span className="text-profit-green">CUAN</span>
             </h1>
@@ -152,7 +158,8 @@ const Dashboard: React.FC = () => {
                 const event = new KeyboardEvent("keydown", { key: "k", metaKey: true });
                 document.dispatchEvent(event);
               }}
-              className="hidden lg:flex items-center gap-2 text-xs font-mono text-gray-500 hover:text-gray-300 bg-gray-900 px-3 py-1.5 rounded border border-gray-800"
+              className="hidden lg:flex items-center gap-2 text-xs font-mono text-gray-400 hover:text-gray-200 bg-gray-900 px-3 py-1.5 rounded border border-gray-800"
+              aria-label="Open command palette (Cmd+K)"
             >
               <Keyboard className="w-3 h-3" />
               <span>Cmd+K</span>
@@ -233,20 +240,23 @@ const Dashboard: React.FC = () => {
           {/* Sidebar */}
           <div className="col-span-12 md:col-span-3 space-y-4 flex flex-col">
             <div className="bg-terminal-gray border border-gray-800 p-4 rounded-lg">
-              <label className="block text-xs font-mono text-gray-500 mb-1">
+              <label htmlFor="ticker-input" className="block text-xs font-mono text-gray-400 mb-1">
                 ASSET TICKER (Gunakan .JK untuk saham IHSG)
               </label>
               <div className="relative flex gap-2">
                 <input
+                  id="ticker-input"
                   type="text"
                   value={searchInput}
                   onChange={(e) => setSearchInput(e.target.value)}
                   onKeyDown={handleKeyDown}
                   className="w-full bg-black border border-gray-700 text-white px-3 py-2 rounded focus:outline-none focus:border-profit-green font-mono font-bold uppercase"
+                  aria-label="Enter stock ticker symbol"
                 />
                 <button
                   onClick={handleSearch}
                   className="bg-gray-800 hover:bg-gray-700 text-white px-3 rounded border border-gray-700"
+                  aria-label="Search ticker"
                 >
                   GO
                 </button>
@@ -267,16 +277,17 @@ const Dashboard: React.FC = () => {
             </div>
 
             <div className="bg-terminal-gray border border-gray-800 p-4 rounded-lg">
-              <label className="block text-xs font-mono text-gray-500 mb-2">TIMEFRAME</label>
+              <label className="block text-xs font-mono text-gray-400 mb-2">TIMEFRAME</label>
               <div className="grid grid-cols-5 gap-1 sm:gap-2">
                 {(["1D", "5D", "1M", "3M", "6M", "YTD", "1Y", "5Y", "ALL"] as TimeFrame[]).map((tf) => (
                   <button
                     key={tf}
                     onClick={() => setTimeframe(tf)}
+                    aria-label={`Set timeframe to ${tf}`}
                     className={`py-1 px-1 sm:px-2 text-[10px] sm:text-xs font-mono rounded border transition-colors ${
                       timeframe === tf
                         ? "bg-gray-800 border-profit-green text-profit-green"
-                        : "bg-black border-gray-800 text-gray-500 hover:bg-gray-800 hover:text-gray-300"
+                        : "bg-black border-gray-800 text-gray-400 hover:bg-gray-800 hover:text-gray-300"
                     }`}
                   >
                     {tf}

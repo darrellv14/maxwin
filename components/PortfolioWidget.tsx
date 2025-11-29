@@ -261,6 +261,7 @@ const PortfolioWidget: React.FC = () => {
                             toast.success("Position removed");
                           }}
                           className="p-1 opacity-0 group-hover:opacity-100 hover:bg-red-500/20 rounded transition-all"
+                          aria-label={`Remove ${pos.ticker} from portfolio`}
                         >
                           <X className="w-3 h-3 text-gray-500 hover:text-red-500" />
                         </button>

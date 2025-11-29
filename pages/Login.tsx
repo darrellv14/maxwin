@@ -4,8 +4,7 @@ import { motion } from "framer-motion";
 import { Eye, EyeOff, LogIn, Loader2, TrendingUp, BarChart3, Zap, Shield } from "lucide-react";
 import { login } from "../services/authService";
 import { useToast } from "../components/ToastProvider";
-
-const MOOCUAN_LOGO = "https://res.cloudinary.com/drvu0dpry/image/upload/v1764410228/moocuan-logo_ya5ous.png";
+import { LOGO_SIZES, getOptimizedLogoUrl } from "../constants/logo";
 
 const Login: React.FC = () => {
   const navigate = useNavigate();
@@ -41,7 +40,7 @@ const Login: React.FC = () => {
       <div className="hidden lg:flex lg:w-1/2 bg-terminal-dark border-r border-gray-800 flex-col justify-between p-6 xl:p-12 space-y-4">
         <div>
           <div className="flex items-center gap-3 mb-8 xl:mb-12">
-            <img src={MOOCUAN_LOGO} alt="MooCuan" className="w-10 h-10 xl:w-14 xl:h-14 object-contain" />
+            <img src={getOptimizedLogoUrl(56)} alt="MooCuan Logo" className="w-10 h-10 xl:w-14 xl:h-14 object-contain" />
             <h1 className="text-xl xl:text-2xl font-bold tracking-tight text-white font-mono">
               MOO<span className="text-profit-green">CUAN</span>
             </h1>
@@ -122,7 +121,7 @@ const Login: React.FC = () => {
           {/* Mobile Logo */}
           <div className="text-center mb-6 sm:mb-8 lg:hidden">
             <div className="flex flex-col items-center gap-2 mb-3 sm:mb-4">
-              <img src={MOOCUAN_LOGO} alt="MooCuan" className="w-16 h-16 sm:w-20 sm:h-20 object-contain" />
+              <img src={LOGO_SIZES.md} alt="MooCuan Logo" className="w-16 h-16 sm:w-20 sm:h-20 object-contain" />
               <span className="text-xl sm:text-2xl font-bold text-white font-mono">
                 MOO<span className="text-profit-green">CUAN</span>
               </span>

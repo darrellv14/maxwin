@@ -28,9 +28,8 @@ import {
   User,
   getUser,
 } from "../services/authService";
-
-const MOOCUAN_LOGO = "https://res.cloudinary.com/drvu0dpry/image/upload/v1764410228/moocuan-logo_ya5ous.png";
 import { useToast } from "../components/ToastProvider";
+import { LOGO_SIZES } from "../constants/logo";
 
 const AdminDashboard: React.FC = () => {
   const navigate = useNavigate();
@@ -149,7 +148,7 @@ const AdminDashboard: React.FC = () => {
         <div className="max-w-7xl mx-auto px-3 sm:px-4 py-2 sm:py-3 flex justify-between items-center">
           <div className="flex items-center gap-2 sm:gap-4">
             <Link to="/" className="flex items-center gap-2 sm:gap-3">
-              <img src={MOOCUAN_LOGO} alt="MooCuan" className="w-8 h-8 sm:w-10 sm:h-10 object-contain" />
+              <img src={LOGO_SIZES.sm} alt="MooCuan Logo" className="w-8 h-8 sm:w-10 sm:h-10 object-contain" />
               <h1 className="text-base sm:text-xl font-bold tracking-tight text-white font-mono hidden xs:block">
                 MOO<span className="text-profit-green">CUAN</span>
               </h1>

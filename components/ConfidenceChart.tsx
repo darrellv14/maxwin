@@ -17,9 +17,9 @@ interface ConfidenceChartProps {
 const ConfidenceChart: React.FC<ConfidenceChartProps> = ({ data }) => {
   return (
     <div className="h-full w-full bg-terminal-dark rounded-lg p-3 sm:p-4 border border-gray-800 flex flex-col">
-      <h3 className="text-[10px] sm:text-xs font-mono text-gray-400 mb-1.5 sm:mb-2 uppercase tracking-wider">
+      <h2 className="text-[10px] sm:text-xs font-mono text-gray-400 mb-1.5 sm:mb-2 uppercase tracking-wider">
         AI Confidence / Win Rate History
-      </h3>
+      </h2>
       <div className="flex-1 min-h-[120px] sm:min-h-[150px]">
         <ResponsiveContainer width="100%" height="100%">
           <AreaChart data={data}>
