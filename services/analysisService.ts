@@ -26,7 +26,7 @@ const parsePrice = (priceStr: string): number => {
 
 export const saveAnalysis = async (analysis: AIAnalysisResult, ticker: string) => {
   try {
-    const response = await fetch("/api/save", {
+    const response = await fetch("/api/history/save", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -74,8 +74,7 @@ export const updateAnalysisStatus = async (): Promise<{
   updated_count: number;
 }> => {
   try {
-    // DULU: const response = await fetch("/_svc/update-status", { method: "POST" });
-    const response = await fetch("/api/update-status", {
+    const response = await fetch("/api/history/update-status", {
       method: "POST",
     });
 

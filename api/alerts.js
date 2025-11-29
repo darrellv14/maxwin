@@ -18,7 +18,6 @@ const initDb = async () => {
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )
     `);
-    console.log("Alerts table initialized");
   } catch (error) {
     console.error("Error initializing alerts table:", error);
   }
@@ -26,6 +25,86 @@ const initDb = async () => {
 
 initDb();
 
+// ============ CHECK ALERTS (cron) ============
+async function checkAlerts(req, res) {
+  try {
+    const alertsResult = await pool.query(`
+      SELECT DISTINCT ticker FROM price_alerts 
+      WHERE active = TRUE AND triggered = FALSE
+    `);
+
+    const tickers = alertsResult.rows.map((r) => r.ticker);
+    
+    if (tickers.length === 0) {
+      return res.json({ success: true, message: "No active alerts to check", triggered: 0 });
+    }
+
+    let triggeredCount = 0;
+
+    for (const ticker of tickers) {
+      try {
+        const priceResponse = await fetch(
+          `${process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "http://localhost:3000"}/api/live?ticker=${ticker}`
+        );
+        
+        if (!priceResponse.ok) continue;
+        
+        const priceData = await priceResponse.json();
+        const currentPrice = priceData.price;
+        
+        if (!currentPrice) continue;
+
+        const tickerAlerts = await pool.query(
+          `SELECT id, user_id, condition, target_price 
+           FROM price_alerts 
+           WHERE ticker = $1 AND active = TRUE AND triggered = FALSE`,
+          [ticker]
+        );
+
+        for (const alert of tickerAlerts.rows) {
+          const targetPrice = parseFloat(alert.target_price);
+          let shouldTrigger = false;
+
+          switch (alert.condition) {
+            case "above":
+              shouldTrigger = currentPrice >= targetPrice;
+              break;
+            case "below":
+              shouldTrigger = currentPrice <= targetPrice;
+              break;
+            case "crosses":
+              shouldTrigger = Math.abs(currentPrice - targetPrice) / targetPrice < 0.01;
+              break;
+          }
+
+          if (shouldTrigger) {
+            await pool.query(
+              `UPDATE price_alerts 
+               SET triggered = TRUE, triggered_at = CURRENT_TIMESTAMP, triggered_price = $1
+               WHERE id = $2`,
+              [currentPrice, alert.id]
+            );
+            triggeredCount++;
+            console.log(`Alert triggered: ${ticker} ${alert.condition} ${targetPrice} (current: ${currentPrice})`);
+          }
+        }
+      } catch (tickerError) {
+        console.error(`Error checking ticker ${ticker}:`, tickerError);
+      }
+    }
+
+    return res.json({
+      success: true,
+      message: `Checked ${tickers.length} tickers`,
+      triggered: triggeredCount,
+    });
+  } catch (error) {
+    console.error("Check alerts error:", error);
+    return res.status(500).json({ success: false, message: "Server error" });
+  }
+}
+
+// ============ MAIN HANDLER ============
 export default async function handler(req, res) {
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
@@ -35,7 +114,17 @@ export default async function handler(req, res) {
     return res.status(200).end();
   }
 
-  // Verify authentication
+  const path = req.url.split("?")[0].replace("/api/alerts", "");
+
+  // Route: /api/alerts/check (cron job - no auth needed)
+  if (path === "/check") {
+    if (req.method !== "POST" && req.method !== "GET") {
+      return res.status(405).json({ success: false, message: "Method not allowed" });
+    }
+    return checkAlerts(req, res);
+  }
+
+  // All other routes require authentication
   const authHeader = req.headers.authorization;
   if (!authHeader || !authHeader.startsWith("Bearer ")) {
     return res.status(401).json({ success: false, message: "Unauthorized" });
@@ -47,7 +136,6 @@ export default async function handler(req, res) {
   }
 
   const userId = payload.userId;
-  const path = req.url.split("?")[0].replace("/api/alerts", "");
 
   try {
     // GET - Get all alerts
@@ -105,7 +193,6 @@ export default async function handler(req, res) {
 
       const normalizedTicker = ticker.toUpperCase();
 
-      // Limit alerts per user (max 20)
       const countResult = await pool.query(
         "SELECT COUNT(*) FROM price_alerts WHERE user_id = $1 AND active = TRUE",
         [userId]
