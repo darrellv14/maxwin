@@ -90,7 +90,7 @@ const OraclePanel: React.FC<OraclePanelProps> = ({ analysis, loading, onAnalyze 
 
           <div className="bg-black/30 p-3 sm:p-4 rounded border border-gray-800 flex-1 overflow-y-auto max-h-[120px] sm:max-h-[150px]">
             <div className="text-gray-400 text-[10px] sm:text-xs font-mono uppercase mb-1.5 sm:mb-2">The Verdict</div>
-            <p className="text-gray-300 text-xs sm:text-sm leading-relaxed font-mono">
+            <p className="text-gray-300 text-xs sm:text-sm leading-relaxed font-mono text-justify">
               "{analysis.reasoning}"
             </p>
           </div>
@@ -104,8 +104,8 @@ const OraclePanel: React.FC<OraclePanelProps> = ({ analysis, loading, onAnalyze 
                   ? "bg-loss-red/10 border-loss-red/30"
                   : "bg-yellow-500/10 border-yellow-500/30"
             }`}>
-              <div className="flex items-center gap-2 mb-2">
-                <span className={`text-lg ${
+              <div className="flex items-start gap-2 sm:gap-3 mb-2">
+                <span className={`text-xl sm:text-2xl flex-shrink-0 ${
                   analysis.sentiment.type === "BULLISH" 
                     ? "text-profit-green" 
                     : analysis.sentiment.type === "BEARISH"
@@ -114,11 +114,24 @@ const OraclePanel: React.FC<OraclePanelProps> = ({ analysis, loading, onAnalyze 
                 }`}>
                   {analysis.sentiment.type === "BULLISH" ? "📈" : analysis.sentiment.type === "BEARISH" ? "📉" : "📊"}
                 </span>
-                <div className="flex-1">
-                  <div className="text-[10px] sm:text-xs text-gray-500 font-mono uppercase">
-                    Sentimen {analysis.sentiment.source && `• ${analysis.sentiment.source}`}
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap mb-1">
+                    <span className={`text-[10px] sm:text-xs font-bold px-1.5 py-0.5 rounded ${
+                      analysis.sentiment.type === "BULLISH" 
+                        ? "bg-profit-green/20 text-profit-green" 
+                        : analysis.sentiment.type === "BEARISH"
+                          ? "bg-loss-red/20 text-loss-red"
+                          : "bg-yellow-500/20 text-yellow-400"
+                    }`}>
+                      {analysis.sentiment.type}
+                    </span>
+                    {analysis.sentiment.source && (
+                      <span className="text-[10px] sm:text-xs text-gray-500 font-mono">
+                        • {analysis.sentiment.source}
+                      </span>
+                    )}
                   </div>
-                  <div className={`text-xs sm:text-sm font-bold ${
+                  <div className={`text-xs sm:text-sm font-bold leading-tight ${
                     analysis.sentiment.type === "BULLISH" 
                       ? "text-profit-green" 
                       : analysis.sentiment.type === "BEARISH"
@@ -130,7 +143,7 @@ const OraclePanel: React.FC<OraclePanelProps> = ({ analysis, loading, onAnalyze 
                 </div>
               </div>
               {analysis.sentiment.description && (
-                <p className="text-gray-400 text-[10px] sm:text-xs font-mono leading-relaxed">
+                <p className="text-gray-400 text-[10px] sm:text-xs font-mono leading-relaxed text-justify pl-7 sm:pl-9 border-l-2 border-gray-700/50 ml-2">
                   {analysis.sentiment.description}
                 </p>
               )}
