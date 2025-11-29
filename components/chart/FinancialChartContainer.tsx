@@ -46,6 +46,12 @@ const FinancialChartContainer: React.FC<FinancialChartContainerProps> = ({
   const [isDrawing, setIsDrawing] = useState(false);
   const [currentDrawing, setCurrentDrawing] = useState<DrawingObject | null>(null);
   const [canvasSize, setCanvasSize] = useState({ width: 0, height: 0 });
+  const [textInput, setTextInput] = useState<{ visible: boolean; x: number; y: number; value: string }>({
+    visible: false,
+    x: 0,
+    y: 0,
+    value: "",
+  });
 
   const chartRef = useRef<TradingViewChartHandle>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -150,6 +156,9 @@ const FinancialChartContainer: React.FC<FinancialChartContainerProps> = ({
           newDrawing.points = [coords, { x: coords.x + 100, y: coords.y }];
         }
         setDrawings((prev) => [...prev, newDrawing]);
+      } else if (activeTool === "text") {
+        // Show text input at clicked position
+        setTextInput({ visible: true, x: coords.x, y: coords.y, value: "" });
       } else {
         setCurrentDrawing(newDrawing);
         setIsDrawing(true);
@@ -265,6 +274,22 @@ const FinancialChartContainer: React.FC<FinancialChartContainerProps> = ({
             }
             ctx.closePath();
             ctx.fill();
+          }
+          break;
+
+        case "text":
+          if (drawing.points.length >= 1 && drawing.text) {
+            const [p] = drawing.points;
+            ctx.font = "14px monospace";
+            ctx.fillStyle = drawing.color;
+            // Draw background
+            const metrics = ctx.measureText(drawing.text);
+            const textHeight = 16;
+            ctx.fillStyle = "rgba(0, 0, 0, 0.7)";
+            ctx.fillRect(p.x - 2, p.y - textHeight, metrics.width + 4, textHeight + 4);
+            // Draw text
+            ctx.fillStyle = drawing.color;
+            ctx.fillText(drawing.text, p.x, p.y);
           }
           break;
       }
@@ -415,6 +440,51 @@ const FinancialChartContainer: React.FC<FinancialChartContainerProps> = ({
           {drawings.length > 0 && (
             <div className="absolute bottom-2 left-2 bg-black/80 px-1.5 sm:px-2 py-0.5 sm:py-1 rounded text-[10px] sm:text-xs font-mono text-gray-400">
               📐 {drawings.length}
+            </div>
+          )}
+
+          {/* Text Input Overlay */}
+          {textInput.visible && (
+            <div
+              className="absolute z-30"
+              style={{ left: textInput.x, top: textInput.y - 30 }}
+            >
+              <input
+                type="text"
+                autoFocus
+                value={textInput.value}
+                onChange={(e) => setTextInput({ ...textInput, value: e.target.value })}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && textInput.value.trim()) {
+                    const newTextDrawing: DrawingObject = {
+                      id: Date.now().toString(),
+                      type: "text",
+                      points: [{ x: textInput.x, y: textInput.y }],
+                      color: "#fbbf24",
+                      text: textInput.value.trim(),
+                    };
+                    setDrawings((prev) => [...prev, newTextDrawing]);
+                    setTextInput({ visible: false, x: 0, y: 0, value: "" });
+                  } else if (e.key === "Escape") {
+                    setTextInput({ visible: false, x: 0, y: 0, value: "" });
+                  }
+                }}
+                onBlur={() => {
+                  if (textInput.value.trim()) {
+                    const newTextDrawing: DrawingObject = {
+                      id: Date.now().toString(),
+                      type: "text",
+                      points: [{ x: textInput.x, y: textInput.y }],
+                      color: "#fbbf24",
+                      text: textInput.value.trim(),
+                    };
+                    setDrawings((prev) => [...prev, newTextDrawing]);
+                  }
+                  setTextInput({ visible: false, x: 0, y: 0, value: "" });
+                }}
+                placeholder="Enter text..."
+                className="bg-terminal-darker border border-profit-green text-white px-2 py-1 text-sm font-mono rounded outline-none min-w-[150px]"
+              />
             </div>
           )}
         </div>

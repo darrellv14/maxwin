@@ -1,5 +1,17 @@
 const API_BASE = "/api";
 
+// Logout callbacks registry
+const logoutCallbacks: (() => void)[] = [];
+
+export const onLogout = (callback: () => void): (() => void) => {
+  logoutCallbacks.push(callback);
+  // Return unsubscribe function
+  return () => {
+    const index = logoutCallbacks.indexOf(callback);
+    if (index > -1) logoutCallbacks.splice(index, 1);
+  };
+};
+
 export interface User {
   id: number;
   email: string;
@@ -87,6 +99,8 @@ export const login = async (data: LoginData): Promise<AuthResponse> => {
 };
 
 export const logout = (): void => {
+  // Call all logout callbacks (e.g., clear watchlist)
+  logoutCallbacks.forEach(cb => cb());
   clearAuth();
   window.location.href = "/login";
 };

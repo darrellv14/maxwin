@@ -1,7 +1,7 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import { watchlistApi, alertsApi } from "../services/apiService";
-import { getToken } from "../services/authService";
+import { getToken, onLogout } from "../services/authService";
 
 export interface WatchlistItem {
   ticker: string;
@@ -34,6 +34,7 @@ interface WatchlistStore {
   isInWatchlist: (ticker: string) => boolean;
   updateWatchlistItem: (ticker: string, data: Partial<WatchlistItem>) => void;
   syncWatchlistFromServer: () => Promise<void>;
+  clearWatchlist: () => void;
 
   // Recent searches
   addRecentSearch: (ticker: string) => void;
@@ -118,26 +119,24 @@ export const useWatchlistStore = create<WatchlistStore>()(
         set({ isSyncing: true });
         try {
           const serverWatchlist = await watchlistApi.getAll();
-          const currentWatchlist = get().watchlist;
-
-          // Merge server and local (server takes priority for existing items)
-          const serverTickers = new Set(serverWatchlist.map((w) => w.ticker));
-          const mergedWatchlist: WatchlistItem[] = [
-            ...serverWatchlist.map((w) => ({
+          
+          // Replace local with server data (don't merge, just use server data)
+          set({ 
+            watchlist: serverWatchlist.map((w) => ({
               ticker: w.ticker,
               name: w.name,
               addedAt: new Date(w.addedAt).getTime(),
-            })),
-            // Keep local items not on server
-            ...currentWatchlist.filter((w) => !serverTickers.has(w.ticker)),
-          ];
-
-          set({ watchlist: mergedWatchlist });
+            }))
+          });
         } catch (error) {
           console.error("Failed to sync watchlist from server:", error);
         } finally {
           set({ isSyncing: false });
         }
+      },
+
+      clearWatchlist: () => {
+        set({ watchlist: [], alerts: [], recentSearches: [] });
       },
 
       addRecentSearch: (ticker: string) => {
@@ -234,3 +233,8 @@ export const useWatchlistStore = create<WatchlistStore>()(
     }
   )
 );
+
+// Register logout callback to clear watchlist when user logs out
+onLogout(() => {
+  useWatchlistStore.getState().clearWatchlist();
+});
