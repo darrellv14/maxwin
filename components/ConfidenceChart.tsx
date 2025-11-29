@@ -16,11 +16,11 @@ interface ConfidenceChartProps {
 
 const ConfidenceChart: React.FC<ConfidenceChartProps> = ({ data }) => {
   return (
-    <div className="h-full w-full bg-terminal-dark rounded-lg p-4 border border-gray-800 flex flex-col">
-      <h3 className="text-xs font-mono text-gray-400 mb-2 uppercase tracking-wider">
+    <div className="h-full w-full bg-terminal-dark rounded-lg p-3 sm:p-4 border border-gray-800 flex flex-col">
+      <h3 className="text-[10px] sm:text-xs font-mono text-gray-400 mb-1.5 sm:mb-2 uppercase tracking-wider">
         AI Confidence / Win Rate History
       </h3>
-      <div className="flex-1 min-h-[150px]">
+      <div className="flex-1 min-h-[120px] sm:min-h-[150px]">
         <ResponsiveContainer width="100%" height="100%">
           <AreaChart data={data}>
             <defs>
@@ -33,20 +33,21 @@ const ConfidenceChart: React.FC<ConfidenceChartProps> = ({ data }) => {
             <XAxis
               dataKey="date"
               stroke="#555"
-              tick={{ fontSize: 10, fill: "#666" }}
+              tick={{ fontSize: 9, fill: "#666" }}
               tickFormatter={(val) => val.slice(5)}
-              minTickGap={30}
+              minTickGap={20}
             />
             <YAxis
               domain={[0, 100]}
               stroke="#555"
-              tick={{ fontSize: 10, fill: "#666" }}
+              tick={{ fontSize: 9, fill: "#666" }}
               orientation="right"
+              width={30}
             />
             <Tooltip
-              contentStyle={{ backgroundColor: "#111", borderColor: "#333", color: "#eee" }}
-              itemStyle={{ fontSize: "12px" }}
-              labelStyle={{ color: "#888", marginBottom: "5px" }}
+              contentStyle={{ backgroundColor: "#111", borderColor: "#333", color: "#eee", fontSize: "11px" }}
+              itemStyle={{ fontSize: "11px" }}
+              labelStyle={{ color: "#888", marginBottom: "5px", fontSize: "10px" }}
               formatter={(value: number) => [`${value.toFixed(1)}%`, "Win Rate"]}
             />
             <Area

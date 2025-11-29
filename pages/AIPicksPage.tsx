@@ -54,32 +54,33 @@ const AIPicksPage: React.FC = () => {
   }, [picks, sortBy, filterSignal]);
 
   return (
-    <div className="min-h-screen bg-terminal-black text-gray-300 p-8 font-sans selection:bg-profit-green selection:text-black">
+    <div className="min-h-screen bg-terminal-black text-gray-300 p-4 sm:p-6 lg:p-8 font-sans selection:bg-profit-green selection:text-black">
       <div className="max-w-7xl mx-auto 2xl:max-w-none">
         {/* Header */}
-        <div className="flex justify-between items-center mb-8 border-b border-gray-800 pb-6">
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6 sm:mb-8 border-b border-gray-800 pb-4 sm:pb-6">
           <div>
             <motion.h1
               initial={{ opacity: 0, y: -20 }}
               animate={{ opacity: 1, y: 0 }}
-              className="text-3xl font-bold text-white tracking-tight flex items-center gap-3"
+              className="text-xl sm:text-2xl lg:text-3xl font-bold text-white tracking-tight flex items-center gap-2 sm:gap-3"
             >
-              <Bot className="w-8 h-8 text-profit-green" />
-              AI STOCK SCREENER{" "}
-              <span className="text-gray-500 text-lg font-normal">(IDX MARKET)</span>
+              <Bot className="w-6 h-6 sm:w-8 sm:h-8 text-profit-green" />
+              <span className="hidden xs:inline">AI STOCK SCREENER</span>
+              <span className="xs:hidden">AI SCREENER</span>
+              <span className="text-gray-500 text-xs sm:text-sm lg:text-lg font-normal hidden md:inline">(IDX MARKET)</span>
             </motion.h1>
-            <p className="text-gray-400 mt-2 font-mono text-sm">
-              Automated market scan & AI selection based on technical indicators.
+            <p className="text-gray-400 mt-1 sm:mt-2 font-mono text-xs sm:text-sm">
+              <span className="hidden sm:inline">Automated market scan & AI selection based on technical indicators.</span>
+              <span className="sm:hidden">AI-powered stock screening.</span>
             </p>
           </div>
-          <div className="flex items-center gap-3">
-            <Link
-              to="/"
-              className="bg-gray-800 hover:bg-gray-700 text-white px-4 py-2 rounded border border-gray-700 font-mono text-sm transition-colors"
-            >
-              ← BACK TO TERMINAL
-            </Link>
-          </div>
+          <Link
+            to="/"
+            className="bg-gray-800 hover:bg-gray-700 text-white px-3 sm:px-4 py-1.5 sm:py-2 rounded border border-gray-700 font-mono text-xs sm:text-sm transition-colors whitespace-nowrap"
+          >
+            <span className="hidden sm:inline">← BACK TO TERMINAL</span>
+            <span className="sm:hidden">← BACK</span>
+          </Link>
         </div>
 
         {/* Controls Bar */}
@@ -87,83 +88,84 @@ const AIPicksPage: React.FC = () => {
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.1 }}
-          className="flex flex-wrap items-center justify-between gap-4 mb-6 bg-terminal-gray border border-gray-800 rounded-lg p-4"
+          className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 sm:gap-4 mb-4 sm:mb-6 bg-terminal-gray border border-gray-800 rounded-lg p-3 sm:p-4"
         >
-          <div className="flex items-center gap-4">
+          <div className="flex flex-wrap items-center gap-2 sm:gap-4">
             {/* View Mode Toggle */}
             <div className="flex items-center gap-1 bg-black rounded-lg p-1">
               <button
                 onClick={() => setViewMode("grid")}
-                className={`p-2 rounded ${viewMode === "grid" ? "bg-gray-800 text-profit-green" : "text-gray-500 hover:text-gray-300"}`}
+                className={`p-1.5 sm:p-2 rounded ${viewMode === "grid" ? "bg-gray-800 text-profit-green" : "text-gray-500 hover:text-gray-300"}`}
               >
                 <Grid className="w-4 h-4" />
               </button>
               <button
                 onClick={() => setViewMode("table")}
-                className={`p-2 rounded ${viewMode === "table" ? "bg-gray-800 text-profit-green" : "text-gray-500 hover:text-gray-300"}`}
+                className={`p-1.5 sm:p-2 rounded ${viewMode === "table" ? "bg-gray-800 text-profit-green" : "text-gray-500 hover:text-gray-300"}`}
               >
                 <List className="w-4 h-4" />
               </button>
             </div>
 
             {/* Filter */}
-            <div className="flex items-center gap-2">
-              <Filter className="w-4 h-4 text-gray-500" />
+            <div className="flex items-center gap-1 sm:gap-2">
+              <Filter className="w-4 h-4 text-gray-500 hidden sm:block" />
               <select
                 value={filterSignal}
                 onChange={(e) => setFilterSignal(e.target.value as any)}
-                className="bg-black border border-gray-700 text-gray-300 text-sm rounded px-3 py-1.5 focus:outline-none focus:border-profit-green"
+                className="bg-black border border-gray-700 text-gray-300 text-xs sm:text-sm rounded px-2 sm:px-3 py-1 sm:py-1.5 focus:outline-none focus:border-profit-green"
               >
-                <option value="ALL">All Signals</option>
-                <option value="BUY">BUY Only</option>
-                <option value="SELL">SELL Only</option>
+                <option value="ALL">All</option>
+                <option value="BUY">BUY</option>
+                <option value="SELL">SELL</option>
               </select>
             </div>
 
             {/* Sort */}
-            <div className="flex items-center gap-2">
-              <SortAsc className="w-4 h-4 text-gray-500" />
+            <div className="flex items-center gap-1 sm:gap-2">
+              <SortAsc className="w-4 h-4 text-gray-500 hidden sm:block" />
               <select
                 value={sortBy}
                 onChange={(e) => setSortBy(e.target.value as SortOption)}
-                className="bg-black border border-gray-700 text-gray-300 text-sm rounded px-3 py-1.5 focus:outline-none focus:border-profit-green"
+                className="bg-black border border-gray-700 text-gray-300 text-xs sm:text-sm rounded px-2 sm:px-3 py-1 sm:py-1.5 focus:outline-none focus:border-profit-green"
               >
-                <option value="date">Latest First</option>
-                <option value="confidence">Highest Confidence</option>
-                <option value="ticker">Ticker A-Z</option>
+                <option value="date">Latest</option>
+                <option value="confidence">Confidence</option>
+                <option value="ticker">A-Z</option>
               </select>
             </div>
           </div>
 
-          <div className="flex items-center gap-4">
-            <span className="text-xs font-mono text-gray-500">
-              {sortedAndFilteredPicks.length} picks found
+          <div className="flex items-center justify-between sm:justify-end gap-3 sm:gap-4">
+            <span className="text-[10px] sm:text-xs font-mono text-gray-500">
+              {sortedAndFilteredPicks.length} picks
             </span>
             <motion.button
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
               onClick={fetchPicks}
               disabled={loading}
-              className="flex items-center gap-2 bg-gray-800 hover:bg-gray-700 text-white px-3 py-1.5 rounded border border-gray-700 text-sm font-mono disabled:opacity-50"
+              className="flex items-center gap-1.5 sm:gap-2 bg-gray-800 hover:bg-gray-700 text-white px-2 sm:px-3 py-1 sm:py-1.5 rounded border border-gray-700 text-xs sm:text-sm font-mono disabled:opacity-50"
             >
-              <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
-              Refresh
+              <RefreshCw className={`w-3 h-3 sm:w-4 sm:h-4 ${loading ? "animate-spin" : ""}`} />
+              <span className="hidden xs:inline">Refresh</span>
             </motion.button>
           </div>
         </motion.div>
 
         {/* Content */}
         {loading ? (
-          <div className="p-12 flex justify-center items-center text-gray-500 font-mono bg-terminal-gray border border-gray-800 rounded-lg">
-            <Loader2 className="w-6 h-6 animate-spin mr-2" />
-            SCANNING MARKET DATA...
+          <div className="p-8 sm:p-12 flex justify-center items-center text-gray-500 font-mono bg-terminal-gray border border-gray-800 rounded-lg text-xs sm:text-sm">
+            <Loader2 className="w-5 h-5 sm:w-6 sm:h-6 animate-spin mr-2" />
+            <span className="hidden sm:inline">SCANNING MARKET DATA...</span>
+            <span className="sm:hidden">SCANNING...</span>
           </div>
         ) : viewMode === "grid" ? (
           /* Grid View with ScreenerCards */
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
-            className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"
+            className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4"
           >
             <AnimatePresence>
               {sortedAndFilteredPicks.map((record, index) => (

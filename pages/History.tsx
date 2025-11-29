@@ -38,15 +38,15 @@ const StatsCard: React.FC<{
   <motion.div
     initial={{ opacity: 0, y: 20 }}
     animate={{ opacity: 1, y: 0 }}
-    className="bg-terminal-darker border border-gray-800 rounded-xl p-4"
+    className="bg-terminal-darker border border-gray-800 rounded-xl p-3 sm:p-4"
   >
     <div className="flex items-start justify-between">
-      <div>
-        <p className="text-xs text-gray-500 font-mono uppercase mb-1">{title}</p>
-        <p className={`text-2xl font-bold font-mono ${color}`}>{value}</p>
-        {subtitle && <p className="text-xs text-gray-600 mt-1">{subtitle}</p>}
+      <div className="min-w-0 flex-1">
+        <p className="text-[10px] sm:text-xs text-gray-500 font-mono uppercase mb-1 truncate">{title}</p>
+        <p className={`text-lg sm:text-2xl font-bold font-mono ${color}`}>{value}</p>
+        {subtitle && <p className="text-[10px] sm:text-xs text-gray-600 mt-1 truncate">{subtitle}</p>}
       </div>
-      <div className={`p-2 rounded-lg bg-opacity-20 ${color.replace("text-", "bg-")}`}>{icon}</div>
+      <div className={`p-1.5 sm:p-2 rounded-lg bg-opacity-20 ${color.replace("text-", "bg-")} flex-shrink-0`}>{icon}</div>
     </div>
   </motion.div>
 );
@@ -270,78 +270,78 @@ const History: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-terminal-black text-gray-200 font-sans p-4 md:p-6">
+    <div className="min-h-screen bg-terminal-black text-gray-200 font-sans p-3 sm:p-4 md:p-6">
       <div className="max-w-7xl mx-auto">
         {/* Header */}
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4 mb-4 sm:mb-6">
           <div>
-            <h1 className="text-2xl font-bold font-mono text-white">
+            <h1 className="text-lg sm:text-xl md:text-2xl font-bold font-mono text-white">
               ANALYSIS <span className="text-profit-green">HISTORY</span>
             </h1>
-            <p className="text-gray-500 text-sm mt-1">Track record of AI Oracle predictions</p>
+            <p className="text-gray-500 text-xs sm:text-sm mt-1">Track record of AI Oracle predictions</p>
           </div>
           <div className="flex flex-wrap gap-2">
             <button
               onClick={handleRefreshStatus}
               disabled={updatingStatus || loading}
-              className="flex items-center gap-2 bg-gray-800 hover:bg-gray-700 text-white px-4 py-2 rounded-lg border border-gray-700 font-mono text-sm transition-all disabled:opacity-50"
+              className="flex items-center gap-1.5 sm:gap-2 bg-gray-800 hover:bg-gray-700 text-white px-2.5 sm:px-4 py-1.5 sm:py-2 rounded-lg border border-gray-700 font-mono text-xs sm:text-sm transition-all disabled:opacity-50"
             >
-              <RefreshCw className={`w-4 h-4 ${updatingStatus ? "animate-spin" : ""}`} />
-              {updatingStatus ? "UPDATING..." : "REFRESH"}
+              <RefreshCw className={`w-3 h-3 sm:w-4 sm:h-4 ${updatingStatus ? "animate-spin" : ""}`} />
+              <span className="hidden xs:inline">{updatingStatus ? "UPDATING..." : "REFRESH"}</span>
             </button>
             <button
               onClick={handleExport}
               disabled={loading || history.length === 0}
-              className="flex items-center gap-2 bg-gray-800 hover:bg-gray-700 text-white px-4 py-2 rounded-lg border border-gray-700 font-mono text-sm transition-all disabled:opacity-50"
+              className="flex items-center gap-1.5 sm:gap-2 bg-gray-800 hover:bg-gray-700 text-white px-2.5 sm:px-4 py-1.5 sm:py-2 rounded-lg border border-gray-700 font-mono text-xs sm:text-sm transition-all disabled:opacity-50"
             >
-              <Download className="w-4 h-4" />
-              EXPORT CSV
+              <Download className="w-3 h-3 sm:w-4 sm:h-4" />
+              <span className="hidden sm:inline">EXPORT CSV</span>
             </button>
             <Link
               to="/"
-              className="bg-terminal-green hover:bg-terminal-green/80 text-black px-4 py-2 rounded-lg font-mono text-sm font-bold transition-colors"
+              className="bg-terminal-green hover:bg-terminal-green/80 text-black px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg font-mono text-xs sm:text-sm font-bold transition-colors"
             >
-              ← BACK
+              ← <span className="hidden xs:inline">BACK</span>
             </Link>
           </div>
         </div>
 
         {/* Stats Grid */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3 mb-4 sm:mb-6">
           <StatsCard
             title="Total Trades"
             value={stats.total}
             subtitle={`${stats.active} still active`}
-            icon={<BarChart3 className="w-5 h-5 text-blue-400" />}
+            icon={<BarChart3 className="w-4 h-4 sm:w-5 sm:h-5 text-blue-400" />}
             color="text-blue-400"
           />
           <StatsCard
             title="Win Rate"
             value={`${stats.winRate}%`}
             subtitle={`${stats.wins}W / ${stats.losses}L`}
-            icon={<Target className="w-5 h-5 text-green-400" />}
+            icon={<Target className="w-4 h-4 sm:w-5 sm:h-5 text-green-400" />}
             color={parseFloat(stats.winRate) >= 50 ? "text-green-400" : "text-red-400"}
           />
           <StatsCard
             title="Avg Return"
             value={`${parseFloat(stats.avgReturn) >= 0 ? "+" : ""}${stats.avgReturn}%`}
             subtitle="per trade"
-            icon={<TrendingUp className="w-5 h-5 text-purple-400" />}
+            icon={<TrendingUp className="w-4 h-4 sm:w-5 sm:h-5 text-purple-400" />}
             color={parseFloat(stats.avgReturn) >= 0 ? "text-green-400" : "text-red-400"}
           />
           <StatsCard
             title="Performance"
             value=""
-            icon={<Award className="w-5 h-5 text-yellow-400" />}
+            icon={<Award className="w-4 h-4 sm:w-5 sm:h-5 text-yellow-400" />}
             color="text-white"
           />
         </div>
 
         {/* Performance Bar */}
-        <div className="bg-terminal-darker border border-gray-800 rounded-xl p-4 mb-6">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-xs text-gray-500 font-mono">TRADE DISTRIBUTION</span>
-            <div className="flex items-center gap-4 text-xs">
+        <div className="bg-terminal-darker border border-gray-800 rounded-xl p-3 sm:p-4 mb-4 sm:mb-6">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-2">
+            <span className="text-[10px] sm:text-xs text-gray-500 font-mono">TRADE DISTRIBUTION</span>
+            <div className="flex items-center gap-2 sm:gap-4 text-[10px] sm:text-xs flex-wrap">
               <span className="flex items-center gap-1 text-green-400">
                 <div className="w-2 h-2 bg-green-500 rounded-full" /> Wins ({stats.wins})
               </span>
@@ -359,14 +359,14 @@ const History: React.FC = () => {
         </div>
 
         {/* Filters */}
-        <div className="flex flex-wrap items-center gap-2 mb-4">
-          <Filter className="w-4 h-4 text-gray-500" />
-          <span className="text-xs text-gray-500 mr-2">Signal:</span>
+        <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 mb-3 sm:mb-4">
+          <Filter className="w-3 h-3 sm:w-4 sm:h-4 text-gray-500" />
+          <span className="text-[10px] sm:text-xs text-gray-500 mr-1 sm:mr-2">Signal:</span>
           {["all", "BUY", "SELL"].map((f) => (
             <button
               key={f}
               onClick={() => setFilter(f as any)}
-              className={`px-3 py-1 text-xs font-mono rounded-full transition-colors ${
+              className={`px-2 sm:px-3 py-0.5 sm:py-1 text-[10px] sm:text-xs font-mono rounded-full transition-colors ${
                 filter === f
                   ? "bg-terminal-green/20 text-terminal-green border border-terminal-green/50"
                   : "bg-gray-800 text-gray-400 border border-gray-700 hover:border-gray-600"
@@ -376,17 +376,17 @@ const History: React.FC = () => {
             </button>
           ))}
 
-          <span className="text-xs text-gray-500 mx-2">Status:</span>
+          <span className="text-[10px] sm:text-xs text-gray-500 ml-1 sm:mx-2">Status:</span>
           {[
             { key: "all", label: "All" },
             { key: "active", label: "Active" },
-            { key: "tp", label: "TP Hit" },
-            { key: "sl", label: "SL Hit" },
+            { key: "tp", label: "TP" },
+            { key: "sl", label: "SL" },
           ].map((s) => (
             <button
               key={s.key}
               onClick={() => setStatusFilter(s.key as any)}
-              className={`px-3 py-1 text-xs font-mono rounded-full transition-colors ${
+              className={`px-2 sm:px-3 py-0.5 sm:py-1 text-[10px] sm:text-xs font-mono rounded-full transition-colors ${
                 statusFilter === s.key
                   ? "bg-blue-500/20 text-blue-400 border border-blue-500/50"
                   : "bg-gray-800 text-gray-400 border border-gray-700 hover:border-gray-600"
@@ -400,24 +400,25 @@ const History: React.FC = () => {
         {/* History Table */}
         <div className="bg-terminal-darker border border-gray-800 rounded-xl overflow-hidden">
           {loading ? (
-            <div className="p-12 flex justify-center items-center text-gray-500 font-mono">
-              <Loader2 className="w-6 h-6 animate-spin mr-2" />
-              LOADING HISTORY DATA...
+            <div className="p-8 sm:p-12 flex justify-center items-center text-gray-500 font-mono text-xs sm:text-sm">
+              <Loader2 className="w-5 h-5 sm:w-6 sm:h-6 animate-spin mr-2" />
+              <span className="hidden sm:inline">LOADING HISTORY DATA...</span>
+              <span className="sm:hidden">LOADING...</span>
             </div>
           ) : (
             <>
               <div className="overflow-x-auto">
-                <table className="w-full text-left text-sm font-mono">
+                <table className="w-full text-left text-[10px] sm:text-xs md:text-sm font-mono min-w-[700px]">
                   <thead className="bg-gray-900/50 text-gray-500 border-b border-gray-800">
                     <tr>
-                      <th className="p-4">DATE</th>
-                      <th className="p-4">TICKER</th>
-                      <th className="p-4">SIGNAL</th>
-                      <th className="p-4">ENTRY</th>
-                      <th className="p-4">TP1 / TP2</th>
-                      <th className="p-4">SL</th>
-                      <th className="p-4">HIGH / LOW</th>
-                      <th className="p-4">STATUS</th>
+                      <th className="p-2 sm:p-3 md:p-4">DATE</th>
+                      <th className="p-2 sm:p-3 md:p-4">TICKER</th>
+                      <th className="p-2 sm:p-3 md:p-4">SIGNAL</th>
+                      <th className="p-2 sm:p-3 md:p-4">ENTRY</th>
+                      <th className="p-2 sm:p-3 md:p-4">TP1/TP2</th>
+                      <th className="p-2 sm:p-3 md:p-4">SL</th>
+                      <th className="p-2 sm:p-3 md:p-4">H/L</th>
+                      <th className="p-2 sm:p-3 md:p-4">STATUS</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-800">
@@ -431,28 +432,28 @@ const History: React.FC = () => {
                           transition={{ delay: index * 0.02 }}
                           className="hover:bg-gray-800/30 transition-colors"
                         >
-                          <td className="p-4">
-                            <div className="flex items-center gap-2 text-gray-400">
-                              <Calendar className="w-3 h-3" />
+                          <td className="p-2 sm:p-3 md:p-4">
+                            <div className="flex items-center gap-1 sm:gap-2 text-gray-400">
+                              <Calendar className="w-3 h-3 hidden sm:block" />
                               <div>
-                                <div>{new Date(record.date_created).toLocaleDateString()}</div>
-                                <div className="text-xs text-gray-600">
+                                <div className="text-[10px] sm:text-xs">{new Date(record.date_created).toLocaleDateString()}</div>
+                                <div className="text-[9px] sm:text-[10px] text-gray-600 hidden sm:block">
                                   {new Date(record.date_created).toLocaleTimeString()}
                                 </div>
                               </div>
                             </div>
                           </td>
-                          <td className="p-4">
+                          <td className="p-2 sm:p-3 md:p-4">
                             <Link
                               to={`/?ticker=${record.ticker}`}
-                              className="font-bold text-white hover:text-terminal-green transition-colors"
+                              className="font-bold text-white hover:text-terminal-green transition-colors text-[10px] sm:text-xs md:text-sm"
                             >
                               {record.ticker.replace(".JK", "")}
                             </Link>
                           </td>
-                          <td className="p-4">
+                          <td className="p-2 sm:p-3 md:p-4">
                             <div
-                              className={`inline-flex items-center gap-1 ${
+                              className={`inline-flex items-center gap-1 text-[10px] sm:text-xs ${
                                 record.signal === "BUY" ? "text-green-400" : "text-red-400"
                               }`}
                             >
@@ -461,26 +462,26 @@ const History: React.FC = () => {
                               ) : (
                                 <TrendingDown className="w-3 h-3" />
                               )}
-                              {record.signal}
+                              <span className="hidden xs:inline">{record.signal}</span>
                             </div>
                           </td>
-                          <td className="p-4 text-white">{record.entry_price.toLocaleString()}</td>
-                          <td className="p-4">
-                            <div className="text-green-400">{record.tp1.toLocaleString()}</div>
-                            <div className="text-green-300 text-xs">
+                          <td className="p-2 sm:p-3 md:p-4 text-white text-[10px] sm:text-xs">{record.entry_price.toLocaleString()}</td>
+                          <td className="p-2 sm:p-3 md:p-4">
+                            <div className="text-green-400 text-[10px] sm:text-xs">{record.tp1.toLocaleString()}</div>
+                            <div className="text-green-300 text-[9px] sm:text-[10px]">
                               {record.tp2.toLocaleString()}
                             </div>
                           </td>
-                          <td className="p-4 text-red-400">{record.stop_loss.toLocaleString()}</td>
-                          <td className="p-4">
-                            <div className="text-green-400 text-xs">
-                              H: {record.highest_price.toLocaleString()}
+                          <td className="p-2 sm:p-3 md:p-4 text-red-400 text-[10px] sm:text-xs">{record.stop_loss.toLocaleString()}</td>
+                          <td className="p-2 sm:p-3 md:p-4">
+                            <div className="text-green-400 text-[9px] sm:text-[10px]">
+                              H:{record.highest_price.toLocaleString()}
                             </div>
-                            <div className="text-red-400 text-xs">
-                              L: {record.lowest_price.toLocaleString()}
+                            <div className="text-red-400 text-[9px] sm:text-[10px]">
+                              L:{record.lowest_price.toLocaleString()}
                             </div>
                           </td>
-                          <td className="p-4">
+                          <td className="p-2 sm:p-3 md:p-4">
                             <StatusBadge status={record.status} />
                           </td>
                         </motion.tr>

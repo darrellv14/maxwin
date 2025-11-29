@@ -18,12 +18,12 @@ const ChartHeader: React.FC<ChartHeaderProps> = ({
   const isPositive = (change ?? 0) >= 0;
 
   return (
-    <div className="flex items-center gap-4 font-mono">
-      <div className="text-lg font-bold text-white">{ticker}</div>
+    <div className="flex flex-wrap items-center gap-2 sm:gap-4 font-mono">
+      <div className="text-sm sm:text-lg font-bold text-white">{ticker}</div>
 
       {price !== undefined && (
-        <div className="flex items-center gap-2">
-          <span className="text-xl font-bold text-white">
+        <div className="flex items-center gap-1.5 sm:gap-2">
+          <span className="text-base sm:text-xl font-bold text-white">
             {price.toLocaleString(undefined, {
               minimumFractionDigits: 2,
               maximumFractionDigits: 2,
@@ -31,7 +31,7 @@ const ChartHeader: React.FC<ChartHeaderProps> = ({
           </span>
 
           {change !== undefined && (
-            <span className={`text-sm ${isPositive ? "text-profit-green" : "text-loss-red"}`}>
+            <span className={`text-xs sm:text-sm ${isPositive ? "text-profit-green" : "text-loss-red"}`}>
               {isPositive ? "+" : ""}
               {change.toLocaleString(undefined, {
                 minimumFractionDigits: 2,
@@ -42,7 +42,7 @@ const ChartHeader: React.FC<ChartHeaderProps> = ({
 
           {changePercent !== undefined && (
             <span
-              className={`text-xs px-1.5 py-0.5 rounded ${
+              className={`text-[10px] sm:text-xs px-1 sm:px-1.5 py-0.5 rounded ${
                 isPositive ? "bg-profit-green/20 text-profit-green" : "bg-loss-red/20 text-loss-red"
               }`}
             >
@@ -53,7 +53,7 @@ const ChartHeader: React.FC<ChartHeaderProps> = ({
         </div>
       )}
 
-      {time && <span className="text-xs text-gray-500 ml-auto">{time}</span>}
+      {time && <span className="text-[10px] sm:text-xs text-gray-500 ml-auto hidden sm:inline">{time}</span>}
     </div>
   );
 };

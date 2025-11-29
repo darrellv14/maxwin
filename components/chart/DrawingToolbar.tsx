@@ -48,30 +48,30 @@ const DrawingToolbar: React.FC<DrawingToolbarProps> = ({
   onUndo,
 }) => {
   return (
-    <div className="flex flex-col gap-1 p-1 bg-terminal-darker rounded-lg border border-gray-800">
+    <div className="flex flex-row sm:flex-col gap-0.5 sm:gap-1 p-1 bg-terminal-darker rounded-lg border border-gray-800 overflow-x-auto sm:overflow-visible">
       {tools.map(({ id, icon: Icon, label }) => (
         <button
           key={id}
           onClick={() => onToolChange(id)}
           title={label}
-          className={`p-2 rounded transition-all ${
+          className={`p-1.5 sm:p-2 rounded transition-all shrink-0 ${
             activeTool === id
               ? "bg-profit-green text-black"
               : "text-gray-400 hover:bg-gray-800 hover:text-white"
           }`}
         >
-          <Icon size={18} />
+          <Icon size={14} className="sm:w-[18px] sm:h-[18px]" />
         </button>
       ))}
 
-      <div className="border-t border-gray-700 my-1" />
+      <div className="border-l sm:border-t sm:border-l-0 border-gray-700 mx-0.5 sm:mx-0 sm:my-1" />
 
       <button
         onClick={onClearAll}
         title="Clear All Drawings"
-        className="p-2 rounded text-gray-400 hover:bg-red-900/50 hover:text-red-400 transition-all"
+        className="p-1.5 sm:p-2 rounded text-gray-400 hover:bg-red-900/50 hover:text-red-400 transition-all shrink-0"
       >
-        <Trash2 size={18} />
+        <Trash2 size={14} className="sm:w-[18px] sm:h-[18px]" />
       </button>
     </div>
   );

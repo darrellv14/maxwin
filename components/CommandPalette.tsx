@@ -104,30 +104,30 @@ const CommandPalette: React.FC<CommandPaletteProps> = ({ onSearch }) => {
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95, y: -20 }}
             transition={{ duration: 0.15 }}
-            className="fixed left-1/2 top-[20%] -translate-x-1/2 w-full max-w-xl z-50"
+            className="fixed left-2 right-2 top-[15%] sm:left-1/2 sm:right-auto sm:top-[20%] sm:-translate-x-1/2 w-auto sm:w-full sm:max-w-xl z-50"
           >
             <Command
               className="bg-terminal-dark border border-gray-700 rounded-xl shadow-2xl overflow-hidden"
               shouldFilter={true}
             >
               {/* Input */}
-              <div className="flex items-center border-b border-gray-800 px-4">
-                <Search className="w-5 h-5 text-gray-500" />
+              <div className="flex items-center border-b border-gray-800 px-3 sm:px-4">
+                <Search className="w-4 h-4 sm:w-5 sm:h-5 text-gray-500" />
                 <Command.Input
                   value={search}
                   onValueChange={setSearch}
-                  placeholder="Search stocks, navigate, or type a command..."
-                  className="w-full bg-transparent text-white placeholder-gray-500 py-4 px-3 outline-none font-mono text-sm"
+                  placeholder="Search stocks..."
+                  className="w-full bg-transparent text-white placeholder-gray-500 py-3 sm:py-4 px-2 sm:px-3 outline-none font-mono text-xs sm:text-sm"
                 />
                 <button onClick={() => setOpen(false)} className="p-1 hover:bg-gray-800 rounded">
-                  <X className="w-4 h-4 text-gray-500" />
+                  <X className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-gray-500" />
                 </button>
               </div>
 
               {/* Results */}
-              <Command.List className="max-h-[400px] overflow-y-auto p-2">
-                <Command.Empty className="py-6 text-center text-gray-500 text-sm font-mono">
-                  No results found. Try searching for a stock ticker...
+              <Command.List className="max-h-[50vh] sm:max-h-[400px] overflow-y-auto p-1.5 sm:p-2">
+                <Command.Empty className="py-4 sm:py-6 text-center text-gray-500 text-xs sm:text-sm font-mono">
+                  No results found.
                 </Command.Empty>
 
                 {/* Quick Search - if input looks like a ticker */}
@@ -136,11 +136,11 @@ const CommandPalette: React.FC<CommandPaletteProps> = ({ onSearch }) => {
                     <Command.Item
                       value={`search:${search.toUpperCase()}`}
                       onSelect={handleSelect}
-                      className="flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer text-sm font-mono
+                      className="flex items-center gap-2 sm:gap-3 px-2 sm:px-3 py-1.5 sm:py-2 rounded-lg cursor-pointer text-xs sm:text-sm font-mono
                         data-[selected=true]:bg-terminal-green/20 data-[selected=true]:text-terminal-green"
                     >
-                      <Search className="w-4 h-4" />
-                      <span>Search for "{search.toUpperCase()}"</span>
+                      <Search className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                      <span>Search "{search.toUpperCase()}"</span>
                     </Command.Item>
                   </Command.Group>
                 )}
@@ -153,10 +153,10 @@ const CommandPalette: React.FC<CommandPaletteProps> = ({ onSearch }) => {
                         key={ticker}
                         value={`search:${ticker}`}
                         onSelect={handleSelect}
-                        className="flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer text-sm font-mono
+                        className="flex items-center gap-2 sm:gap-3 px-2 sm:px-3 py-1.5 sm:py-2 rounded-lg cursor-pointer text-xs sm:text-sm font-mono
                           data-[selected=true]:bg-terminal-green/20 data-[selected=true]:text-terminal-green"
                       >
-                        <History className="w-4 h-4 text-gray-500" />
+                        <History className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-gray-500" />
                         <span>{ticker}</span>
                       </Command.Item>
                     ))}
@@ -171,12 +171,12 @@ const CommandPalette: React.FC<CommandPaletteProps> = ({ onSearch }) => {
                         key={item.ticker}
                         value={`search:${item.ticker} ${item.name || ""}`}
                         onSelect={() => handleSelect(`search:${item.ticker}`)}
-                        className="flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer text-sm font-mono
+                        className="flex items-center gap-2 sm:gap-3 px-2 sm:px-3 py-1.5 sm:py-2 rounded-lg cursor-pointer text-xs sm:text-sm font-mono
                           data-[selected=true]:bg-terminal-green/20 data-[selected=true]:text-terminal-green"
                       >
-                        <Star className="w-4 h-4 text-yellow-500" />
+                        <Star className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-yellow-500" />
                         <span>{item.ticker}</span>
-                        {item.name && <span className="text-gray-500 text-xs">{item.name}</span>}
+                        {item.name && <span className="text-gray-500 text-[10px] sm:text-xs hidden sm:inline">{item.name}</span>}
                       </Command.Item>
                     ))}
                   </Command.Group>
@@ -187,38 +187,38 @@ const CommandPalette: React.FC<CommandPaletteProps> = ({ onSearch }) => {
                   <Command.Item
                     value="navigate:home"
                     onSelect={handleSelect}
-                    className="flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer text-sm font-mono
+                    className="flex items-center gap-2 sm:gap-3 px-2 sm:px-3 py-1.5 sm:py-2 rounded-lg cursor-pointer text-xs sm:text-sm font-mono
                       data-[selected=true]:bg-terminal-green/20 data-[selected=true]:text-terminal-green"
                   >
-                    <Home className="w-4 h-4" />
+                    <Home className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                     <span>Home / Dashboard</span>
                   </Command.Item>
                   <Command.Item
                     value="navigate:screener"
                     onSelect={handleSelect}
-                    className="flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer text-sm font-mono
+                    className="flex items-center gap-2 sm:gap-3 px-2 sm:px-3 py-1.5 sm:py-2 rounded-lg cursor-pointer text-xs sm:text-sm font-mono
                       data-[selected=true]:bg-terminal-green/20 data-[selected=true]:text-terminal-green"
                   >
-                    <Zap className="w-4 h-4" />
+                    <Zap className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                     <span>AI Screener</span>
                   </Command.Item>
                   <Command.Item
                     value="navigate:history"
                     onSelect={handleSelect}
-                    className="flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer text-sm font-mono
+                    className="flex items-center gap-2 sm:gap-3 px-2 sm:px-3 py-1.5 sm:py-2 rounded-lg cursor-pointer text-xs sm:text-sm font-mono
                       data-[selected=true]:bg-terminal-green/20 data-[selected=true]:text-terminal-green"
                   >
-                    <History className="w-4 h-4" />
+                    <History className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                     <span>History</span>
                   </Command.Item>
                   {isUserAdmin && (
                     <Command.Item
                       value="navigate:admin"
                       onSelect={handleSelect}
-                      className="flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer text-sm font-mono
+                      className="flex items-center gap-2 sm:gap-3 px-2 sm:px-3 py-1.5 sm:py-2 rounded-lg cursor-pointer text-xs sm:text-sm font-mono
                         data-[selected=true]:bg-terminal-green/20 data-[selected=true]:text-terminal-green"
                     >
-                      <Shield className="w-4 h-4" />
+                      <Shield className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                       <span>Admin Panel</span>
                     </Command.Item>
                   )}
@@ -230,20 +230,20 @@ const CommandPalette: React.FC<CommandPaletteProps> = ({ onSearch }) => {
                     <Command.Item
                       value="navigate:logout"
                       onSelect={handleSelect}
-                      className="flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer text-sm font-mono
+                      className="flex items-center gap-2 sm:gap-3 px-2 sm:px-3 py-1.5 sm:py-2 rounded-lg cursor-pointer text-xs sm:text-sm font-mono
                         data-[selected=true]:bg-terminal-green/20 data-[selected=true]:text-terminal-green"
                     >
-                      <LogOut className="w-4 h-4" />
+                      <LogOut className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                       <span>Logout</span>
                     </Command.Item>
                   ) : (
                     <Command.Item
                       value="navigate:login"
                       onSelect={handleSelect}
-                      className="flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer text-sm font-mono
+                      className="flex items-center gap-2 sm:gap-3 px-2 sm:px-3 py-1.5 sm:py-2 rounded-lg cursor-pointer text-xs sm:text-sm font-mono
                         data-[selected=true]:bg-terminal-green/20 data-[selected=true]:text-terminal-green"
                     >
-                      <LogOut className="w-4 h-4" />
+                      <LogOut className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                       <span>Login</span>
                     </Command.Item>
                   )}
@@ -251,8 +251,8 @@ const CommandPalette: React.FC<CommandPaletteProps> = ({ onSearch }) => {
               </Command.List>
 
               {/* Footer */}
-              <div className="border-t border-gray-800 px-4 py-2 flex items-center justify-between text-xs text-gray-500 font-mono">
-                <div className="flex items-center gap-4">
+              <div className="border-t border-gray-800 px-3 sm:px-4 py-1.5 sm:py-2 flex items-center justify-between text-[10px] sm:text-xs text-gray-500 font-mono">
+                <div className="hidden sm:flex items-center gap-4">
                   <span className="flex items-center gap-1">
                     <kbd className="px-1.5 py-0.5 bg-gray-800 rounded">↑↓</kbd>
                     navigate

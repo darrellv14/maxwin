@@ -28,6 +28,8 @@ import {
   User,
   getUser,
 } from "../services/authService";
+
+const MOOCUAN_LOGO = "https://res.cloudinary.com/drvu0dpry/image/upload/v1764410228/moocuan-logo_ya5ous.png";
 import { useToast } from "../components/ToastProvider";
 
 const AdminDashboard: React.FC = () => {
@@ -141,71 +143,71 @@ const AdminDashboard: React.FC = () => {
   const currentUser = getUser();
 
   return (
-    <div className="min-h-screen bg-terminal-black text-gray-200 font-sans selection:bg-green-900 selection:text-white pb-10">
+    <div className="min-h-screen bg-terminal-black text-gray-200 font-sans selection:bg-green-900 selection:text-white pb-6 sm:pb-10">
       {/* Header */}
       <header className="border-b border-gray-800 bg-terminal-dark/50 backdrop-blur sticky top-0 z-50">
-        <div className="max-w-7xl mx-auto px-4 py-3 flex justify-between items-center">
-          <div className="flex items-center gap-4">
-            <Link to="/" className="flex items-center gap-2">
-              <div className="w-3 h-3 bg-profit-green rounded-full shadow-[0_0_10px_#00ff9d]"></div>
-              <h1 className="text-xl font-bold tracking-tight text-white font-mono">
+        <div className="max-w-7xl mx-auto px-3 sm:px-4 py-2 sm:py-3 flex justify-between items-center">
+          <div className="flex items-center gap-2 sm:gap-4">
+            <Link to="/" className="flex items-center gap-2 sm:gap-3">
+              <img src={MOOCUAN_LOGO} alt="MooCuan" className="w-8 h-8 sm:w-10 sm:h-10 object-contain" />
+              <h1 className="text-base sm:text-xl font-bold tracking-tight text-white font-mono hidden xs:block">
                 MOO<span className="text-profit-green">CUAN</span>
               </h1>
             </Link>
-            <div className="h-6 w-px bg-gray-700"></div>
-            <div className="flex items-center gap-2">
-              <Shield className="w-5 h-5 text-purple-400" />
-              <span className="text-purple-400 font-mono font-bold text-sm">ADMIN PANEL</span>
+            <div className="h-4 sm:h-6 w-px bg-gray-700"></div>
+            <div className="flex items-center gap-1.5 sm:gap-2">
+              <Shield className="w-4 h-4 sm:w-5 sm:h-5 text-purple-400" />
+              <span className="text-purple-400 font-mono font-bold text-[10px] sm:text-sm">ADMIN</span>
             </div>
           </div>
 
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2 sm:gap-4">
             <Link
               to="/"
-              className="text-xs font-mono bg-gray-900 px-3 py-1.5 rounded border border-gray-800 hover:bg-gray-800 text-gray-300 transition-colors flex items-center gap-2"
+              className="text-[10px] sm:text-xs font-mono bg-gray-900 px-2 sm:px-3 py-1 sm:py-1.5 rounded border border-gray-800 hover:bg-gray-800 text-gray-300 transition-colors flex items-center gap-1 sm:gap-2"
             >
               <Home className="w-3 h-3" />
-              DASHBOARD
+              <span className="hidden sm:inline">DASHBOARD</span>
             </Link>
 
-            <div className="flex items-center gap-2 border-l border-gray-700 pl-4">
-              <div className="w-8 h-8 bg-purple-500/20 rounded-full flex items-center justify-center border border-purple-500/30">
-                <Shield className="w-4 h-4 text-purple-400" />
+            <div className="flex items-center gap-1.5 sm:gap-2 border-l border-gray-700 pl-2 sm:pl-4">
+              <div className="w-6 h-6 sm:w-8 sm:h-8 bg-purple-500/20 rounded-full flex items-center justify-center border border-purple-500/30">
+                <Shield className="w-3 h-3 sm:w-4 sm:h-4 text-purple-400" />
               </div>
-              <span className="text-xs text-gray-400 font-mono">{currentUser?.name}</span>
+              <span className="text-[10px] sm:text-xs text-gray-400 font-mono hidden md:block">{currentUser?.name}</span>
               <button
                 onClick={logout}
-                className="p-1.5 text-gray-400 hover:text-red-400 transition-colors"
+                className="p-1 sm:p-1.5 text-gray-400 hover:text-red-400 transition-colors"
                 title="Logout"
               >
-                <LogOut className="w-4 h-4" />
+                <LogOut className="w-3 h-3 sm:w-4 sm:h-4" />
               </button>
             </div>
           </div>
         </div>
       </header>
 
-      <main className="max-w-7xl mx-auto px-4 mt-6">
+      <main className="max-w-7xl mx-auto px-3 sm:px-4 mt-4 sm:mt-6">
         {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-4 mb-4 sm:mb-6">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            className="bg-terminal-gray border border-gray-800 rounded-lg p-4"
+            className="bg-terminal-gray border border-gray-800 rounded-lg p-3 sm:p-4"
           >
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-xs text-gray-500 font-mono uppercase">Pending</p>
-                <p className="text-2xl font-bold text-yellow-400 font-mono">
+                <p className="text-[10px] sm:text-xs text-gray-500 font-mono uppercase">Pending</p>
+                <p className="text-lg sm:text-2xl font-bold text-yellow-400 font-mono">
                   {users.filter((u) => u.status === "pending").length}
                 </p>
               </div>
-              <div className="w-12 h-12 bg-yellow-500/10 rounded-lg flex items-center justify-center border border-yellow-500/20">
-                <Clock className="w-6 h-6 text-yellow-400" />
+              <div className="w-8 h-8 sm:w-12 sm:h-12 bg-yellow-500/10 rounded-lg flex items-center justify-center border border-yellow-500/20">
+                <Clock className="w-4 h-4 sm:w-6 sm:h-6 text-yellow-400" />
               </div>
             </div>
             {pendingCount > 0 && (
-              <div className="mt-2 flex items-center gap-1 text-xs text-yellow-400">
+              <div className="mt-1.5 sm:mt-2 flex items-center gap-1 text-[10px] sm:text-xs text-yellow-400">
                 <AlertTriangle className="w-3 h-3" />
                 <span>Butuh approval</span>
               </div>
@@ -216,17 +218,17 @@ const AdminDashboard: React.FC = () => {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.1 }}
-            className="bg-terminal-gray border border-gray-800 rounded-lg p-4"
+            className="bg-terminal-gray border border-gray-800 rounded-lg p-3 sm:p-4"
           >
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-xs text-gray-500 font-mono uppercase">Approved</p>
-                <p className="text-2xl font-bold text-profit-green font-mono">
+                <p className="text-[10px] sm:text-xs text-gray-500 font-mono uppercase">Approved</p>
+                <p className="text-lg sm:text-2xl font-bold text-profit-green font-mono">
                   {users.filter((u) => u.status === "approved").length}
                 </p>
               </div>
-              <div className="w-12 h-12 bg-profit-green/10 rounded-lg flex items-center justify-center border border-profit-green/20">
-                <UserCheck className="w-6 h-6 text-profit-green" />
+              <div className="w-8 h-8 sm:w-12 sm:h-12 bg-profit-green/10 rounded-lg flex items-center justify-center border border-profit-green/20">
+                <UserCheck className="w-4 h-4 sm:w-6 sm:h-6 text-profit-green" />
               </div>
             </div>
           </motion.div>
@@ -235,17 +237,17 @@ const AdminDashboard: React.FC = () => {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.2 }}
-            className="bg-terminal-gray border border-gray-800 rounded-lg p-4"
+            className="bg-terminal-gray border border-gray-800 rounded-lg p-3 sm:p-4"
           >
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-xs text-gray-500 font-mono uppercase">Rejected</p>
-                <p className="text-2xl font-bold text-loss-red font-mono">
+                <p className="text-[10px] sm:text-xs text-gray-500 font-mono uppercase">Rejected</p>
+                <p className="text-lg sm:text-2xl font-bold text-loss-red font-mono">
                   {users.filter((u) => u.status === "rejected").length}
                 </p>
               </div>
-              <div className="w-12 h-12 bg-red-500/10 rounded-lg flex items-center justify-center border border-red-500/20">
-                <UserX className="w-6 h-6 text-loss-red" />
+              <div className="w-8 h-8 sm:w-12 sm:h-12 bg-red-500/10 rounded-lg flex items-center justify-center border border-red-500/20">
+                <UserX className="w-4 h-4 sm:w-6 sm:h-6 text-loss-red" />
               </div>
             </div>
           </motion.div>
@@ -254,87 +256,87 @@ const AdminDashboard: React.FC = () => {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.3 }}
-            className="bg-terminal-gray border border-gray-800 rounded-lg p-4"
+            className="bg-terminal-gray border border-gray-800 rounded-lg p-3 sm:p-4"
           >
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-xs text-gray-500 font-mono uppercase">Total Users</p>
-                <p className="text-2xl font-bold text-blue-400 font-mono">{users.length}</p>
+                <p className="text-[10px] sm:text-xs text-gray-500 font-mono uppercase">Total Users</p>
+                <p className="text-lg sm:text-2xl font-bold text-blue-400 font-mono">{users.length}</p>
               </div>
-              <div className="w-12 h-12 bg-blue-500/10 rounded-lg flex items-center justify-center border border-blue-500/20">
-                <Users className="w-6 h-6 text-blue-400" />
+              <div className="w-8 h-8 sm:w-12 sm:h-12 bg-blue-500/10 rounded-lg flex items-center justify-center border border-blue-500/20">
+                <Users className="w-4 h-4 sm:w-6 sm:h-6 text-blue-400" />
               </div>
             </div>
           </motion.div>
         </div>
 
         {/* Tabs & Actions */}
-        <div className="bg-terminal-gray border border-gray-800 rounded-lg p-4 mb-6">
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div className="bg-terminal-gray border border-gray-800 rounded-lg p-3 sm:p-4 mb-4 sm:mb-6">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4">
             <div className="flex items-center gap-2">
               <button
                 onClick={() => setActiveTab("pending")}
-                className={`flex items-center gap-2 px-4 py-2 rounded-lg font-mono text-sm transition-colors ${
+                className={`flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg font-mono text-[10px] sm:text-sm transition-colors ${
                   activeTab === "pending"
                     ? "bg-profit-green text-black font-bold"
                     : "bg-black border border-gray-700 text-gray-400 hover:text-white hover:border-gray-600"
                 }`}
               >
-                <Clock className="w-4 h-4" />
-                PENDING
+                <Clock className="w-3 h-3 sm:w-4 sm:h-4" />
+                <span className="hidden xs:inline">PENDING</span>
                 {pendingCount > 0 && (
-                  <span className="ml-1 px-2 py-0.5 bg-loss-red text-white text-xs rounded-full animate-pulse">
+                  <span className="px-1.5 sm:px-2 py-0.5 bg-loss-red text-white text-[10px] sm:text-xs rounded-full animate-pulse">
                     {pendingCount}
                   </span>
                 )}
               </button>
               <button
                 onClick={() => setActiveTab("all")}
-                className={`flex items-center gap-2 px-4 py-2 rounded-lg font-mono text-sm transition-colors ${
+                className={`flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg font-mono text-[10px] sm:text-sm transition-colors ${
                   activeTab === "all"
                     ? "bg-profit-green text-black font-bold"
                     : "bg-black border border-gray-700 text-gray-400 hover:text-white hover:border-gray-600"
                 }`}
               >
-                <Users className="w-4 h-4" />
-                ALL USERS
+                <Users className="w-3 h-3 sm:w-4 sm:h-4" />
+                <span className="hidden xs:inline">ALL</span> USERS
               </button>
             </div>
 
             <button
               onClick={loadUsers}
               disabled={isLoading}
-              className="flex items-center gap-2 px-4 py-2 bg-black border border-gray-700 text-gray-400 
-                hover:text-white hover:border-gray-600 rounded-lg transition-colors font-mono text-sm disabled:opacity-50"
+              className="flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-1.5 sm:py-2 bg-black border border-gray-700 text-gray-400 
+                hover:text-white hover:border-gray-600 rounded-lg transition-colors font-mono text-[10px] sm:text-sm disabled:opacity-50"
             >
-              <RefreshCw className={`w-4 h-4 ${isLoading ? "animate-spin" : ""}`} />
-              REFRESH
+              <RefreshCw className={`w-3 h-3 sm:w-4 sm:h-4 ${isLoading ? "animate-spin" : ""}`} />
+              <span className="hidden xs:inline">REFRESH</span>
             </button>
           </div>
         </div>
 
         {/* Users Table */}
         <div className="bg-terminal-gray border border-gray-800 rounded-lg overflow-hidden">
-          <div className="border-b border-gray-800 px-4 py-3">
-            <h2 className="text-lg font-bold font-mono text-white flex items-center gap-2">
-              <Activity className="w-5 h-5 text-profit-green" />
+          <div className="border-b border-gray-800 px-3 sm:px-4 py-2 sm:py-3">
+            <h2 className="text-sm sm:text-lg font-bold font-mono text-white flex items-center gap-2">
+              <Activity className="w-4 h-4 sm:w-5 sm:h-5 text-profit-green" />
               USER MANAGEMENT
             </h2>
           </div>
 
           {isLoading ? (
-            <div className="flex items-center justify-center py-16">
+            <div className="flex items-center justify-center py-12 sm:py-16">
               <div className="text-center">
-                <Loader2 className="w-8 h-8 text-profit-green animate-spin mx-auto mb-4" />
-                <p className="text-gray-500 font-mono text-sm">Loading users...</p>
+                <Loader2 className="w-6 h-6 sm:w-8 sm:h-8 text-profit-green animate-spin mx-auto mb-3 sm:mb-4" />
+                <p className="text-gray-500 font-mono text-xs sm:text-sm">Loading users...</p>
               </div>
             </div>
           ) : users.length === 0 ? (
-            <div className="text-center py-16">
-              <div className="w-16 h-16 bg-gray-800 rounded-full flex items-center justify-center mx-auto mb-4">
-                <Users className="w-8 h-8 text-gray-600" />
+            <div className="text-center py-12 sm:py-16">
+              <div className="w-12 h-12 sm:w-16 sm:h-16 bg-gray-800 rounded-full flex items-center justify-center mx-auto mb-3 sm:mb-4">
+                <Users className="w-6 h-6 sm:w-8 sm:h-8 text-gray-600" />
               </div>
-              <p className="text-gray-400 font-mono">
+              <p className="text-gray-400 font-mono text-xs sm:text-sm">
                 {activeTab === "pending"
                   ? "Tidak ada user yang menunggu persetujuan"
                   : "Belum ada user terdaftar"}
@@ -342,14 +344,14 @@ const AdminDashboard: React.FC = () => {
             </div>
           ) : (
             <div className="overflow-x-auto">
-              <table className="w-full text-left font-mono text-sm">
-                <thead className="bg-black border-b border-gray-800 text-gray-500 text-xs uppercase">
+              <table className="w-full text-left font-mono text-[10px] sm:text-xs md:text-sm min-w-[600px]">
+                <thead className="bg-black border-b border-gray-800 text-gray-500 text-[10px] sm:text-xs uppercase">
                   <tr>
-                    <th className="px-4 py-3">User</th>
-                    <th className="px-4 py-3">Role</th>
-                    <th className="px-4 py-3">Status</th>
-                    <th className="px-4 py-3">Registered</th>
-                    <th className="px-4 py-3 text-right">Actions</th>
+                    <th className="px-2 sm:px-4 py-2 sm:py-3">User</th>
+                    <th className="px-2 sm:px-4 py-2 sm:py-3">Role</th>
+                    <th className="px-2 sm:px-4 py-2 sm:py-3">Status</th>
+                    <th className="px-2 sm:px-4 py-2 sm:py-3 hidden sm:table-cell">Registered</th>
+                    <th className="px-2 sm:px-4 py-2 sm:py-3 text-right">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-800">
@@ -361,30 +363,30 @@ const AdminDashboard: React.FC = () => {
                       transition={{ delay: index * 0.05 }}
                       className="hover:bg-gray-800/50 transition-colors"
                     >
-                      <td className="px-4 py-4">
-                        <div className="flex items-center gap-3">
-                          <div className="w-10 h-10 bg-gray-800 rounded-full flex items-center justify-center border border-gray-700">
-                            <span className="text-profit-green font-bold">
+                      <td className="px-2 sm:px-4 py-2 sm:py-4">
+                        <div className="flex items-center gap-2 sm:gap-3">
+                          <div className="w-7 h-7 sm:w-10 sm:h-10 bg-gray-800 rounded-full flex items-center justify-center border border-gray-700 flex-shrink-0">
+                            <span className="text-profit-green font-bold text-xs sm:text-sm">
                               {user.name?.charAt(0).toUpperCase() || "?"}
                             </span>
                           </div>
-                          <div>
-                            <p className="font-bold text-white">{user.name}</p>
-                            <p className="text-xs text-gray-500">{user.email}</p>
+                          <div className="min-w-0">
+                            <p className="font-bold text-white text-[10px] sm:text-sm truncate">{user.name}</p>
+                            <p className="text-[9px] sm:text-xs text-gray-500 truncate">{user.email}</p>
                           </div>
                         </div>
                       </td>
-                      <td className="px-4 py-4">{getRoleBadge(user.role)}</td>
-                      <td className="px-4 py-4">{getStatusBadge(user.status)}</td>
-                      <td className="px-4 py-4 text-gray-500">
+                      <td className="px-2 sm:px-4 py-2 sm:py-4">{getRoleBadge(user.role)}</td>
+                      <td className="px-2 sm:px-4 py-2 sm:py-4">{getStatusBadge(user.status)}</td>
+                      <td className="px-2 sm:px-4 py-2 sm:py-4 text-gray-500 hidden sm:table-cell text-[10px] sm:text-xs">
                         {new Date(user.createdAt).toLocaleDateString("id-ID", {
                           day: "numeric",
                           month: "short",
                           year: "numeric",
                         })}
                       </td>
-                      <td className="px-4 py-4">
-                        <div className="flex items-center justify-end gap-2">
+                      <td className="px-2 sm:px-4 py-2 sm:py-4">
+                        <div className="flex items-center justify-end gap-1 sm:gap-2">
                           {user.status === "pending" && (
                             <>
                               <motion.button
@@ -392,8 +394,8 @@ const AdminDashboard: React.FC = () => {
                                 whileTap={{ scale: 0.95 }}
                                 onClick={() => handleApprove(user.id)}
                                 disabled={actionLoading === user.id}
-                                className="flex items-center gap-1 px-3 py-1.5 bg-profit-green/20 
-                                  hover:bg-profit-green/30 text-profit-green rounded-lg text-xs font-bold
+                                className="flex items-center gap-1 px-2 sm:px-3 py-1 sm:py-1.5 bg-profit-green/20 
+                                  hover:bg-profit-green/30 text-profit-green rounded-lg text-[10px] sm:text-xs font-bold
                                   transition-colors disabled:opacity-50 border border-profit-green/30"
                               >
                                 {actionLoading === user.id ? (
@@ -401,19 +403,19 @@ const AdminDashboard: React.FC = () => {
                                 ) : (
                                   <CheckCircle className="w-3 h-3" />
                                 )}
-                                APPROVE
+                                <span className="hidden xs:inline">APPROVE</span>
                               </motion.button>
                               <motion.button
                                 whileHover={{ scale: 1.05 }}
                                 whileTap={{ scale: 0.95 }}
                                 onClick={() => handleReject(user.id)}
                                 disabled={actionLoading === user.id}
-                                className="flex items-center gap-1 px-3 py-1.5 bg-loss-red/20 
-                                  hover:bg-loss-red/30 text-loss-red rounded-lg text-xs font-bold
+                                className="flex items-center gap-1 px-2 sm:px-3 py-1 sm:py-1.5 bg-loss-red/20 
+                                  hover:bg-loss-red/30 text-loss-red rounded-lg text-[10px] sm:text-xs font-bold
                                   transition-colors disabled:opacity-50 border border-loss-red/30"
                               >
                                 <XCircle className="w-3 h-3" />
-                                REJECT
+                                <span className="hidden xs:inline">REJECT</span>
                               </motion.button>
                             </>
                           )}
@@ -423,21 +425,21 @@ const AdminDashboard: React.FC = () => {
                               whileTap={{ scale: 0.95 }}
                               onClick={() => handleApprove(user.id)}
                               disabled={actionLoading === user.id}
-                              className="flex items-center gap-1 px-3 py-1.5 bg-profit-green/20 
-                                hover:bg-profit-green/30 text-profit-green rounded-lg text-xs font-bold
+                              className="flex items-center gap-1 px-2 sm:px-3 py-1 sm:py-1.5 bg-profit-green/20 
+                                hover:bg-profit-green/30 text-profit-green rounded-lg text-[10px] sm:text-xs font-bold
                                 transition-colors disabled:opacity-50 border border-profit-green/30"
                             >
                               <CheckCircle className="w-3 h-3" />
-                              RE-APPROVE
+                              <span className="hidden xs:inline">RE-APPROVE</span>
                             </motion.button>
                           )}
                           {user.status === "approved" && user.role !== "admin" && (
-                            <span className="text-xs text-gray-600">Active</span>
+                            <span className="text-[10px] sm:text-xs text-gray-600">Active</span>
                           )}
                           {user.role === "admin" && (
-                            <span className="text-xs text-purple-400 flex items-center gap-1">
+                            <span className="text-[10px] sm:text-xs text-purple-400 flex items-center gap-1">
                               <Shield className="w-3 h-3" />
-                              Admin
+                              <span className="hidden xs:inline">Admin</span>
                             </span>
                           )}
                         </div>
@@ -451,8 +453,8 @@ const AdminDashboard: React.FC = () => {
         </div>
 
         {/* Footer Info */}
-        <div className="mt-6 text-center">
-          <p className="text-gray-600 text-xs font-mono">
+        <div className="mt-4 sm:mt-6 text-center">
+          <p className="text-gray-600 text-[10px] sm:text-xs font-mono">
             MooCuan Admin Panel • Total {users.length} users registered
           </p>
         </div>

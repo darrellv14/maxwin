@@ -39,5 +39,43 @@ export default defineConfig(({ mode }) => {
         "@": path.resolve(__dirname, "."),
       },
     },
+    build: {
+      rollupOptions: {
+        output: {
+          manualChunks: (id) => {
+            if (id.includes('node_modules')) {
+              // React core
+              if (id.includes('react-dom') || id.includes('/react/')) {
+                return 'vendor-react';
+              }
+              // Router
+              if (id.includes('react-router')) {
+                return 'vendor-router';
+              }
+              // Charts - these are big
+              if (id.includes('lightweight-charts') || id.includes('recharts')) {
+                return 'vendor-charts';
+              }
+              // UI libraries
+              if (id.includes('framer-motion')) {
+                return 'vendor-motion';
+              }
+              if (id.includes('lucide-react')) {
+                return 'vendor-icons';
+              }
+              // Finance/indicators - these are big
+              if (id.includes('technicalindicators')) {
+                return 'vendor-indicators';
+              }
+              // Other vendor libs
+              if (id.includes('zustand') || id.includes('react-hot-toast') || id.includes('cmdk')) {
+                return 'vendor-utils';
+              }
+            }
+          },
+        },
+      },
+      chunkSizeWarningLimit: 600,
+    },
   };
 });

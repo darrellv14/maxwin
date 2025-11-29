@@ -128,15 +128,15 @@ const AIChatAssistant: React.FC<AIChatAssistantProps> = ({ currentTicker, curren
             whileHover={{ scale: 1.1 }}
             whileTap={{ scale: 0.9 }}
             onClick={() => setIsOpen(true)}
-            className="fixed bottom-6 right-6 w-16 h-16 bg-gradient-to-br from-green-400 via-emerald-500 to-teal-500 
+            className="fixed bottom-4 right-4 sm:bottom-6 sm:right-6 w-12 h-12 sm:w-16 sm:h-16 bg-gradient-to-br from-green-400 via-emerald-500 to-teal-500 
               rounded-full shadow-xl shadow-green-500/50 flex items-center justify-center z-50
               hover:shadow-green-400/70 hover:from-green-300 hover:via-emerald-400 hover:to-teal-400 
               transition-all duration-300 border-2 border-white/20"
           >
-            <MessageCircle className="w-7 h-7 text-white drop-shadow-lg" />
-            <span className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 rounded-full flex items-center justify-center
+            <MessageCircle className="w-5 h-5 sm:w-7 sm:h-7 text-white drop-shadow-lg" />
+            <span className="absolute -top-1 -right-1 w-4 h-4 sm:w-5 sm:h-5 bg-red-500 rounded-full flex items-center justify-center
               border-2 border-white shadow-lg animate-pulse">
-              <Sparkles className="w-3 h-3 text-white" />
+              <Sparkles className="w-2 h-2 sm:w-3 sm:h-3 text-white" />
             </span>
           </motion.button>
         )}
@@ -152,72 +152,72 @@ const AIChatAssistant: React.FC<AIChatAssistantProps> = ({ currentTicker, curren
             className={`fixed z-50 bg-terminal-dark border border-gray-700 rounded-2xl shadow-2xl 
               overflow-hidden flex flex-col ${
                 isExpanded
-                  ? "inset-4 md:inset-8"
-                  : "bottom-6 right-6 w-[380px] h-[500px] max-h-[80vh]"
+                  ? "inset-2 sm:inset-4 md:inset-8"
+                  : "bottom-2 right-2 left-2 sm:left-auto sm:bottom-6 sm:right-6 sm:w-[380px] h-[70vh] sm:h-[500px] max-h-[80vh]"
               }`}
           >
             {/* Header */}
-            <div className="flex items-center justify-between px-4 py-3 bg-gray-800/50 border-b border-gray-700">
+            <div className="flex items-center justify-between px-3 sm:px-4 py-2.5 sm:py-3 bg-gray-800/50 border-b border-gray-700">
               <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-full bg-linear-to-br from-terminal-green to-emerald-600 flex items-center justify-center">
-                  <Bot className="w-4 h-4 text-black" />
+                <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-linear-to-br from-terminal-green to-emerald-600 flex items-center justify-center">
+                  <Bot className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-black" />
                 </div>
                 <div>
-                  <h3 className="font-mono font-bold text-white text-sm">MooCuan AI</h3>
-                  <p className="text-xs text-gray-500">Stock Assistant</p>
+                  <h3 className="font-mono font-bold text-white text-xs sm:text-sm">MooCuan AI</h3>
+                  <p className="text-[10px] sm:text-xs text-gray-500">Stock Assistant</p>
                 </div>
               </div>
-              <div className="flex items-center gap-1">
+              <div className="flex items-center gap-0.5 sm:gap-1">
                 <button
                   onClick={() => setIsExpanded(!isExpanded)}
-                  className="p-2 hover:bg-gray-700 rounded-lg transition-colors"
+                  className="p-1.5 sm:p-2 hover:bg-gray-700 rounded-lg transition-colors"
                 >
                   {isExpanded ? (
-                    <Minimize2 className="w-4 h-4 text-gray-400" />
+                    <Minimize2 className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-gray-400" />
                   ) : (
-                    <Maximize2 className="w-4 h-4 text-gray-400" />
+                    <Maximize2 className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-gray-400" />
                   )}
                 </button>
                 <button
                   onClick={() => setIsOpen(false)}
-                  className="p-2 hover:bg-gray-700 rounded-lg transition-colors"
+                  className="p-1.5 sm:p-2 hover:bg-gray-700 rounded-lg transition-colors"
                 >
-                  <X className="w-4 h-4 text-gray-400" />
+                  <X className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-gray-400" />
                 </button>
               </div>
             </div>
 
             {/* Messages */}
-            <div className="flex-1 overflow-y-auto p-4 space-y-4">
+            <div className="flex-1 overflow-y-auto p-3 sm:p-4 space-y-3 sm:space-y-4">
               {messages.map((message) => (
                 <motion.div
                   key={message.id}
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
-                  className={`flex gap-3 ${message.role === "user" ? "flex-row-reverse" : ""}`}
+                  className={`flex gap-2 sm:gap-3 ${message.role === "user" ? "flex-row-reverse" : ""}`}
                 >
                   <div
-                    className={`w-8 h-8 rounded-full shrink-0 flex items-center justify-center ${
+                    className={`w-7 h-7 sm:w-8 sm:h-8 rounded-full shrink-0 flex items-center justify-center ${
                       message.role === "user"
                         ? "bg-blue-500"
                         : "bg-linear-to-br from-terminal-green to-emerald-600"
                     }`}
                   >
                     {message.role === "user" ? (
-                      <User className="w-4 h-4 text-white" />
+                      <User className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-white" />
                     ) : (
-                      <Bot className="w-4 h-4 text-black" />
+                      <Bot className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-black" />
                     )}
                   </div>
                   <div
-                    className={`max-w-[80%] rounded-2xl px-4 py-2.5 ${
+                    className={`max-w-[85%] sm:max-w-[80%] rounded-2xl px-3 sm:px-4 py-2 sm:py-2.5 ${
                       message.role === "user"
                         ? "bg-blue-500 text-white rounded-tr-md"
                         : "bg-gray-800 text-gray-200 rounded-tl-md"
                     }`}
                   >
-                    <p className="text-sm whitespace-pre-wrap">{message.content}</p>
-                    <p className="text-xs mt-1 opacity-50">
+                    <p className="text-xs sm:text-sm whitespace-pre-wrap">{message.content}</p>
+                    <p className="text-[10px] sm:text-xs mt-1 opacity-50">
                       {message.timestamp.toLocaleTimeString("id-ID", {
                         hour: "2-digit",
                         minute: "2-digit",
@@ -231,15 +231,15 @@ const AIChatAssistant: React.FC<AIChatAssistantProps> = ({ currentTicker, curren
                 <motion.div
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
-                  className="flex gap-3"
+                  className="flex gap-2 sm:gap-3"
                 >
-                  <div className="w-8 h-8 rounded-full bg-linear-to-br from-terminal-green to-emerald-600 flex items-center justify-center">
-                    <Bot className="w-4 h-4 text-black" />
+                  <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-linear-to-br from-terminal-green to-emerald-600 flex items-center justify-center">
+                    <Bot className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-black" />
                   </div>
-                  <div className="bg-gray-800 rounded-2xl rounded-tl-md px-4 py-3">
+                  <div className="bg-gray-800 rounded-2xl rounded-tl-md px-3 sm:px-4 py-2.5 sm:py-3">
                     <div className="flex items-center gap-2">
-                      <Loader2 className="w-4 h-4 text-terminal-green animate-spin" />
-                      <span className="text-sm text-gray-400">Thinking...</span>
+                      <Loader2 className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-terminal-green animate-spin" />
+                      <span className="text-xs sm:text-sm text-gray-400">Thinking...</span>
                     </div>
                   </div>
                 </motion.div>
@@ -250,14 +250,14 @@ const AIChatAssistant: React.FC<AIChatAssistantProps> = ({ currentTicker, curren
 
             {/* Quick Questions */}
             {messages.length <= 2 && (
-              <div className="px-4 pb-2">
-                <p className="text-xs text-gray-500 mb-2">Quick questions:</p>
-                <div className="flex flex-wrap gap-2">
+              <div className="px-3 sm:px-4 pb-2">
+                <p className="text-[10px] sm:text-xs text-gray-500 mb-1.5 sm:mb-2">Quick questions:</p>
+                <div className="flex flex-wrap gap-1.5 sm:gap-2">
                   {quickQuestions.map((q, i) => (
                     <button
                       key={i}
                       onClick={() => handleQuickQuestion(q)}
-                      className="px-3 py-1.5 text-xs bg-gray-800 hover:bg-gray-700 text-gray-300 rounded-full transition-colors"
+                      className="px-2 sm:px-3 py-1 sm:py-1.5 text-[10px] sm:text-xs bg-gray-800 hover:bg-gray-700 text-gray-300 rounded-full transition-colors"
                     >
                       {q}
                     </button>
@@ -267,8 +267,8 @@ const AIChatAssistant: React.FC<AIChatAssistantProps> = ({ currentTicker, curren
             )}
 
             {/* Input */}
-            <div className="p-4 border-t border-gray-700">
-              <div className="flex items-center gap-2 bg-gray-800 rounded-xl px-4 py-2">
+            <div className="p-3 sm:p-4 border-t border-gray-700">
+              <div className="flex items-center gap-2 bg-gray-800 rounded-xl px-3 sm:px-4 py-1.5 sm:py-2">
                 <input
                   ref={inputRef}
                   type="text"
@@ -276,16 +276,16 @@ const AIChatAssistant: React.FC<AIChatAssistantProps> = ({ currentTicker, curren
                   onChange={(e) => setInput(e.target.value)}
                   onKeyPress={(e) => e.key === "Enter" && handleSend()}
                   placeholder="Ask about stocks..."
-                  className="flex-1 bg-transparent text-white text-sm outline-none placeholder-gray-500"
+                  className="flex-1 bg-transparent text-white text-xs sm:text-sm outline-none placeholder-gray-500"
                   disabled={isLoading}
                 />
                 <button
                   onClick={handleSend}
                   disabled={!input.trim() || isLoading}
-                  className="p-2 bg-terminal-green hover:bg-terminal-green/80 disabled:bg-gray-700 
+                  className="p-1.5 sm:p-2 bg-terminal-green hover:bg-terminal-green/80 disabled:bg-gray-700 
                     disabled:text-gray-500 text-black rounded-lg transition-colors"
                 >
-                  <Send className="w-4 h-4" />
+                  <Send className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                 </button>
               </div>
             </div>

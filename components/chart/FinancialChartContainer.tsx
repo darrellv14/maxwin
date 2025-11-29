@@ -311,10 +311,10 @@ const FinancialChartContainer: React.FC<FinancialChartContainerProps> = ({
   return (
     <div
       ref={fullscreenRef}
-      className={`w-full space-y-2 ${isFullscreen ? "fixed inset-0 z-50 bg-terminal-dark p-4" : ""}`}
+      className={`w-full space-y-1.5 sm:space-y-2 ${isFullscreen ? "fixed inset-0 z-50 bg-terminal-dark p-2 sm:p-4" : ""}`}
     >
       {/* Header Row */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-0">
         <ChartHeader
           ticker={ticker}
           price={currentPrice}
@@ -346,7 +346,7 @@ const FinancialChartContainer: React.FC<FinancialChartContainerProps> = ({
 
       {/* Chart Area with Drawing Tools */}
       <div
-        className={`flex gap-2 ${isFullscreen ? "flex-1" : ""}`}
+        className={`flex flex-col sm:flex-row gap-1.5 sm:gap-2 ${isFullscreen ? "flex-1" : ""}`}
         style={isFullscreen ? { height: "calc(100vh - 140px)" } : {}}
       >
         {/* Drawing Toolbar */}
@@ -359,8 +359,8 @@ const FinancialChartContainer: React.FC<FinancialChartContainerProps> = ({
         {/* Chart Container */}
         <div
           ref={containerRef}
-          className="flex-1 relative bg-terminal-dark rounded-lg border border-gray-800 overflow-hidden"
-          style={{ height: isFullscreen ? "100%" : 500 }}
+          className="flex-1 relative bg-terminal-dark rounded-lg border border-gray-800 overflow-hidden min-h-[300px] sm:min-h-[400px]"
+          style={{ height: isFullscreen ? "100%" : undefined }}
         >
           {/* TradingView Chart */}
           <TradingViewChart
@@ -371,7 +371,7 @@ const FinancialChartContainer: React.FC<FinancialChartContainerProps> = ({
             showSMA20={showSMA20}
             showSMA50={showSMA50}
             showBollingerBands={showBB}
-            height={isFullscreen ? undefined : 500}
+            height={isFullscreen ? undefined : undefined}
             onCrosshairMove={handleCrosshairMove}
           />
 
@@ -396,14 +396,14 @@ const FinancialChartContainer: React.FC<FinancialChartContainerProps> = ({
 
           {/* Active Tool Indicator */}
           {activeTool !== "cursor" && (
-            <div className="absolute top-2 right-2 bg-profit-green/90 text-black px-2 py-1 rounded text-xs font-mono font-bold z-20">
-              ✏️ {activeTool.toUpperCase()} MODE
+            <div className="absolute top-2 right-2 bg-profit-green/90 text-black px-1.5 sm:px-2 py-0.5 sm:py-1 rounded text-[10px] sm:text-xs font-mono font-bold z-20">
+              ✏️ {activeTool.toUpperCase()}
             </div>
           )}
 
           {/* Crosshair Price Display */}
           {crosshairData.price && activeTool === "cursor" && (
-            <div className="absolute top-2 left-2 bg-black/80 px-2 py-1 rounded text-xs font-mono text-white">
+            <div className="absolute top-2 left-2 bg-black/80 px-1.5 sm:px-2 py-0.5 sm:py-1 rounded text-[10px] sm:text-xs font-mono text-white">
               {crosshairData.price.toLocaleString(undefined, {
                 minimumFractionDigits: 2,
                 maximumFractionDigits: 2,
@@ -413,8 +413,8 @@ const FinancialChartContainer: React.FC<FinancialChartContainerProps> = ({
 
           {/* Drawing Count */}
           {drawings.length > 0 && (
-            <div className="absolute bottom-2 left-2 bg-black/80 px-2 py-1 rounded text-xs font-mono text-gray-400">
-              📐 {drawings.length} drawing{drawings.length > 1 ? "s" : ""}
+            <div className="absolute bottom-2 left-2 bg-black/80 px-1.5 sm:px-2 py-0.5 sm:py-1 rounded text-[10px] sm:text-xs font-mono text-gray-400">
+              📐 {drawings.length}
             </div>
           )}
         </div>
@@ -422,16 +422,15 @@ const FinancialChartContainer: React.FC<FinancialChartContainerProps> = ({
 
       {/* Legend */}
       {legendItems.length > 0 && (
-        <div className="pl-12">
+        <div className="pl-0 sm:pl-12">
           <ChartLegend items={legendItems} />
         </div>
       )}
 
       {/* Drawing Tools Help */}
       {activeTool !== "cursor" && (
-        <div className="text-xs text-gray-500 font-mono pl-12">
-          📝 Active Tool: <span className="text-profit-green">{activeTool.toUpperCase()}</span> —
-          Click and drag to draw. Press ESC or select cursor to exit.
+        <div className="text-[10px] sm:text-xs text-gray-500 font-mono pl-0 sm:pl-12">
+          📝 <span className="text-profit-green">{activeTool.toUpperCase()}</span> — Click and drag
         </div>
       )}
     </div>

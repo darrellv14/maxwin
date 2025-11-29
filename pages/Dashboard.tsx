@@ -8,27 +8,46 @@ import StatCard from "../components/StatCard";
 import OraclePanel from "../components/OraclePanel";
 import ConfidenceChart from "../components/ConfidenceChart";
 import WatchlistWidget from "../components/WatchlistWidget";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { motion } from "framer-motion";
 import toast from "react-hot-toast";
 import { Star, Keyboard, LogOut, Shield } from "lucide-react";
 import { useWatchlistStore } from "../stores/watchlistStore";
 import { logout, isAdmin, getUser } from "../services/authService";
 import AIChatAssistant from "@/components/AIChatAssistant";
+import { ChartSkeleton, StatCardSkeleton } from "../components/Skeleton";
+
+const MOOCUAN_LOGO = "https://res.cloudinary.com/drvu0dpry/image/upload/v1764410228/moocuan-logo_ya5ous.png";
 
 const Dashboard: React.FC = () => {
-  const [ticker, setTicker] = useState<string>("BTC-USD");
-  const [searchInput, setSearchInput] = useState<string>("BTC-USD");
+  const [searchParams, setSearchParams] = useSearchParams();
+  const initialTicker = searchParams.get("ticker")?.toUpperCase() || "BTC-USD";
+  
+  const [ticker, setTicker] = useState<string>(initialTicker);
+  const [searchInput, setSearchInput] = useState<string>(initialTicker);
   const [timeframe, setTimeframe] = useState<TimeFrame>("3M");
   const [data, setData] = useState<IndicatorData[]>([]);
   const [analysis, setAnalysis] = useState<AIAnalysisResult | null>(null);
   const [loadingAI, setLoadingAI] = useState<boolean>(false);
+  const [loadingData, setLoadingData] = useState<boolean>(true);
 
   const { addToWatchlist, removeFromWatchlist, isInWatchlist } = useWatchlistStore();
   const user = getUser();
 
+  // Update URL when ticker changes
+  useEffect(() => {
+    const currentParam = searchParams.get("ticker")?.toUpperCase();
+    if (ticker !== "BTC-USD" && ticker !== currentParam) {
+      setSearchParams({ ticker: ticker }, { replace: true });
+    } else if (ticker === "BTC-USD" && currentParam) {
+      // Remove param if back to default
+      setSearchParams({}, { replace: true });
+    }
+  }, [ticker, searchParams, setSearchParams]);
+
   useEffect(() => {
     const loadData = async () => {
+      setLoadingData(true);
       try {
         const rawData = await fetchStockData(ticker, timeframe);
         const enrichedData = calculateIndicators(rawData);
@@ -36,6 +55,8 @@ const Dashboard: React.FC = () => {
         setAnalysis(null);
       } catch (err) {
         console.error("Failed to fetch stock data:", err);
+      } finally {
+        setLoadingData(false);
       }
     };
     loadData();
@@ -113,26 +134,26 @@ const Dashboard: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-terminal-black text-gray-200 font-sans selection:bg-green-900 selection:text-white pb-10">
+    <div className="min-h-screen bg-terminal-black text-gray-200 font-sans selection:bg-green-900 selection:text-white pb-6 md:pb-10">
       {/* Header */}
       <header className="border-b border-gray-800 bg-terminal-dark/50 backdrop-blur sticky top-0 z-50">
-        <div className="max-w-7xl mx-auto px-4 py-3 flex justify-between items-center 2xl:max-w-none">
-          <div className="flex items-center gap-2">
-            <div className="w-3 h-3 bg-profit-green rounded-full shadow-[0_0_10px_#00ff9d]"></div>
-            <h1 className="text-xl font-bold tracking-tight text-white font-mono">
+        <div className="max-w-7xl mx-auto px-3 sm:px-4 py-2 sm:py-3 flex justify-between items-center 2xl:max-w-none">
+          <div className="flex items-center gap-2 sm:gap-3">
+            <img src={MOOCUAN_LOGO} alt="MooCuan" className="w-8 h-8 sm:w-10 sm:h-10 object-contain" />
+            <h1 className="text-base sm:text-xl font-bold tracking-tight text-white font-mono">
               MOO<span className="text-profit-green">CUAN</span>
-              <span className="text-gray-600 text-sm ml-1">v1.0</span>
-              <span className="text-gray-500 text-xs ml-3">by Darrell</span>
+              <span className="text-gray-600 text-xs sm:text-sm ml-1 hidden xs:inline">v1.0</span>
             </h1>
           </div>
 
-          <div className="flex items-center gap-4">
+          {/* Desktop Nav */}
+          <div className="hidden md:flex items-center gap-3 lg:gap-4">
             <button
               onClick={() => {
                 const event = new KeyboardEvent("keydown", { key: "k", metaKey: true });
                 document.dispatchEvent(event);
               }}
-              className="hidden md:flex items-center gap-2 text-xs font-mono text-gray-500 hover:text-gray-300 bg-gray-900 px-3 py-1.5 rounded border border-gray-800"
+              className="hidden lg:flex items-center gap-2 text-xs font-mono text-gray-500 hover:text-gray-300 bg-gray-900 px-3 py-1.5 rounded border border-gray-800"
             >
               <Keyboard className="w-3 h-3" />
               <span>Cmd+K</span>
@@ -143,13 +164,15 @@ const Dashboard: React.FC = () => {
               className="text-xs font-mono bg-gray-900 px-3 py-1 rounded-full border border-gray-800 hover:bg-gray-800 text-profit-green transition-colors flex items-center gap-2"
             >
               <span className="w-2 h-2 bg-profit-green rounded-full animate-pulse"></span>
-              AI SCREENER
+              <span className="hidden lg:inline">AI SCREENER</span>
+              <span className="lg:hidden">AI</span>
             </Link>
             <Link
               to="/history"
               className="text-xs font-mono bg-gray-900 px-3 py-1 rounded-full border border-gray-800 hover:bg-gray-800 text-gray-300 transition-colors"
             >
-              VIEW HISTORY
+              <span className="hidden lg:inline">VIEW HISTORY</span>
+              <span className="lg:hidden">HISTORY</span>
             </Link>
 
             {isAdmin() && (
@@ -158,12 +181,12 @@ const Dashboard: React.FC = () => {
                 className="text-xs font-mono bg-purple-900/50 px-3 py-1 rounded-full border border-purple-700 hover:bg-purple-800 text-purple-300 transition-colors flex items-center gap-2"
               >
                 <Shield className="w-3 h-3" />
-                ADMIN
+                <span className="hidden lg:inline">ADMIN</span>
               </Link>
             )}
 
             <div className="flex items-center gap-2 border-l border-gray-700 pl-4">
-              <span className="text-xs text-gray-400">{user?.name}</span>
+              <span className="text-xs text-gray-400 hidden lg:block">{user?.name}</span>
               <button
                 onClick={logout}
                 className="p-1.5 text-gray-400 hover:text-red-400 transition-colors"
@@ -173,10 +196,40 @@ const Dashboard: React.FC = () => {
               </button>
             </div>
           </div>
+
+          {/* Mobile Nav */}
+          <div className="flex md:hidden items-center gap-2">
+            <Link
+              to="/screener"
+              className="text-[10px] font-mono bg-gray-900 px-2 py-1 rounded-full border border-gray-800 text-profit-green"
+            >
+              AI
+            </Link>
+            <Link
+              to="/history"
+              className="text-[10px] font-mono bg-gray-900 px-2 py-1 rounded-full border border-gray-800 text-gray-300"
+            >
+              📊
+            </Link>
+            {isAdmin() && (
+              <Link
+                to="/admin"
+                className="text-[10px] font-mono bg-purple-900/50 px-2 py-1 rounded-full border border-purple-700 text-purple-300"
+              >
+                <Shield className="w-3 h-3" />
+              </Link>
+            )}
+            <button
+              onClick={logout}
+              className="p-1 text-gray-400 hover:text-red-400 transition-colors"
+            >
+              <LogOut className="w-4 h-4" />
+            </button>
+          </div>
         </div>
       </header>
 
-      <main className="max-w-7xl mx-auto px-4 mt-6 2xl:max-w-none">
+      <main className="max-w-7xl mx-auto px-3 sm:px-4 mt-4 sm:mt-6 2xl:max-w-none">
         <div className="grid grid-cols-1 md:grid-cols-12 gap-4 mb-6">
           {/* Sidebar */}
           <div className="col-span-12 md:col-span-3 space-y-4 flex flex-col">
@@ -290,50 +343,63 @@ const Dashboard: React.FC = () => {
 
           {/* Main Chart Area */}
           <div className="col-span-12 md:col-span-9 space-y-4 flex flex-col">
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <StatCard
-                label="Last Price"
-                value={current?.close?.toLocaleString("id-ID") || "0"}
-                subValue={`${priceStats.val} (${priceStats.percent})`}
-                trend={priceStats.trend}
-              />
-              <StatCard
-                label="Volume"
-                value={(current?.volume || 0).toLocaleString()}
-                color="text-blue-400"
-              />
-              <StatCard
-                label="Volatility"
-                value={Math.abs((current?.bbUpper || 0) - (current?.bbLower || 0)).toFixed(0)}
-                subValue="BB Width"
-                color="text-yellow-400"
-              />
-              <StatCard
-                label="Signal"
-                value={analysis ? analysis.signal : "WAITING"}
-                color={
-                  analysis?.signal === "BUY"
-                    ? "text-profit-green"
-                    : analysis?.signal === "SELL"
-                      ? "text-loss-red"
-                      : "text-gray-500"
-                }
-              />
-            </div>
-          <AIChatAssistant />
-
-            <FinancialChart data={data} />
+            {loadingData ? (
+              <>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  <StatCardSkeleton />
+                  <StatCardSkeleton />
+                  <StatCardSkeleton />
+                  <StatCardSkeleton />
+                </div>
+                <ChartSkeleton />
+              </>
+            ) : (
+              <>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  <StatCard
+                    label="Last Price"
+                    value={current?.close?.toLocaleString("id-ID") || "0"}
+                    subValue={`${priceStats.val} (${priceStats.percent})`}
+                    trend={priceStats.trend}
+                  />
+                  <StatCard
+                    label="Volume"
+                    value={(current?.volume || 0).toLocaleString()}
+                    color="text-blue-400"
+                  />
+                  <StatCard
+                    label="Volatility"
+                    value={Math.abs((current?.bbUpper || 0) - (current?.bbLower || 0)).toFixed(0)}
+                    subValue="BB Width"
+                    color="text-yellow-400"
+                  />
+                  <StatCard
+                    label="Signal"
+                    value={analysis ? analysis.signal : "WAITING"}
+                    color={
+                      analysis?.signal === "BUY"
+                        ? "text-profit-green"
+                        : analysis?.signal === "SELL"
+                          ? "text-loss-red"
+                          : "text-gray-500"
+                    }
+                  />
+                </div>
+                <AIChatAssistant />
+                <FinancialChart data={data} />
+              </>
+            )}
           </div>
         </div>
 
         {/* Bottom Section */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
           <OraclePanel analysis={analysis} loading={loadingAI} onAnalyze={handleAnalyze} />
 
-          <div className="bg-terminal-gray border border-gray-800 rounded-lg p-6">
-            <h2 className="text-lg font-bold font-mono text-white mb-4">MARKET DEPTH LOG</h2>
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs font-mono">
+          <div className="bg-terminal-gray border border-gray-800 rounded-lg p-4 sm:p-6">
+            <h2 className="text-sm sm:text-lg font-bold font-mono text-white mb-3 sm:mb-4">MARKET DEPTH LOG</h2>
+            <div className="overflow-x-auto -mx-4 sm:mx-0 px-4 sm:px-0">
+              <table className="w-full text-left text-[10px] sm:text-xs font-mono min-w-[300px]">
                 <thead className="border-b border-gray-700 text-gray-500">
                   <tr>
                     <th className="pb-2">DATE</th>

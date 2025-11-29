@@ -10,17 +10,17 @@ interface StatCardProps {
 
 const StatCard: React.FC<StatCardProps> = ({ label, value, subValue, trend, color }) => {
   return (
-    <div className="bg-terminal-gray border border-gray-800 p-4 rounded-lg shadow-lg">
-      <div className="text-gray-400 text-xs font-mono uppercase tracking-wider mb-1">{label}</div>
+    <div className="bg-terminal-gray border border-gray-800 p-3 sm:p-4 rounded-lg shadow-lg">
+      <div className="text-gray-400 text-[10px] sm:text-xs font-mono uppercase tracking-wider mb-1">{label}</div>
       <div
-        className={`text-2xl font-bold font-mono truncate ${color ? color : "text-white"}`}
+        className={`text-lg sm:text-xl md:text-2xl font-bold font-mono truncate ${color ? color : "text-white"}`}
         title={String(value)}
       >
         {value}
       </div>
       {subValue && (
         <div
-          className={`text-sm mt-1 flex items-center ${
+          className={`text-xs sm:text-sm mt-1 flex items-center ${
             trend === "up"
               ? "text-profit-green"
               : trend === "down"

@@ -16,6 +16,8 @@ import {
 import { register } from "../services/authService";
 import { useToast } from "../components/ToastProvider";
 
+const MOOCUAN_LOGO = "https://res.cloudinary.com/drvu0dpry/image/upload/v1764410228/moocuan-logo_ya5ous.png";
+
 const Register: React.FC = () => {
   const navigate = useNavigate();
   const { showToast } = useToast();
@@ -63,8 +65,8 @@ const Register: React.FC = () => {
       <div className="min-h-screen bg-terminal-black flex items-center justify-center p-4">
         {/* Background effects */}
         <div className="absolute inset-0 overflow-hidden pointer-events-none">
-          <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-profit-green/5 rounded-full blur-3xl" />
-          <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-blue-500/5 rounded-full blur-3xl" />
+          <div className="absolute top-1/4 left-1/4 w-64 sm:w-96 h-64 sm:h-96 bg-profit-green/5 rounded-full blur-3xl" />
+          <div className="absolute bottom-1/4 right-1/4 w-64 sm:w-96 h-64 sm:h-96 bg-blue-500/5 rounded-full blur-3xl" />
         </div>
 
         <motion.div
@@ -72,26 +74,28 @@ const Register: React.FC = () => {
           animate={{ opacity: 1, scale: 1 }}
           className="w-full max-w-md text-center relative"
         >
-          <div className="bg-terminal-gray border border-gray-800 rounded-xl p-8">
+          <div className="bg-terminal-gray border border-gray-800 rounded-xl p-5 sm:p-8">
             <motion.div
               initial={{ scale: 0 }}
               animate={{ scale: 1 }}
               transition={{ type: "spring", delay: 0.2 }}
-              className="w-20 h-20 bg-profit-green/20 rounded-full flex items-center justify-center mx-auto mb-6 border border-profit-green/30"
+              className="w-16 h-16 sm:w-24 sm:h-24 mx-auto mb-4 sm:mb-6 relative"
             >
-              <CheckCircle className="w-10 h-10 text-profit-green" />
+              <div className="absolute inset-0 bg-profit-green/20 rounded-full blur-xl animate-pulse" />
+              <img src={MOOCUAN_LOGO} alt="MooCuan" className="w-full h-full object-contain relative z-10" />
+              <CheckCircle className="absolute -bottom-1 -right-1 w-6 h-6 sm:w-8 sm:h-8 text-profit-green bg-terminal-gray rounded-full" />
             </motion.div>
 
-            <h2 className="text-2xl font-bold text-white font-mono mb-2">
+            <h2 className="text-lg sm:text-2xl font-bold text-white font-mono mb-2">
               REGISTRASI <span className="text-profit-green">BERHASIL!</span>
             </h2>
 
-            <div className="bg-black border border-gray-800 rounded-lg p-4 my-6 text-left font-mono text-sm">
+            <div className="bg-black border border-gray-800 rounded-lg p-3 sm:p-4 my-4 sm:my-6 text-left font-mono text-xs sm:text-sm">
               <div className="flex items-center gap-2 text-yellow-400 mb-2">
-                <Clock className="w-4 h-4" />
+                <Clock className="w-3 h-3 sm:w-4 sm:h-4" />
                 <span>Status: PENDING APPROVAL</span>
               </div>
-              <p className="text-gray-400 text-xs">
+              <p className="text-gray-400 text-[10px] sm:text-xs">
                 Akun Anda sedang menunggu persetujuan admin. Kami akan mengaktifkan akun Anda
                 segera.
               </p>
@@ -99,7 +103,7 @@ const Register: React.FC = () => {
 
             <Link
               to="/login"
-              className="inline-flex items-center gap-2 px-6 py-3 bg-profit-green text-black font-bold font-mono uppercase
+              className="inline-flex items-center gap-2 px-4 sm:px-6 py-2.5 sm:py-3 bg-profit-green text-black font-bold font-mono uppercase text-sm sm:text-base
                 rounded-lg hover:bg-profit-green/90 transition-colors shadow-lg shadow-profit-green/20"
             >
               KEMBALI KE LOGIN
@@ -113,11 +117,11 @@ const Register: React.FC = () => {
   return (
     <div className="min-h-screen bg-terminal-black flex">
       {/* Left Side - Branding */}
-      <div className="hidden lg:flex lg:w-1/2 bg-terminal-dark border-r border-gray-800 flex-col p-12">
+      <div className="hidden lg:flex lg:w-1/2 bg-terminal-dark border-r border-gray-800 flex-col p-6 xl:p-12">
         <div>
-          <div className="flex items-center gap-2 mb-4">
-            <div className="w-3 h-3 bg-profit-green rounded-full shadow-[0_0_10px_#00ff9d]"></div>
-            <h1 className="text-2xl font-bold tracking-tight text-white font-mono">
+          <div className="flex items-center gap-2 xl:gap-3 mb-4">
+            <img src={MOOCUAN_LOGO} alt="MooCuan" className="w-10 h-10 xl:w-14 xl:h-14 object-contain" />
+            <h1 className="text-xl xl:text-2xl font-bold tracking-tight text-white font-mono">
               MOO<span className="text-profit-green">CUAN</span>
             </h1>
           </div>
@@ -127,18 +131,18 @@ const Register: React.FC = () => {
             animate={{ opacity: 1, x: 0 }}
             transition={{ delay: 0.2 }}
           >
-            <h2 className="text-4xl font-bold text-white mb-4 font-mono">
+            <h2 className="text-2xl xl:text-4xl font-bold text-white mb-3 xl:mb-4 font-mono">
               Join the
               <br />
               <span className="text-profit-green">Smart Traders</span>
             </h2>
-            <p className="text-gray-400 text-lg mb-8">
+            <p className="text-gray-400 text-sm xl:text-lg mb-6 xl:mb-8">
               Bergabung dengan trader cerdas yang menggunakan AI untuk analisis saham.
             </p>
           </motion.div>
 
           {/* Features */}
-          <div className="space-y-4 mt-12">
+          <div className="space-y-3 xl:space-y-4 mt-8 xl:mt-12">
             {[
               { icon: BarChart3, text: "TradingView-style Charts", color: "text-blue-400" },
               { icon: Zap, text: "AI Stock Screener", color: "text-yellow-400" },
@@ -150,23 +154,23 @@ const Register: React.FC = () => {
                 initial={{ opacity: 0, x: -20 }}
                 animate={{ opacity: 1, x: 0 }}
                 transition={{ delay: 0.3 + i * 0.1 }}
-                className="flex items-center gap-3"
+                className="flex items-center gap-2 xl:gap-3"
               >
-                <div className="w-10 h-10 bg-gray-800 rounded-lg flex items-center justify-center border border-gray-700">
-                  <feature.icon className={`w-5 h-5 ${feature.color}`} />
+                <div className="w-8 h-8 xl:w-10 xl:h-10 bg-gray-800 rounded-lg flex items-center justify-center border border-gray-700">
+                  <feature.icon className={`w-4 h-4 xl:w-5 xl:h-5 ${feature.color}`} />
                 </div>
-                <span className="text-gray-300 font-mono">{feature.text}</span>
+                <span className="text-gray-300 font-mono text-sm xl:text-base">{feature.text}</span>
               </motion.div>
             ))}
           </div>
         </div>
 
         {/* Terminal Effect */}
-        <div className="bg-black border border-gray-800 rounded-lg p-4 font-mono text-sm mt-4">
-          <div className="flex items-center gap-2 mb-2">
-            <div className="w-3 h-3 rounded-full bg-red-500"></div>
-            <div className="w-3 h-3 rounded-full bg-yellow-500"></div>
-            <div className="w-3 h-3 rounded-full bg-green-500"></div>
+        <div className="bg-black border border-gray-800 rounded-lg p-3 xl:p-4 font-mono text-xs xl:text-sm mt-4">
+          <div className="flex items-center gap-1.5 xl:gap-2 mb-2">
+            <div className="w-2 h-2 xl:w-3 xl:h-3 rounded-full bg-red-500"></div>
+            <div className="w-2 h-2 xl:w-3 xl:h-3 rounded-full bg-yellow-500"></div>
+            <div className="w-2 h-2 xl:w-3 xl:h-3 rounded-full bg-green-500"></div>
           </div>
           <div className="text-gray-500">
             <span className="text-profit-green">$</span> user.create --premium
@@ -181,11 +185,11 @@ const Register: React.FC = () => {
       </div>
 
       {/* Right Side - Register Form */}
-      <div className="flex-1 flex items-center justify-center p-8 overflow-y-auto">
+      <div className="flex-1 flex items-center justify-center p-4 sm:p-6 md:p-8 overflow-y-auto">
         {/* Background effects */}
         <div className="absolute inset-0 overflow-hidden pointer-events-none lg:left-1/2">
-          <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-profit-green/5 rounded-full blur-3xl" />
-          <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-blue-500/5 rounded-full blur-3xl" />
+          <div className="absolute top-1/4 left-1/4 w-64 sm:w-96 h-64 sm:h-96 bg-profit-green/5 rounded-full blur-3xl" />
+          <div className="absolute bottom-1/4 right-1/4 w-64 sm:w-96 h-64 sm:h-96 bg-blue-500/5 rounded-full blur-3xl" />
         </div>
 
         <motion.div
@@ -194,33 +198,33 @@ const Register: React.FC = () => {
           className="w-full max-w-md relative"
         >
           {/* Mobile Logo */}
-          <div className="text-center mb-6 lg:hidden">
-            <div className="inline-flex items-center gap-2 mb-4">
-              <div className="w-3 h-3 bg-profit-green rounded-full shadow-[0_0_10px_#00ff9d]"></div>
-              <span className="text-2xl font-bold text-white font-mono">
+          <div className="text-center mb-4 sm:mb-6 lg:hidden">
+            <div className="flex flex-col items-center gap-2 mb-3 sm:mb-4">
+              <img src={MOOCUAN_LOGO} alt="MooCuan" className="w-16 h-16 sm:w-20 sm:h-20 object-contain" />
+              <span className="text-xl sm:text-2xl font-bold text-white font-mono">
                 MOO<span className="text-profit-green">CUAN</span>
               </span>
             </div>
           </div>
 
-          <div className="text-center mb-6">
-            <h2 className="text-2xl font-bold text-white font-mono mb-2">Create Account</h2>
-            <p className="text-gray-500 font-mono text-sm">Buat akun baru untuk mulai trading</p>
+          <div className="text-center mb-4 sm:mb-6">
+            <h2 className="text-xl sm:text-2xl font-bold text-white font-mono mb-1 sm:mb-2">Create Account</h2>
+            <p className="text-gray-500 font-mono text-xs sm:text-sm">Buat akun baru untuk mulai trading</p>
           </div>
 
           {/* Form Card */}
-          <div className="bg-terminal-gray border border-gray-800 rounded-xl p-8">
-            <form onSubmit={handleSubmit} className="space-y-5">
+          <div className="bg-terminal-gray border border-gray-800 rounded-xl p-4 sm:p-6 md:p-8">
+            <form onSubmit={handleSubmit} className="space-y-3 sm:space-y-4 md:space-y-5">
               {/* Name */}
               <div>
-                <label className="block text-xs font-mono text-gray-500 mb-2 uppercase">
+                <label className="block text-[10px] sm:text-xs font-mono text-gray-500 mb-1.5 sm:mb-2 uppercase">
                   Nama Lengkap
                 </label>
                 <input
                   type="text"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
-                  className="w-full px-4 py-3 bg-black border border-gray-700 rounded-lg text-white 
+                  className="w-full px-3 sm:px-4 py-2.5 sm:py-3 bg-black border border-gray-700 rounded-lg text-white text-sm sm:text-base
                     placeholder-gray-600 focus:outline-none focus:border-profit-green font-mono
                     transition-colors"
                   placeholder="John Doe"
@@ -230,14 +234,14 @@ const Register: React.FC = () => {
 
               {/* Email */}
               <div>
-                <label className="block text-xs font-mono text-gray-500 mb-2 uppercase">
+                <label className="block text-[10px] sm:text-xs font-mono text-gray-500 mb-1.5 sm:mb-2 uppercase">
                   Email
                 </label>
                 <input
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  className="w-full px-4 py-3 bg-black border border-gray-700 rounded-lg text-white 
+                  className="w-full px-3 sm:px-4 py-2.5 sm:py-3 bg-black border border-gray-700 rounded-lg text-white text-sm sm:text-base
                     placeholder-gray-600 focus:outline-none focus:border-profit-green font-mono
                     transition-colors"
                   placeholder="email@example.com"
@@ -247,7 +251,7 @@ const Register: React.FC = () => {
 
               {/* Password */}
               <div>
-                <label className="block text-xs font-mono text-gray-500 mb-2 uppercase">
+                <label className="block text-[10px] sm:text-xs font-mono text-gray-500 mb-1.5 sm:mb-2 uppercase">
                   Password
                 </label>
                 <div className="relative">
@@ -255,7 +259,7 @@ const Register: React.FC = () => {
                     type={showPassword ? "text" : "password"}
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    className="w-full px-4 py-3 pr-12 bg-black border border-gray-700 rounded-lg text-white 
+                    className="w-full px-3 sm:px-4 py-2.5 sm:py-3 pr-10 sm:pr-12 bg-black border border-gray-700 rounded-lg text-white text-sm sm:text-base
                       placeholder-gray-600 focus:outline-none focus:border-profit-green font-mono
                       transition-colors"
                     placeholder="••••••••"
@@ -264,24 +268,24 @@ const Register: React.FC = () => {
                   <button
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-500 hover:text-white transition-colors"
+                    className="absolute right-3 sm:right-4 top-1/2 -translate-y-1/2 text-gray-500 hover:text-white transition-colors"
                   >
-                    {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                    {showPassword ? <EyeOff className="w-4 h-4 sm:w-5 sm:h-5" /> : <Eye className="w-4 h-4 sm:w-5 sm:h-5" />}
                   </button>
                 </div>
-                <p className="text-gray-600 text-xs mt-1 font-mono">Minimal 6 karakter</p>
+                <p className="text-gray-600 text-[10px] sm:text-xs mt-1 font-mono">Minimal 6 karakter</p>
               </div>
 
               {/* Confirm Password */}
               <div>
-                <label className="block text-xs font-mono text-gray-500 mb-2 uppercase">
+                <label className="block text-[10px] sm:text-xs font-mono text-gray-500 mb-1.5 sm:mb-2 uppercase">
                   Konfirmasi Password
                 </label>
                 <input
                   type="password"
                   value={confirmPassword}
                   onChange={(e) => setConfirmPassword(e.target.value)}
-                  className={`w-full px-4 py-3 bg-black border rounded-lg text-white 
+                  className={`w-full px-3 sm:px-4 py-2.5 sm:py-3 bg-black border rounded-lg text-white text-sm sm:text-base
                     placeholder-gray-600 focus:outline-none font-mono transition-colors ${
                       confirmPassword && password !== confirmPassword
                         ? "border-red-500 focus:border-red-500"
@@ -293,7 +297,7 @@ const Register: React.FC = () => {
                   required
                 />
                 {confirmPassword && password !== confirmPassword && (
-                  <p className="text-red-400 text-xs mt-1 font-mono">Password tidak cocok</p>
+                  <p className="text-red-400 text-[10px] sm:text-xs mt-1 font-mono">Password tidak cocok</p>
                 )}
               </div>
 
@@ -303,19 +307,19 @@ const Register: React.FC = () => {
                 disabled={isLoading || !!(confirmPassword && password !== confirmPassword)}
                 whileHover={{ scale: 1.02 }}
                 whileTap={{ scale: 0.98 }}
-                className="w-full py-3 bg-profit-green text-black font-bold font-mono uppercase
+                className="w-full py-2.5 sm:py-3 bg-profit-green text-black font-bold font-mono uppercase text-sm sm:text-base
                   rounded-lg shadow-lg shadow-profit-green/20 hover:shadow-profit-green/40 
                   transition-all flex items-center justify-center gap-2 disabled:opacity-50
                   hover:bg-profit-green/90"
               >
                 {isLoading ? (
                   <>
-                    <Loader2 className="w-5 h-5 animate-spin" />
+                    <Loader2 className="w-4 h-4 sm:w-5 sm:h-5 animate-spin" />
                     <span>LOADING...</span>
                   </>
                 ) : (
                   <>
-                    <UserPlus className="w-5 h-5" />
+                    <UserPlus className="w-4 h-4 sm:w-5 sm:h-5" />
                     <span>DAFTAR</span>
                   </>
                 )}
@@ -323,15 +327,15 @@ const Register: React.FC = () => {
             </form>
 
             {/* Divider */}
-            <div className="flex items-center gap-4 my-6">
+            <div className="flex items-center gap-3 sm:gap-4 my-4 sm:my-6">
               <div className="flex-1 h-px bg-gray-800"></div>
-              <span className="text-gray-600 text-xs font-mono">OR</span>
+              <span className="text-gray-600 text-[10px] sm:text-xs font-mono">OR</span>
               <div className="flex-1 h-px bg-gray-800"></div>
             </div>
 
             {/* Login Link */}
             <div className="text-center">
-              <p className="text-gray-500 font-mono text-sm">
+              <p className="text-gray-500 font-mono text-xs sm:text-sm">
                 Sudah punya akun?{" "}
                 <Link to="/login" className="text-profit-green hover:underline font-bold">
                   LOGIN
@@ -341,7 +345,7 @@ const Register: React.FC = () => {
           </div>
 
           {/* Footer */}
-          <p className="text-center text-gray-600 text-xs mt-6 font-mono">
+          <p className="text-center text-gray-600 text-[10px] sm:text-xs mt-4 sm:mt-6 font-mono">
             © 2024 MooCuan by Darrell. AI-Powered Stock Analysis.
           </p>
         </motion.div>
