@@ -50,30 +50,35 @@ export default async function handler(req, res) {
       ${recentData
         .map(
           (d) =>
-            `Date: ${d.date} | Close: ${Number(d.close).toFixed(2)} | RSI: ${d.rsi?.toFixed(2) || 'N/A'} | MACD Hist: ${d.macdHistogram?.toFixed(4) || 'N/A'} | BB Pos: ${d.close > (d.bbUpper || 0) ? "Over Upper" : d.close < (d.bbLower || 0) ? "Below Lower" : "Inside"}`
+            `Date: ${d.date} | Close: ${Number(d.close).toFixed(2)} | RSI: ${d.rsi?.toFixed(2) || "N/A"} | MACD Hist: ${d.macdHistogram?.toFixed(4) || "N/A"} | BB Pos: ${d.close > (d.bbUpper || 0) ? "Over Upper" : d.close < (d.bbLower || 0) ? "Below Lower" : "Inside"}`
         )
         .join("\n")}
 
       Current Indicators:
-      - RSI (14): ${latest.rsi?.toFixed(2) || 'N/A'}
-      - MACD Histogram: ${latest.macdHistogram?.toFixed(4) || 'N/A'}
+      - RSI (14): ${latest.rsi?.toFixed(2) || "N/A"}
+      - MACD Histogram: ${latest.macdHistogram?.toFixed(4) || "N/A"}
       - Price vs SMA50: ${latest.close > (latest.sma50 || 0) ? "Bullish" : "Bearish"}
       - Bollinger Band Squeeze: ${((latest.bbUpper || 0) - (latest.bbLower || 0)) / latest.close < 0.05 ? "YES" : "NO"}
 
       IMPORTANT CONSTRAINTS:
       ${strategyPrompt}
-      2. **Pattern Recognition:** Search for Cup and Handle, Head and Shoulders, Double Bottom/Top, Flags, Triangles. 
+      2. **Pattern Recognition (REQUIRED - MUST INCLUDE):** Search for Cup and Handle, Head and Shoulders, Double Bottom/Top, Flags, Triangles. 
          - ONLY report a pattern if you are >80% confident.
          - Fallback: If no clear pattern, focus on Trend and Support/Resistance. Do NOT hallucinate.
-      3. **Sentiment & News Analysis:**
-         - Based on your knowledge, identify any recent news, events, or sentiment that could impact ${ticker}.
-         - Include earnings reports, corporate actions, sector trends, macroeconomic factors, or geopolitical events.
-         - ONLY include if you have relevant information. If no significant news, set sentiment to null.
+      3. **Sentiment & News Analysis (REQUIRED - MUST INCLUDE):**
+         - You MUST search your knowledge for ANY recent news, events, or sentiment about ${ticker}.
+         - This is MANDATORY. Always provide sentiment data even if the news is from weeks/months ago.
+         - Search for: earnings reports, quarterly results, corporate actions (dividends, stock splits, rights issue), 
+           M&A activity, management changes, sector trends, regulatory news, macroeconomic factors, analyst ratings.
+         - For Indonesian stocks (.JK): Check for RUPS, laporan keuangan, aksi korporasi, berita sektor.
+         - For crypto/global assets: Check for regulatory news, adoption news, whale movements, protocol updates.
+         - If absolutely NO news exists, explain the company's general business outlook or sector condition.
+         - NEVER leave sentiment as null unless the ticker is completely unknown.
 
       Task:
       Provide a trading signal, "Win Rate Probability", and a concrete trade plan (Entry, SL, TP).
       Also include any relevant market sentiment or news that could affect the price.
-      Output purely in JSON format without markdown code blocks. PASTIKAN HASILNYA DALAM BAHASA INDONESIA PADA BAGIAN REASONING DAN SENTIMENT.
+      Output purely in JSON format without markdown code blocks. PASTIKAN HASILNYA DALAM BAHASA INDONESIA PADA BAGIAN REASONING DAN SENTIMENT (Kecuali sahamnya bukan saham IHSG atau ^JKSE).
       
       JSON Schema:
       {
@@ -86,10 +91,10 @@ export default async function handler(req, res) {
         "predictionTime": "string value, e.g., 'Next 2-3 Days'",
         "reasoning": "A short, sharp, professional paragraph explaining why. Use financial jargon like 'divergence', 'overbought', 'momentum', 'consolidation'. DALAM BAHASA INDONESIA.",
         "sentiment": {
-          "type": "BULLISH" | "BEARISH" | "NEUTRAL" | null,
-          "headline": "Brief headline of the news/event if any, null if none. DALAM BAHASA INDONESIA.",
-          "description": "Short description of the sentiment/news impact. DALAM BAHASA INDONESIA. null if no significant news.",
-          "source": "Source or type of news (e.g., 'Laporan Keuangan', 'Berita Sektor', 'Ekonomi Makro', 'Aksi Korporasi'). null if none."
+          "type": "BULLISH" | "BEARISH" | "NEUTRAL",
+          "headline": "Brief headline of the news/event. WAJIB DIISI. DALAM BAHASA INDONESIA.",
+          "description": "Short description of the sentiment/news impact and why it matters for the stock. WAJIB DIISI. DALAM BAHASA INDONESIA (Kecuali sahamnya bukan saham IHSG atau ^JKSE).",
+          "source": "Source type: 'Laporan Keuangan', 'Berita Sektor', 'Ekonomi Makro', 'Aksi Korporasi', 'Rating Analis', 'Berita Perusahaan', or 'Outlook Bisnis'. WAJIB DIISI."
         }
       }
     `;
@@ -109,14 +114,13 @@ export default async function handler(req, res) {
 
     return res.json({
       success: true,
-      result: parsedResult
+      result: parsedResult,
     });
-
   } catch (error) {
     console.error("Analysis API Error:", error);
-    return res.status(500).json({ 
+    return res.status(500).json({
       error: "Analysis failed",
-      message: error.message 
+      message: error.message,
     });
   }
 }
