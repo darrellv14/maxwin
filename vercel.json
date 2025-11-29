@@ -1,8 +1,32 @@
 {
   "rewrites": [
     {
-      "source": "/api/(.*)",
-      "destination": "/api/$1.js"
+      "source": "/api/auth/:path*",
+      "destination": "/api/auth.js"
+    },
+    {
+      "source": "/api/history/:path*",
+      "destination": "/api/history.js"
+    },
+    {
+      "source": "/api/alerts/:path*",
+      "destination": "/api/alerts.js"
+    },
+    {
+      "source": "/api/ai-picks/:path*",
+      "destination": "/api/ai-picks.js"
+    },
+    {
+      "source": "/api/watchlist/:path*",
+      "destination": "/api/watchlist.js"
+    },
+    {
+      "source": "/api/portfolio/:path*",
+      "destination": "/api/portfolio.js"
+    },
+    {
+      "source": "/api/:path",
+      "destination": "/api/:path.js"
     },
     {
       "source": "/(.*)",
