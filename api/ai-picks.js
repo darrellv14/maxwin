@@ -133,8 +133,12 @@ async function getAIPicks(req, res) {
 // ============ RUN SCREENER (CRON) ============
 async function runScreener(req, res) {
   try {
+    // Check auth only for /run-screener path, skip for ?action=generate (dev mode)
+    const url = new URL(req.url, `http://${req.headers.host}`);
+    const isDevMode = url.searchParams.get("action") === "generate";
+    
     const secret = process.env.CRON_SECRET;
-    if (secret) {
+    if (secret && !isDevMode) {
       const authHeader = req.headers["authorization"] || req.headers["Authorization"];
       if (authHeader !== secret) return res.status(401).json({ error: "Unauthorized" });
     }
@@ -301,15 +305,18 @@ export default async function handler(req, res) {
     return res.status(200).end();
   }
 
-  const path = req.url.split("?")[0].replace("/api/ai-picks", "");
+  const url = new URL(req.url, `http://${req.headers.host}`);
+  const path = url.pathname.replace("/api/ai-picks", "");
+  const action = url.searchParams.get("action");
 
   // Route: GET /api/ai-picks - get current AI picks
-  if (req.method === "GET" && (path === "" || path === "/")) {
+  if (req.method === "GET" && (path === "" || path === "/") && !action) {
     return getAIPicks(req, res);
   }
 
+  // Route: GET /api/ai-picks?action=generate - manual trigger (dev/testing)
   // Route: POST /api/ai-picks/run-screener - run the AI screener (cron)
-  if ((req.method === "POST" || req.method === "GET") && path === "/run-screener") {
+  if (action === "generate" || path === "/run-screener") {
     return runScreener(req, res);
   }
 
