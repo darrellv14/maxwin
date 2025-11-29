@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { getAIPicks, AnalysisRecord } from "../services/analysisService";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { Loader2, Bot, TrendingUp, Grid, List, Filter, SortAsc, RefreshCw } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import ScreenerCard from "../components/ScreenerCard";
@@ -9,11 +9,16 @@ type ViewMode = "grid" | "table";
 type SortOption = "date" | "confidence" | "ticker";
 
 const AIPicksPage: React.FC = () => {
+  const navigate = useNavigate();
   const [picks, setPicks] = useState<AnalysisRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [viewMode, setViewMode] = useState<ViewMode>("grid");
   const [sortBy, setSortBy] = useState<SortOption>("date");
   const [filterSignal, setFilterSignal] = useState<"ALL" | "BUY" | "SELL">("ALL");
+
+  const handleViewChart = (ticker: string) => {
+    navigate(`/?ticker=${encodeURIComponent(ticker)}`);
+  };
 
   const fetchPicks = async () => {
     setLoading(true);
@@ -186,6 +191,7 @@ const AIPicksPage: React.FC = () => {
                     stopLoss={record.stop_loss}
                     reasoning={record.reasoning.replace("[AI-SCREENER] ", "")}
                     date={new Date(record.date_created)}
+                    onViewChart={handleViewChart}
                   />
                 </motion.div>
               ))}
@@ -216,7 +222,8 @@ const AIPicksPage: React.FC = () => {
                     <th className="p-4">ENTRY AREA</th>
                     <th className="p-4">TARGETS (TP)</th>
                     <th className="p-4">STOP LOSS</th>
-                    <th className="p-4 w-1/3">AI REASONING</th>
+                    <th className="p-4 w-1/4">AI REASONING</th>
+                    <th className="p-4">ACTION</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-800">
@@ -262,11 +269,20 @@ const AIPicksPage: React.FC = () => {
                           {record.reasoning.replace("[AI-SCREENER] ", "")}
                         </div>
                       </td>
+                      <td className="p-4">
+                        <button
+                          onClick={() => handleViewChart(record.ticker)}
+                          className="px-3 py-1.5 bg-terminal-green/20 hover:bg-terminal-green/30 text-terminal-green 
+                            border border-terminal-green/50 rounded text-xs font-mono transition-colors"
+                        >
+                          View Chart
+                        </button>
+                      </td>
                     </tr>
                   ))}
                   {sortedAndFilteredPicks.length === 0 && (
                     <tr>
-                      <td colSpan={7} className="p-12 text-center text-gray-500">
+                      <td colSpan={8} className="p-12 text-center text-gray-500">
                         <div className="flex flex-col items-center gap-3">
                           <Bot className="w-12 h-12 opacity-20" />
                           <p>NO AI PICKS GENERATED YET</p>

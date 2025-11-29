@@ -46,18 +46,21 @@ export default async function handler(req, res) {
     // =====================================
     let interval = "1d"; // default daily
     
+    // Check if Indonesian stock (doesn't support intraday intervals well)
+    const isIndonesian = ticker.toUpperCase().endsWith(".JK") || ticker.toUpperCase() === "^JKSE";
+    
     switch (period) {
       case "1D":
         startDate.setDate(startDate.getDate() - 1);
-        interval = "5m"; // 5 minute intervals for 1 day
+        interval = isIndonesian ? "1h" : "5m"; // Indonesian stocks: hourly, US: 5min
         break;
       case "5D":
-        startDate.setDate(startDate.getDate() - 5);
-        interval = "15m"; // 15 minute intervals for 5 days
+        startDate.setDate(startDate.getDate() - 7); // Get 7 days to ensure 5 trading days
+        interval = isIndonesian ? "1h" : "15m"; // Indonesian stocks: hourly, US: 15min
         break;
       case "1M":
         startDate.setMonth(startDate.getMonth() - 1);
-        interval = "1h"; // hourly for 1 month
+        interval = isIndonesian ? "1d" : "1h"; // Indonesian stocks: daily, US: hourly
         break;
       case "3M":
         startDate.setMonth(startDate.getMonth() - 3);
