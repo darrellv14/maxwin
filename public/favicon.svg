@@ -1,0 +1,36 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <defs>
+    <linearGradient id="bullGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#00ff9d"/>
+      <stop offset="100%" style="stop-color:#00cc7d"/>
+    </linearGradient>
+    <linearGradient id="hornGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#f5f5dc"/>
+      <stop offset="100%" style="stop-color:#daa520"/>
+    </linearGradient>
+  </defs>
+  
+  <!-- Background circle -->
+  <circle cx="50" cy="50" r="48" fill="#0a0a0a" stroke="#00ff9d" stroke-width="2"/>
+  
+  <!-- Bull head simplified -->
+  <ellipse cx="50" cy="55" rx="25" ry="22" fill="url(#bullGradient)"/>
+  
+  <!-- Left horn -->
+  <path d="M28 45 Q20 30 15 20 Q18 32 30 42" fill="url(#hornGradient)"/>
+  
+  <!-- Right horn -->
+  <path d="M72 45 Q80 30 85 20 Q82 32 70 42" fill="url(#hornGradient)"/>
+  
+  <!-- Eyes -->
+  <circle cx="40" cy="50" r="3" fill="#0a0a0a"/>
+  <circle cx="60" cy="50" r="3" fill="#0a0a0a"/>
+  
+  <!-- Nose/snout -->
+  <ellipse cx="50" cy="65" rx="12" ry="8" fill="#008f5d"/>
+  <circle cx="45" cy="65" r="2" fill="#0a0a0a"/>
+  <circle cx="55" cy="65" r="2" fill="#0a0a0a"/>
+  
+  <!-- Arrow going up -->
+  <path d="M75 75 L85 40 L80 45 L85 40 L90 47" stroke="#00ff9d" stroke-width="3" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

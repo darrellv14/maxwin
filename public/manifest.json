@@ -1,0 +1,27 @@
+{
+  "name": "MooCuan - AI Stock Analysis",
+  "short_name": "MooCuan",
+  "description": "Platform analisis saham berbasis AI dengan rekomendasi trading real-time untuk pasar Indonesia dan global",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0a0a0a",
+  "theme_color": "#00ff9d",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "https://res.cloudinary.com/drvu0dpry/image/upload/w_192,h_192,c_fit/v1764410228/moocuan-logo_ya5ous.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "https://res.cloudinary.com/drvu0dpry/image/upload/w_512,h_512,c_fit/v1764410228/moocuan-logo_ya5ous.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["finance", "business", "productivity"],
+  "lang": "id",
+  "dir": "ltr"
+}
