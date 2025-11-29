@@ -44,17 +44,13 @@ export default defineConfig(({ mode }) => {
         output: {
           manualChunks: (id) => {
             if (id.includes('node_modules')) {
-              // React core
-              if (id.includes('react-dom') || id.includes('/react/')) {
-                return 'vendor-react';
-              }
-              // Router
-              if (id.includes('react-router')) {
-                return 'vendor-router';
-              }
-              // Charts - these are big
-              if (id.includes('lightweight-charts') || id.includes('recharts')) {
+              // Charts need React, so bundle them together
+              if (id.includes('recharts')) {
                 return 'vendor-charts';
+              }
+              // Lightweight charts (no React dependency)
+              if (id.includes('lightweight-charts')) {
+                return 'vendor-lw-charts';
               }
               // UI libraries
               if (id.includes('framer-motion')) {
@@ -63,7 +59,7 @@ export default defineConfig(({ mode }) => {
               if (id.includes('lucide-react')) {
                 return 'vendor-icons';
               }
-              // Finance/indicators - these are big
+              // Finance/indicators
               if (id.includes('technicalindicators')) {
                 return 'vendor-indicators';
               }
@@ -71,11 +67,15 @@ export default defineConfig(({ mode }) => {
               if (id.includes('zustand') || id.includes('react-hot-toast') || id.includes('cmdk')) {
                 return 'vendor-utils';
               }
+              // Router
+              if (id.includes('react-router')) {
+                return 'vendor-router';
+              }
             }
           },
         },
       },
-      chunkSizeWarningLimit: 600,
+      chunkSizeWarningLimit: 800,
     },
   };
 });
