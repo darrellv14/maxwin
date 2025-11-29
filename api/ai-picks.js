@@ -2,6 +2,7 @@ import pool from "./db.js";
 import YahooFinance from "yahoo-finance2";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import TI from "technicalindicators";
+import { setSecurityHeaders, rateLimit } from "./security.js";
 
 // =======================
 //  Helper: TECHNICALS
@@ -297,6 +298,7 @@ async function runScreener(req, res) {
 
 // ============ MAIN HANDLER ============
 export default async function handler(req, res) {
+  setSecurityHeaders(res);
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");

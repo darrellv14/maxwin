@@ -1,5 +1,6 @@
 import pool from "./db.js";
 import { verifyToken } from "./auth.js";
+import { setSecurityHeaders, sanitizeInput } from "./security.js";
 
 // Initialize watchlist table
 const initDb = async () => {
@@ -50,6 +51,9 @@ const initDb = async () => {
 initDb().catch(console.error);
 
 export default async function handler(req, res) {
+  // Security headers
+  setSecurityHeaders(res);
+  
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "GET, POST, DELETE, OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");

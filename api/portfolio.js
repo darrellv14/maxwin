@@ -1,5 +1,6 @@
 import pool from "./db.js";
 import { verifyToken } from "./auth.js";
+import { setSecurityHeaders, sanitizeInput } from "./security.js";
 
 // Initialize portfolio tables
 const initDb = async () => {
@@ -56,6 +57,7 @@ const initDb = async () => {
 initDb().catch(console.error);
 
 export default async function handler(req, res) {
+  setSecurityHeaders(res);
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");

@@ -1,5 +1,6 @@
 import pool from "./db.js";
 import { verifyToken } from "./auth.js";
+import { setSecurityHeaders, sanitizeInput } from "./security.js";
 
 // Initialize alerts table
 const initDb = async () => {
@@ -119,6 +120,7 @@ async function checkAlerts(req, res) {
 
 // ============ MAIN HANDLER ============
 export default async function handler(req, res) {
+  setSecurityHeaders(res);
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");

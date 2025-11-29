@@ -1,10 +1,12 @@
 import pool from "./db.js";
 import YahooFinance from "yahoo-finance2";
+import { setSecurityHeaders } from "./security.js";
 
 const yahooFinance = new YahooFinance();
 
 // ============ GET HISTORY ============
 async function getHistory(req, res) {
+  setSecurityHeaders(res);
   const limit = parseInt(String(req.query?.limit ?? ""), 10) || 5;
   const offset = parseInt(String(req.query?.offset ?? ""), 10) || 0;
 
@@ -144,6 +146,7 @@ async function updateStatus(req, res) {
 
 // ============ MAIN HANDLER ============
 export default async function handler(req, res) {
+  setSecurityHeaders(res);
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");

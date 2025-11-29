@@ -1,8 +1,10 @@
 import YahooFinance from "yahoo-finance2";
+import { setSecurityHeaders, sanitizeInput } from "./security.js";
 
 const yahooFinance = new YahooFinance();
 
 export default async function handler(req, res) {
+  setSecurityHeaders(res);
   const { ticker, period = "3M" } = req.query;
 
   if (!ticker || typeof ticker !== "string") {

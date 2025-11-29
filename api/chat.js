@@ -1,9 +1,13 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
+import { setSecurityHeaders, rateLimit, sanitizeInput } from "./security.js";
 
 // Initialize Gemini API
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "");
 
 export default async function handler(req, res) {
+  // Security headers
+  setSecurityHeaders(res);
+  
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
