@@ -47,5 +47,4 @@ export interface AIAnalysisResult {
 }
 
 // Harus match dengan period di /api/market handler:
-// case "1M" | "3M" | "6M" | "1Y" dst.
-export type TimeFrame = "1M" | "3M" | "6M" | "1Y" | "YTD" | "ALL";
+export type TimeFrame = "1D" | "5D" | "1M" | "3M" | "6M" | "YTD" | "1Y" | "5Y" | "ALL";

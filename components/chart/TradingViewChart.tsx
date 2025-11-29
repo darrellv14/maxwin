@@ -62,6 +62,7 @@ const TradingViewChart = forwardRef<TradingViewChartHandle, TradingViewChartProp
       sma20: any;
       sma50: any;
       bbUpper: any;
+      bbMiddle: any;
       bbLower: any;
     }>({
       candle: null,
@@ -70,6 +71,7 @@ const TradingViewChart = forwardRef<TradingViewChartHandle, TradingViewChartProp
       sma20: null,
       sma50: null,
       bbUpper: null,
+      bbMiddle: null,
       bbLower: null,
     });
     const markersRef = useRef<ChartMarker[]>([]);
@@ -136,6 +138,7 @@ const TradingViewChart = forwardRef<TradingViewChartHandle, TradingViewChartProp
       const sma20Data: any[] = [];
       const sma50Data: any[] = [];
       const bbUpperData: any[] = [];
+      const bbMiddleData: any[] = [];
       const bbLowerData: any[] = [];
 
       data.forEach((d) => {
@@ -161,10 +164,11 @@ const TradingViewChart = forwardRef<TradingViewChartHandle, TradingViewChartProp
         if (d.sma20 != null) sma20Data.push({ time, value: d.sma20 });
         if (d.sma50 != null) sma50Data.push({ time, value: d.sma50 });
         if (d.bbUpper != null) bbUpperData.push({ time, value: d.bbUpper });
+        if (d.bbMiddle != null) bbMiddleData.push({ time, value: d.bbMiddle });
         if (d.bbLower != null) bbLowerData.push({ time, value: d.bbLower });
       });
 
-      return { candleData, lineData, volumeData, sma20Data, sma50Data, bbUpperData, bbLowerData };
+      return { candleData, lineData, volumeData, sma20Data, sma50Data, bbUpperData, bbMiddleData, bbLowerData };
     }, [data]);
 
     // Initialize chart
@@ -218,7 +222,7 @@ const TradingViewChart = forwardRef<TradingViewChartHandle, TradingViewChartProp
 
       chartRef.current = chart;
 
-      const { candleData, lineData, volumeData, sma20Data, sma50Data, bbUpperData, bbLowerData } =
+      const { candleData, lineData, volumeData, sma20Data, sma50Data, bbUpperData, bbMiddleData, bbLowerData } =
         transformData();
 
       // Volume (behind everything)
@@ -234,7 +238,7 @@ const TradingViewChart = forwardRef<TradingViewChartHandle, TradingViewChartProp
         seriesRef.current.volume = volumeSeries;
       }
 
-      // Bollinger Bands
+      // Bollinger Bands (only if BB is on AND SMA20 is off)
       if (showBollingerBands) {
         const bbUpperSeries = chart.addSeries(LineSeries, {
           color: "rgba(100, 100, 100, 0.5)",
@@ -245,6 +249,19 @@ const TradingViewChart = forwardRef<TradingViewChartHandle, TradingViewChartProp
         });
         bbUpperSeries.setData(bbUpperData);
         seriesRef.current.bbUpper = bbUpperSeries;
+
+        // BB Middle - only show if SMA20 is off (to avoid duplicate lines)
+        if (!showSMA20) {
+          const bbMiddleSeries = chart.addSeries(LineSeries, {
+            color: "#fbbf24", // Same color as SMA20 for consistency
+            lineWidth: 1,
+            lineStyle: 2, // Dashed to differentiate
+            priceLineVisible: false,
+            lastValueVisible: false,
+          });
+          bbMiddleSeries.setData(bbMiddleData);
+          seriesRef.current.bbMiddle = bbMiddleSeries;
+        }
 
         const bbLowerSeries = chart.addSeries(LineSeries, {
           color: "rgba(100, 100, 100, 0.5)",
@@ -257,7 +274,7 @@ const TradingViewChart = forwardRef<TradingViewChartHandle, TradingViewChartProp
         seriesRef.current.bbLower = bbLowerSeries;
       }
 
-      // SMA 20
+      // SMA 20 (only if SMA20 is on AND BB is off, OR both are on - SMA20 takes priority)
       if (showSMA20) {
         const sma20Series = chart.addSeries(LineSeries, {
           color: "#fbbf24",

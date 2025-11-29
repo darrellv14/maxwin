@@ -44,9 +44,20 @@ export default async function handler(req, res) {
     // =====================================
     // 2️⃣ RANGE HANDLER
     // =====================================
+    let interval = "1d"; // default daily
+    
     switch (period) {
+      case "1D":
+        startDate.setDate(startDate.getDate() - 1);
+        interval = "5m"; // 5 minute intervals for 1 day
+        break;
+      case "5D":
+        startDate.setDate(startDate.getDate() - 5);
+        interval = "15m"; // 15 minute intervals for 5 days
+        break;
       case "1M":
         startDate.setMonth(startDate.getMonth() - 1);
+        interval = "1h"; // hourly for 1 month
         break;
       case "3M":
         startDate.setMonth(startDate.getMonth() - 3);
@@ -60,8 +71,13 @@ export default async function handler(req, res) {
       case "YTD":
         startDate = new Date(startDate.getFullYear(), 0, 1);
         break;
+      case "5Y":
+        startDate.setFullYear(startDate.getFullYear() - 5);
+        interval = "1wk"; // weekly for 5 years
+        break;
       case "ALL":
         startDate = await getIPODate(ticker);
+        interval = "1wk"; // weekly for ALL
         break;
       default:
         startDate.setMonth(startDate.getMonth() - 3);
@@ -75,7 +91,7 @@ export default async function handler(req, res) {
         const r = await yahooFinance.chart(ticker, {
           period1: startDate,
           period2: endDate,
-          interval: "1d",
+          interval: interval,
         });
 
         if (r.quotes && r.quotes.length > 0) return r;
@@ -88,6 +104,7 @@ export default async function handler(req, res) {
           throw new Error("Ticker Not Found");
         }
 
+        // Retry with daily interval as fallback
         return await yahooFinance.chart(ticker, {
           period1: new Date(endDate.getFullYear() - 1, endDate.getMonth(), endDate.getDate()),
           period2: endDate,
@@ -99,14 +116,26 @@ export default async function handler(req, res) {
     const result = await fetchChart();
     const quotes = result.quotes ?? [];
 
-    const formattedData = quotes.map((q) => ({
-      date: q.date.toISOString().split("T")[0],
-      open: q.open,
-      high: q.high,
-      low: q.low,
-      close: q.close,
-      volume: q.volume,
-    }));
+    // Filter out quotes with null/undefined OHLC values (common in Indonesian stocks)
+    const formattedData = quotes
+      .filter((q) => 
+        q.open != null && 
+        q.high != null && 
+        q.low != null && 
+        q.close != null &&
+        !isNaN(q.open) &&
+        !isNaN(q.high) &&
+        !isNaN(q.low) &&
+        !isNaN(q.close)
+      )
+      .map((q) => ({
+        date: q.date.toISOString().split("T")[0],
+        open: q.open,
+        high: q.high,
+        low: q.low,
+        close: q.close,
+        volume: q.volume || 0,
+      }));
 
     res.setHeader("Cache-Control", "s-maxage=60, stale-while-revalidate");
     return res.status(200).json(formattedData);

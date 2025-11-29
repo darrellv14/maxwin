@@ -269,15 +269,15 @@ const Dashboard: React.FC = () => {
 
             <div className="bg-terminal-gray border border-gray-800 p-4 rounded-lg">
               <label className="block text-xs font-mono text-gray-500 mb-2">TIMEFRAME</label>
-              <div className="flex gap-2 flex-wrap">
-                {(["1M", "3M", "6M", "1Y", "YTD", "ALL"] as TimeFrame[]).map((tf) => (
+              <div className="grid grid-cols-5 gap-1 sm:gap-2">
+                {(["1D", "5D", "1M", "3M", "6M", "YTD", "1Y", "5Y", "ALL"] as TimeFrame[]).map((tf) => (
                   <button
                     key={tf}
                     onClick={() => setTimeframe(tf)}
-                    className={`flex-1 py-1 px-2 text-xs font-mono rounded border ${
+                    className={`py-1 px-1 sm:px-2 text-[10px] sm:text-xs font-mono rounded border transition-colors ${
                       timeframe === tf
                         ? "bg-gray-800 border-profit-green text-profit-green"
-                        : "bg-black border-gray-800 text-gray-500 hover:bg-gray-800"
+                        : "bg-black border-gray-800 text-gray-500 hover:bg-gray-800 hover:text-gray-300"
                     }`}
                   >
                     {tf}
