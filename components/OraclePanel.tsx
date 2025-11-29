@@ -1,5 +1,5 @@
-import React from 'react';
-import { AIAnalysisResult, SignalType } from '../types';
+import React from "react";
+import { AIAnalysisResult, SignalType } from "../types";
 
 interface OraclePanelProps {
   analysis: AIAnalysisResult | null;
@@ -15,16 +15,16 @@ const OraclePanel: React.FC<OraclePanelProps> = ({ analysis, loading, onAnalyze 
 
       <div className="flex justify-between items-center mb-6 z-10 relative">
         <h2 className="text-xl font-bold font-mono text-white flex items-center">
-          <span className="text-purple-500 mr-2">✦</span> 
+          <span className="text-purple-500 mr-2">✦</span>
           THE ORACLE AI
         </h2>
         {!analysis && !loading && (
-           <button 
-             onClick={onAnalyze}
-             className="bg-purple-600 hover:bg-purple-700 text-white font-mono text-sm py-2 px-4 rounded transition-all shadow-[0_0_15px_rgba(147,51,234,0.3)]"
-           >
-             ANALYZE MARKET
-           </button>
+          <button
+            onClick={onAnalyze}
+            className="bg-purple-600 hover:bg-purple-700 text-white font-mono text-sm py-2 px-4 rounded transition-all shadow-[0_0_15px_rgba(147,51,234,0.3)]"
+          >
+            ANALYZE MARKET
+          </button>
         )}
       </div>
 
@@ -40,11 +40,15 @@ const OraclePanel: React.FC<OraclePanelProps> = ({ analysis, loading, onAnalyze 
           <div className="flex items-center justify-between mb-4">
             <div className="flex flex-col">
               <span className="text-gray-400 text-xs font-mono uppercase">Signal</span>
-              <span className={`text-4xl font-bold tracking-tighter ${
-                analysis.signal === SignalType.BUY ? 'text-profit-green drop-shadow-[0_0_10px_rgba(0,255,157,0.5)]' : 
-                analysis.signal === SignalType.SELL ? 'text-loss-red drop-shadow-[0_0_10px_rgba(255,0,85,0.5)]' : 
-                'text-yellow-400'
-              }`}>
+              <span
+                className={`text-4xl font-bold tracking-tighter ${
+                  analysis.signal === SignalType.BUY
+                    ? "text-profit-green drop-shadow-[0_0_10px_rgba(0,255,157,0.5)]"
+                    : analysis.signal === SignalType.SELL
+                      ? "text-loss-red drop-shadow-[0_0_10px_rgba(255,0,85,0.5)]"
+                      : "text-yellow-400"
+                }`}
+              >
                 {analysis.signal}
               </span>
             </div>
@@ -58,42 +62,45 @@ const OraclePanel: React.FC<OraclePanelProps> = ({ analysis, loading, onAnalyze 
 
           {/* Trade Plan Grid */}
           <div className="grid grid-cols-2 gap-2 mb-4">
-             <div className="bg-gray-900/50 p-2 rounded border border-gray-700/50">
-                <div className="text-xs text-gray-500 font-mono">ENTRY ZONE</div>
-                <div className="text-sm font-bold text-white">{analysis.entryArea}</div>
-             </div>
-             <div className="bg-gray-900/50 p-2 rounded border border-gray-700/50">
-                <div className="text-xs text-gray-500 font-mono">TIMING</div>
-                <div className="text-sm font-bold text-blue-300">{analysis.predictionTime}</div>
-             </div>
-             <div className="bg-gray-900/50 p-2 rounded border border-gray-700/50">
-                <div className="text-xs text-gray-500 font-mono">STOP LOSS</div>
-                <div className="text-sm font-bold text-loss-red">{analysis.stopLoss}</div>
-             </div>
-             <div className="bg-gray-900/50 p-2 rounded border border-gray-700/50">
-                <div className="text-xs text-gray-500 font-mono">
-                  {analysis.signal === 'SELL' && analysis.takeProfit1 !== 'N/A' ? 'TARGETS (DOWN)' : 'TARGETS'}
-                </div>
-                <div className="text-sm font-bold text-profit-green">
-                   TP1: {analysis.takeProfit1}<br/>
-                   TP2: {analysis.takeProfit2}
-                </div>
-             </div>
+            <div className="bg-gray-900/50 p-2 rounded border border-gray-700/50">
+              <div className="text-xs text-gray-500 font-mono">ENTRY ZONE</div>
+              <div className="text-sm font-bold text-white">{analysis.entryArea}</div>
+            </div>
+            <div className="bg-gray-900/50 p-2 rounded border border-gray-700/50">
+              <div className="text-xs text-gray-500 font-mono">TIMING</div>
+              <div className="text-sm font-bold text-blue-300">{analysis.predictionTime}</div>
+            </div>
+            <div className="bg-gray-900/50 p-2 rounded border border-gray-700/50">
+              <div className="text-xs text-gray-500 font-mono">STOP LOSS</div>
+              <div className="text-sm font-bold text-loss-red">{analysis.stopLoss}</div>
+            </div>
+            <div className="bg-gray-900/50 p-2 rounded border border-gray-700/50">
+              <div className="text-xs text-gray-500 font-mono">
+                {analysis.signal === "SELL" && analysis.takeProfit1 !== "N/A"
+                  ? "TARGETS (DOWN)"
+                  : "TARGETS"}
+              </div>
+              <div className="text-sm font-bold text-profit-green">
+                TP1: {analysis.takeProfit1}
+                <br />
+                TP2: {analysis.takeProfit2}
+              </div>
+            </div>
           </div>
 
           <div className="bg-black/30 p-4 rounded border border-gray-800 flex-1 overflow-y-auto max-h-[150px]">
-             <div className="text-gray-400 text-xs font-mono uppercase mb-2">The Verdict</div>
-             <p className="text-gray-300 text-sm leading-relaxed font-mono">
-               "{analysis.reasoning}"
-             </p>
+            <div className="text-gray-400 text-xs font-mono uppercase mb-2">The Verdict</div>
+            <p className="text-gray-300 text-sm leading-relaxed font-mono">
+              "{analysis.reasoning}"
+            </p>
           </div>
-          
-          <button 
-             onClick={onAnalyze}
-             className="mt-4 w-full border border-gray-700 hover:bg-gray-800 text-gray-400 hover:text-white font-mono text-xs py-2 rounded transition-colors"
-           >
-             REFRESH ANALYSIS
-           </button>
+
+          <button
+            onClick={onAnalyze}
+            className="mt-4 w-full border border-gray-700 hover:bg-gray-800 text-gray-400 hover:text-white font-mono text-xs py-2 rounded transition-colors"
+          >
+            REFRESH ANALYSIS
+          </button>
         </div>
       )}
 

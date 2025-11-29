@@ -1,0 +1,175 @@
+import pool from "./db.js";
+import { verifyToken } from "./auth.js";
+
+// Initialize alerts table
+const initDb = async () => {
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS price_alerts (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        ticker VARCHAR(20) NOT NULL,
+        condition VARCHAR(20) NOT NULL CHECK (condition IN ('above', 'below', 'crosses')),
+        target_price DECIMAL(15, 2) NOT NULL,
+        triggered BOOLEAN DEFAULT FALSE,
+        triggered_at TIMESTAMP,
+        triggered_price DECIMAL(15, 2),
+        active BOOLEAN DEFAULT TRUE,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+    console.log("Alerts table initialized");
+  } catch (error) {
+    console.error("Error initializing alerts table:", error);
+  }
+};
+
+initDb();
+
+export default async function handler(req, res) {
+  res.setHeader("Access-Control-Allow-Origin", "*");
+  res.setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
+
+  if (req.method === "OPTIONS") {
+    return res.status(200).end();
+  }
+
+  // Verify authentication
+  const authHeader = req.headers.authorization;
+  if (!authHeader || !authHeader.startsWith("Bearer ")) {
+    return res.status(401).json({ success: false, message: "Unauthorized" });
+  }
+
+  const payload = verifyToken(authHeader.substring(7));
+  if (!payload) {
+    return res.status(401).json({ success: false, message: "Token tidak valid" });
+  }
+
+  const userId = payload.userId;
+  const path = req.url.split("?")[0].replace("/api/alerts", "");
+
+  try {
+    // GET - Get all alerts
+    if (req.method === "GET" && (path === "" || path === "/")) {
+      const activeOnly = req.query?.active === "true";
+      
+      let query = `
+        SELECT id, ticker, condition, target_price, triggered, triggered_at, 
+               triggered_price, active, created_at 
+        FROM price_alerts 
+        WHERE user_id = $1
+      `;
+      
+      if (activeOnly) {
+        query += " AND active = TRUE AND triggered = FALSE";
+      }
+      
+      query += " ORDER BY created_at DESC";
+
+      const result = await pool.query(query, [userId]);
+
+      return res.json({
+        success: true,
+        alerts: result.rows.map((a) => ({
+          id: a.id,
+          ticker: a.ticker,
+          condition: a.condition,
+          targetPrice: parseFloat(a.target_price),
+          triggered: a.triggered,
+          triggeredAt: a.triggered_at,
+          triggeredPrice: a.triggered_price ? parseFloat(a.triggered_price) : null,
+          active: a.active,
+          createdAt: a.created_at,
+        })),
+      });
+    }
+
+    // POST - Create new alert
+    if (req.method === "POST" && (path === "" || path === "/")) {
+      const { ticker, condition, targetPrice } = req.body;
+
+      if (!ticker || !condition || !targetPrice) {
+        return res.status(400).json({
+          success: false,
+          message: "Ticker, condition, dan targetPrice harus diisi",
+        });
+      }
+
+      if (!["above", "below", "crosses"].includes(condition)) {
+        return res.status(400).json({
+          success: false,
+          message: "Condition harus 'above', 'below', atau 'crosses'",
+        });
+      }
+
+      const normalizedTicker = ticker.toUpperCase();
+
+      // Limit alerts per user (max 20)
+      const countResult = await pool.query(
+        "SELECT COUNT(*) FROM price_alerts WHERE user_id = $1 AND active = TRUE",
+        [userId]
+      );
+      
+      if (parseInt(countResult.rows[0].count) >= 20) {
+        return res.status(400).json({
+          success: false,
+          message: "Maksimal 20 alert aktif per user",
+        });
+      }
+
+      const result = await pool.query(
+        `INSERT INTO price_alerts (user_id, ticker, condition, target_price)
+         VALUES ($1, $2, $3, $4)
+         RETURNING id, ticker, condition, target_price, created_at`,
+        [userId, normalizedTicker, condition, targetPrice]
+      );
+
+      const alert = result.rows[0];
+      return res.status(201).json({
+        success: true,
+        message: "Alert berhasil dibuat",
+        alert: {
+          id: alert.id,
+          ticker: alert.ticker,
+          condition: alert.condition,
+          targetPrice: parseFloat(alert.target_price),
+          createdAt: alert.created_at,
+        },
+      });
+    }
+
+    // DELETE /:id - Delete an alert
+    if (req.method === "DELETE" && path.match(/^\/\d+$/)) {
+      const alertId = path.substring(1);
+
+      const result = await pool.query(
+        "DELETE FROM price_alerts WHERE id = $1 AND user_id = $2 RETURNING id",
+        [alertId, userId]
+      );
+
+      if (result.rows.length === 0) {
+        return res.status(404).json({ success: false, message: "Alert tidak ditemukan" });
+      }
+
+      return res.json({ success: true, message: "Alert berhasil dihapus" });
+    }
+
+    // PUT /:id/deactivate - Deactivate an alert
+    if (req.method === "PUT" && path.match(/^\/\d+\/deactivate$/)) {
+      const alertId = path.split("/")[1];
+
+      await pool.query(
+        "UPDATE price_alerts SET active = FALSE WHERE id = $1 AND user_id = $2",
+        [alertId, userId]
+      );
+
+      return res.json({ success: true, message: "Alert dinonaktifkan" });
+    }
+
+    return res.status(404).json({ success: false, message: "Endpoint tidak ditemukan" });
+  } catch (error) {
+    console.error("Alerts error:", error);
+    return res.status(500).json({ success: false, message: "Server error" });
+  }
+}

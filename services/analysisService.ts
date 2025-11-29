@@ -13,6 +13,7 @@ export interface AnalysisRecord {
   status: string;
   highest_price: number;
   lowest_price: number;
+  confidence?: number;
 }
 
 const parsePrice = (priceStr: string): number => {
@@ -23,10 +24,7 @@ const parsePrice = (priceStr: string): number => {
   return 0;
 };
 
-export const saveAnalysis = async (
-  analysis: AIAnalysisResult,
-  ticker: string
-) => {
+export const saveAnalysis = async (analysis: AIAnalysisResult, ticker: string) => {
   try {
     const response = await fetch("/api/save", {
       method: "POST",
@@ -60,9 +58,7 @@ export const getAnalysisHistory = async (
   offset: number = 0
 ): Promise<AnalysisRecord[]> => {
   try {
-    const response = await fetch(
-      `/api/history?limit=${limit}&offset=${offset}`
-    );
+    const response = await fetch(`/api/history?limit=${limit}&offset=${offset}`);
     if (!response.ok) {
       throw new Error("Failed to fetch history");
     }

@@ -1,0 +1,299 @@
+import React, { useState, useRef, useEffect } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import {
+  MessageCircle,
+  Send,
+  X,
+  Minimize2,
+  Maximize2,
+  Bot,
+  User,
+  Loader2,
+  Sparkles,
+  TrendingUp,
+  AlertCircle,
+} from "lucide-react";
+import { chatApi } from "../services/apiService";
+
+interface Message {
+  id: string;
+  role: "user" | "assistant";
+  content: string;
+  timestamp: Date;
+}
+
+interface AIChatAssistantProps {
+  currentTicker?: string;
+  currentData?: any[];
+}
+
+const AIChatAssistant: React.FC<AIChatAssistantProps> = ({ currentTicker, currentData }) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const [isExpanded, setIsExpanded] = useState(false);
+  const [messages, setMessages] = useState<Message[]>([
+    {
+      id: "1",
+      role: "assistant",
+      content: `Halo! Saya AI Assistant MooCuan 🐮. Tanyakan apa saja tentang saham, analisis teknikal, atau strategi trading.${currentTicker ? ` Saat ini Anda melihat ${currentTicker}.` : ""}`,
+      timestamp: new Date(),
+    },
+  ]);
+  const [input, setInput] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  // Auto scroll to bottom
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages]);
+
+  // Focus input when opened
+  useEffect(() => {
+    if (isOpen) {
+      inputRef.current?.focus();
+    }
+  }, [isOpen]);
+
+  // Quick questions
+  const quickQuestions = [
+    `Analisis ${currentTicker || "BBCA.JK"} sekarang`,
+    "Saham apa yang bagus untuk swing trade?",
+    "Jelaskan indikator RSI",
+    "Kapan waktu terbaik untuk entry?",
+  ];
+
+  const handleSend = async () => {
+    if (!input.trim() || isLoading) return;
+
+    const userMessage: Message = {
+      id: Date.now().toString(),
+      role: "user",
+      content: input.trim(),
+      timestamp: new Date(),
+    };
+
+    setMessages((prev) => [...prev, userMessage]);
+    setInput("");
+    setIsLoading(true);
+
+    try {
+      // Build context for AI
+      let context = "";
+
+      if (currentTicker && currentData && currentData.length > 0) {
+        const lastPrice = currentData[currentData.length - 1];
+        context = `User sedang melihat chart ${currentTicker}. Harga terakhir: ${lastPrice.close}, RSI: ${lastPrice.rsi14?.toFixed(2) || "N/A"}, MACD: ${lastPrice.macd?.toFixed(2) || "N/A"}.`;
+      }
+
+      const response = await chatApi.send(input.trim(), "chat", context);
+
+      const assistantMessage: Message = {
+        id: (Date.now() + 1).toString(),
+        role: "assistant",
+        content:
+          response || "Maaf, saya tidak bisa memproses permintaan saat ini. Coba lagi nanti.",
+        timestamp: new Date(),
+      };
+
+      setMessages((prev) => [...prev, assistantMessage]);
+    } catch (error) {
+      console.error("Chat error:", error);
+      const errorMessage: Message = {
+        id: (Date.now() + 1).toString(),
+        role: "assistant",
+        content: "Maaf, terjadi kesalahan. Pastikan API key sudah dikonfigurasi dengan benar.",
+        timestamp: new Date(),
+      };
+      setMessages((prev) => [...prev, errorMessage]);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleQuickQuestion = (question: string) => {
+    setInput(question);
+    inputRef.current?.focus();
+  };
+
+  return (
+    <>
+      {/* Floating Button */}
+      <AnimatePresence>
+        {!isOpen && (
+          <motion.button
+            initial={{ scale: 0, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            exit={{ scale: 0, opacity: 0 }}
+            whileHover={{ scale: 1.1 }}
+            whileTap={{ scale: 0.9 }}
+            onClick={() => setIsOpen(true)}
+            className="fixed bottom-6 right-6 w-16 h-16 bg-gradient-to-br from-green-400 via-emerald-500 to-teal-500 
+              rounded-full shadow-xl shadow-green-500/50 flex items-center justify-center z-50
+              hover:shadow-green-400/70 hover:from-green-300 hover:via-emerald-400 hover:to-teal-400 
+              transition-all duration-300 border-2 border-white/20"
+          >
+            <MessageCircle className="w-7 h-7 text-white drop-shadow-lg" />
+            <span className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 rounded-full flex items-center justify-center
+              border-2 border-white shadow-lg animate-pulse">
+              <Sparkles className="w-3 h-3 text-white" />
+            </span>
+          </motion.button>
+        )}
+      </AnimatePresence>
+
+      {/* Chat Window */}
+      <AnimatePresence>
+        {isOpen && (
+          <motion.div
+            initial={{ opacity: 0, y: 20, scale: 0.95 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 20, scale: 0.95 }}
+            className={`fixed z-50 bg-terminal-dark border border-gray-700 rounded-2xl shadow-2xl 
+              overflow-hidden flex flex-col ${
+                isExpanded
+                  ? "inset-4 md:inset-8"
+                  : "bottom-6 right-6 w-[380px] h-[500px] max-h-[80vh]"
+              }`}
+          >
+            {/* Header */}
+            <div className="flex items-center justify-between px-4 py-3 bg-gray-800/50 border-b border-gray-700">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-full bg-linear-to-br from-terminal-green to-emerald-600 flex items-center justify-center">
+                  <Bot className="w-4 h-4 text-black" />
+                </div>
+                <div>
+                  <h3 className="font-mono font-bold text-white text-sm">MooCuan AI</h3>
+                  <p className="text-xs text-gray-500">Stock Assistant</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-1">
+                <button
+                  onClick={() => setIsExpanded(!isExpanded)}
+                  className="p-2 hover:bg-gray-700 rounded-lg transition-colors"
+                >
+                  {isExpanded ? (
+                    <Minimize2 className="w-4 h-4 text-gray-400" />
+                  ) : (
+                    <Maximize2 className="w-4 h-4 text-gray-400" />
+                  )}
+                </button>
+                <button
+                  onClick={() => setIsOpen(false)}
+                  className="p-2 hover:bg-gray-700 rounded-lg transition-colors"
+                >
+                  <X className="w-4 h-4 text-gray-400" />
+                </button>
+              </div>
+            </div>
+
+            {/* Messages */}
+            <div className="flex-1 overflow-y-auto p-4 space-y-4">
+              {messages.map((message) => (
+                <motion.div
+                  key={message.id}
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className={`flex gap-3 ${message.role === "user" ? "flex-row-reverse" : ""}`}
+                >
+                  <div
+                    className={`w-8 h-8 rounded-full shrink-0 flex items-center justify-center ${
+                      message.role === "user"
+                        ? "bg-blue-500"
+                        : "bg-linear-to-br from-terminal-green to-emerald-600"
+                    }`}
+                  >
+                    {message.role === "user" ? (
+                      <User className="w-4 h-4 text-white" />
+                    ) : (
+                      <Bot className="w-4 h-4 text-black" />
+                    )}
+                  </div>
+                  <div
+                    className={`max-w-[80%] rounded-2xl px-4 py-2.5 ${
+                      message.role === "user"
+                        ? "bg-blue-500 text-white rounded-tr-md"
+                        : "bg-gray-800 text-gray-200 rounded-tl-md"
+                    }`}
+                  >
+                    <p className="text-sm whitespace-pre-wrap">{message.content}</p>
+                    <p className="text-xs mt-1 opacity-50">
+                      {message.timestamp.toLocaleTimeString("id-ID", {
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      })}
+                    </p>
+                  </div>
+                </motion.div>
+              ))}
+
+              {isLoading && (
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  className="flex gap-3"
+                >
+                  <div className="w-8 h-8 rounded-full bg-linear-to-br from-terminal-green to-emerald-600 flex items-center justify-center">
+                    <Bot className="w-4 h-4 text-black" />
+                  </div>
+                  <div className="bg-gray-800 rounded-2xl rounded-tl-md px-4 py-3">
+                    <div className="flex items-center gap-2">
+                      <Loader2 className="w-4 h-4 text-terminal-green animate-spin" />
+                      <span className="text-sm text-gray-400">Thinking...</span>
+                    </div>
+                  </div>
+                </motion.div>
+              )}
+
+              <div ref={messagesEndRef} />
+            </div>
+
+            {/* Quick Questions */}
+            {messages.length <= 2 && (
+              <div className="px-4 pb-2">
+                <p className="text-xs text-gray-500 mb-2">Quick questions:</p>
+                <div className="flex flex-wrap gap-2">
+                  {quickQuestions.map((q, i) => (
+                    <button
+                      key={i}
+                      onClick={() => handleQuickQuestion(q)}
+                      className="px-3 py-1.5 text-xs bg-gray-800 hover:bg-gray-700 text-gray-300 rounded-full transition-colors"
+                    >
+                      {q}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Input */}
+            <div className="p-4 border-t border-gray-700">
+              <div className="flex items-center gap-2 bg-gray-800 rounded-xl px-4 py-2">
+                <input
+                  ref={inputRef}
+                  type="text"
+                  value={input}
+                  onChange={(e) => setInput(e.target.value)}
+                  onKeyPress={(e) => e.key === "Enter" && handleSend()}
+                  placeholder="Ask about stocks..."
+                  className="flex-1 bg-transparent text-white text-sm outline-none placeholder-gray-500"
+                  disabled={isLoading}
+                />
+                <button
+                  onClick={handleSend}
+                  disabled={!input.trim() || isLoading}
+                  className="p-2 bg-terminal-green hover:bg-terminal-green/80 disabled:bg-gray-700 
+                    disabled:text-gray-500 text-black rounded-lg transition-colors"
+                >
+                  <Send className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </>
+  );
+};
+
+export default AIChatAssistant;

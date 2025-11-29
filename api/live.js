@@ -11,11 +11,11 @@ export default async function handler(req, res) {
 
   try {
     const quote = await yahooFinance.quote(ticker);
-    
+
     // Map fields to match Python response
     // Python: symbol, price, open, prevClose
     // Node yahoo-finance2: symbol, regularMarketPrice, regularMarketOpen, regularMarketPreviousClose
-    
+
     const price = quote.regularMarketPrice ?? quote.postMarketPrice ?? quote.preMarketPrice;
     const open = quote.regularMarketOpen;
     const prevClose = quote.regularMarketPreviousClose;
@@ -24,7 +24,7 @@ export default async function handler(req, res) {
       symbol: quote.symbol,
       price: price,
       open: open,
-      prevClose: prevClose
+      prevClose: prevClose,
     });
   } catch (error) {
     console.error("Live quote error:", error);

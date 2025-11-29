@@ -9,22 +9,22 @@ export interface StockData {
 
 export interface IndicatorData extends StockData {
   // Core indicators
-  rsi: number | null;           // Wilder’s RSI 14
-  macd: number | null;          // EMA(12) - EMA(26)
-  macdSignal: number | null;    // EMA 9 dari MACD
+  rsi: number | null; // Wilder’s RSI 14
+  macd: number | null; // EMA(12) - EMA(26)
+  macdSignal: number | null; // EMA 9 dari MACD
   macdHistogram: number | null; // MACD - Signal
 
   // Bollinger Bands (20, 2σ)
   bbUpper: number | null;
   bbLower: number | null;
-  bbMiddle: number | null;      // middle band = SMA 20
+  bbMiddle: number | null; // middle band = SMA 20
 
   // Moving averages
   sma20: number | null;
   sma50: number | null;
 
   // Our custom quant score 0–100
-  technicalConfidence: number;  // always set in calculateIndicators
+  technicalConfidence: number; // always set in calculateIndicators
 }
 
 export enum SignalType {
@@ -35,6 +35,7 @@ export enum SignalType {
 }
 
 export interface AIAnalysisResult {
+  ticker?: string;
   signal: SignalType;
   confidence: number;
   reasoning: string;
@@ -47,4 +48,4 @@ export interface AIAnalysisResult {
 
 // Harus match dengan period di /api/market handler:
 // case "1M" | "3M" | "6M" | "1Y" dst.
-export type TimeFrame = "1M" | "3M" | "6M" | "1Y";
+export type TimeFrame = "1M" | "3M" | "6M" | "1Y" | "YTD" | "ALL";

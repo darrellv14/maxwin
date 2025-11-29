@@ -1,20 +1,56 @@
-import { IndicatorData, AIAnalysisResult, SignalType } from '../types';
+import { IndicatorData, AIAnalysisResult, SignalType } from "../types";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 
 // Initialize Gemini API
 const genAI = new GoogleGenerativeAI(import.meta.env.VITE_GEMINI_API_KEY || "");
 
+// Chat Assistant function for general queries
+interface ChatParams {
+  prompt: string;
+  type: "chat" | "analysis";
+}
+
+export const analyzeWithGemini = async ({ prompt, type }: ChatParams): Promise<string> => {
+  try {
+    const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+
+    const systemPrompt =
+      type === "chat"
+        ? `Anda adalah AI assistant trading saham bernama MooCuan AI. Anda ahli dalam:
+         - Analisis teknikal (RSI, MACD, Bollinger Bands, SMA, EMA, dll)
+         - Analisis fundamental dasar
+         - Strategi trading (swing, scalping, positional)
+         - Manajemen risiko dan money management
+         - Psikologi trading
+         
+         Berikan jawaban yang:
+         - Informatif dan akurat
+         - Dalam bahasa Indonesia yang santai tapi profesional
+         - Gunakan emoji untuk memperjelas poin penting
+         - Berikan contoh konkret jika memungkinkan
+         - Selalu ingatkan tentang manajemen risiko`
+        : `Anda adalah analis teknikal profesional. Berikan analisis mendalam dengan data yang ada.`;
+
+    const result = await model.generateContent(`${systemPrompt}\n\n${prompt}`);
+    const response = await result.response;
+    return response.text() || "Maaf, tidak ada respons dari AI.";
+  } catch (error) {
+    console.error("Gemini Chat Error:", error);
+    throw new Error("Gagal mendapatkan respons dari AI");
+  }
+};
+
 export const analyzeStockWithGemini = async (
-  ticker: string, 
+  ticker: string,
   data: IndicatorData[]
 ): Promise<AIAnalysisResult> => {
   // Get the last 3 data points for trend analysis
   const recentData = data.slice(-5);
   const latest = recentData[recentData.length - 1];
 
-  const isIndonesian = ticker.toUpperCase().endsWith('.JK') || ticker.toUpperCase() === '^JKSE';
-  
-  const strategyPrompt = isIndonesian 
+  const isIndonesian = ticker.toUpperCase().endsWith(".JK") || ticker.toUpperCase() === "^JKSE";
+
+  const strategyPrompt = isIndonesian
     ? `1. **Strategy:** LONG-ONLY (Spot Market). Do NOT suggest Short Selling.
        - If Bearish: Signal 'SELL' (Exit holdings) or 'WAIT'. Set Entry/TP/SL to 'N/A' or describe support levels to watch.
        - If Bullish: Signal 'BUY'. Provide Entry, SL, TP.`
@@ -27,15 +63,18 @@ export const analyzeStockWithGemini = async (
     Analyze the following technical indicators for the asset: ${ticker}.
 
     Recent Data (Last 5 periods):
-    ${recentData.map(d => 
-      `Date: ${d.date} | Close: ${d.close.toFixed(2)} | RSI: ${d.rsi?.toFixed(2)} | MACD Hist: ${d.macdHistogram?.toFixed(4)} | BB Pos: ${d.close > (d.bbUpper || 0) ? 'Over Upper' : d.close < (d.bbLower || 0) ? 'Below Lower' : 'Inside'}`
-    ).join('\n')}
+    ${recentData
+      .map(
+        (d) =>
+          `Date: ${d.date} | Close: ${d.close.toFixed(2)} | RSI: ${d.rsi?.toFixed(2)} | MACD Hist: ${d.macdHistogram?.toFixed(4)} | BB Pos: ${d.close > (d.bbUpper || 0) ? "Over Upper" : d.close < (d.bbLower || 0) ? "Below Lower" : "Inside"}`
+      )
+      .join("\n")}
 
     Current Indicators:
     - RSI (14): ${latest.rsi?.toFixed(2)}
     - MACD Histogram: ${latest.macdHistogram?.toFixed(4)}
-    - Price vs SMA50: ${latest.close > (latest.sma50 || 0) ? 'Bullish' : 'Bearish'}
-    - Bollinger Band Squeeze: ${((latest.bbUpper || 0) - (latest.bbLower || 0)) / latest.close < 0.05 ? 'YES' : 'NO'}
+    - Price vs SMA50: ${latest.close > (latest.sma50 || 0) ? "Bullish" : "Bearish"}
+    - Bollinger Band Squeeze: ${((latest.bbUpper || 0) - (latest.bbLower || 0)) / latest.close < 0.05 ? "YES" : "NO"}
 
     IMPORTANT CONSTRAINTS:
     ${strategyPrompt}
@@ -61,33 +100,32 @@ export const analyzeStockWithGemini = async (
   `;
 
   try {
-    const model = genAI.getGenerativeModel({ model: "gemini-2.5-pro" });
-    
+    const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+
     const result = await model.generateContent(prompt);
     const response = await result.response;
     const text = response.text();
-    
+
     if (!text) throw new Error("No response from Gemini");
 
     // Clean up markdown code blocks if present
-    const cleanText = text.replace(/```json\n?|\n?```/g, '').trim();
+    const cleanText = text.replace(/```json\n?|\n?```/g, "").trim();
     const parsedResult = JSON.parse(cleanText);
 
     let signalEnum = SignalType.HOLD;
-    if (parsedResult.signal === 'BUY') signalEnum = SignalType.BUY;
-    if (parsedResult.signal === 'SELL') signalEnum = SignalType.SELL;
+    if (parsedResult.signal === "BUY") signalEnum = SignalType.BUY;
+    if (parsedResult.signal === "SELL") signalEnum = SignalType.SELL;
 
     return {
       signal: signalEnum,
       confidence: parsedResult.confidence,
       reasoning: parsedResult.reasoning,
-      entryArea: parsedResult.entryArea || 'N/A',
-      stopLoss: parsedResult.stopLoss || 'N/A',
-      takeProfit1: parsedResult.takeProfit1 || 'N/A',
-      takeProfit2: parsedResult.takeProfit2 || 'N/A',
-      predictionTime: parsedResult.predictionTime || 'Unknown'
+      entryArea: parsedResult.entryArea || "N/A",
+      stopLoss: parsedResult.stopLoss || "N/A",
+      takeProfit1: parsedResult.takeProfit1 || "N/A",
+      takeProfit2: parsedResult.takeProfit2 || "N/A",
+      predictionTime: parsedResult.predictionTime || "Unknown",
     };
-
   } catch (error) {
     console.error("Gemini Error:", error);
     return {
@@ -98,7 +136,7 @@ export const analyzeStockWithGemini = async (
       stopLoss: "---",
       takeProfit1: "---",
       takeProfit2: "---",
-      predictionTime: "---"
+      predictionTime: "---",
     };
   }
 };

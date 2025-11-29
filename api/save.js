@@ -5,8 +5,7 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: "Method not allowed" });
   }
 
-  const { ticker, signal, entry_price, tp1, tp2, stop_loss, reasoning } =
-    req.body || {};
+  const { ticker, signal, entry_price, tp1, tp2, stop_loss, reasoning } = req.body || {};
 
   // Validasi minimal (boleh dihapus kalau nggak perlu)
   if (!ticker || !signal || typeof entry_price !== "number") {
@@ -23,24 +22,14 @@ export default async function handler(req, res) {
       RETURNING id
     `;
 
-    const values = [
-      ticker,
-      signal,
-      entry_price,
-      tp1,
-      tp2,
-      stop_loss,
-      reasoning,
-    ];
+    const values = [ticker, signal, entry_price, tp1, tp2, stop_loss, reasoning];
     const { rows } = await pool.query(query, values);
 
     return res.status(201).json({ message: "Saved", id: rows[0].id });
   } catch (error) {
     console.error("Save API Error:", error);
-    return res
-      .status(500)
-      .json({
-        error: error instanceof Error ? error.message : "Internal error",
-      });
+    return res.status(500).json({
+      error: error instanceof Error ? error.message : "Internal error",
+    });
   }
 }

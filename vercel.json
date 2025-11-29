@@ -3,6 +3,10 @@
     {
       "path": "/api/cron-ai-screener",
       "schedule": "0 10 * * 1-5"
+    },
+    {
+      "path": "/api/check-alerts",
+      "schedule": "*/5 9-16 * * 1-5"
     }
   ],
   "rewrites": [

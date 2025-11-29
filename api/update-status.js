@@ -30,14 +30,10 @@ export default async function handler(req, res) {
         const quote = await yahooFinance.quote(analysis.ticker);
         // regularMarketPrice adalah harga “normal market” utama :contentReference[oaicite:1]{index=1}
         let currentPrice =
-          quote.regularMarketPrice ??
-          quote.postMarketPrice ??
-          quote.preMarketPrice;
+          quote.regularMarketPrice ?? quote.postMarketPrice ?? quote.preMarketPrice;
 
         if (typeof currentPrice !== "number") {
-          console.warn(
-            `No usable price for ${analysis.ticker}, skipping update`
-          );
+          console.warn(`No usable price for ${analysis.ticker}, skipping update`);
           continue;
         }
 
@@ -93,9 +89,7 @@ export default async function handler(req, res) {
       }
     }
 
-    return res
-      .status(200)
-      .json({ message: "Status updated", updated_count: updatedCount });
+    return res.status(200).json({ message: "Status updated", updated_count: updatedCount });
   } catch (error) {
     console.error("Update-status API Error:", error);
     return res

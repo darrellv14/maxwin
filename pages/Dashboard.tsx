@@ -2,17 +2,19 @@ import React, { useState, useEffect, useMemo } from "react";
 import { fetchStockData, calculateIndicators } from "../services/stockService";
 import { analyzeStockWithGemini } from "../services/geminiService";
 import { saveAnalysis } from "../services/analysisService";
-import {
-  StockData,
-  IndicatorData,
-  TimeFrame,
-  AIAnalysisResult,
-} from "../types";
+import { IndicatorData, TimeFrame, AIAnalysisResult } from "../types";
 import FinancialChart from "../components/FinancialChart";
 import StatCard from "../components/StatCard";
 import OraclePanel from "../components/OraclePanel";
 import ConfidenceChart from "../components/ConfidenceChart";
+import WatchlistWidget from "../components/WatchlistWidget";
 import { Link } from "react-router-dom";
+import { motion } from "framer-motion";
+import toast from "react-hot-toast";
+import { Star, Keyboard, LogOut, Shield } from "lucide-react";
+import { useWatchlistStore } from "../stores/watchlistStore";
+import { logout, isAdmin, getUser } from "../services/authService";
+import AIChatAssistant from "@/components/AIChatAssistant";
 
 const Dashboard: React.FC = () => {
   const [ticker, setTicker] = useState<string>("BTC-USD");
@@ -21,13 +23,13 @@ const Dashboard: React.FC = () => {
   const [data, setData] = useState<IndicatorData[]>([]);
   const [analysis, setAnalysis] = useState<AIAnalysisResult | null>(null);
   const [loadingAI, setLoadingAI] = useState<boolean>(false);
-  const [apiKeyInput, setApiKeyInput] = useState<string>("");
 
-  // Initialize data
+  const { addToWatchlist, removeFromWatchlist, isInWatchlist } = useWatchlistStore();
+  const user = getUser();
+
   useEffect(() => {
     const loadData = async () => {
       try {
-        // Fetch real historical data
         const rawData = await fetchStockData(ticker, timeframe);
         const enrichedData = calculateIndicators(rawData);
         setData(enrichedData);
@@ -36,7 +38,6 @@ const Dashboard: React.FC = () => {
         console.error("Failed to fetch stock data:", err);
       }
     };
-
     loadData();
   }, [ticker, timeframe]);
 
@@ -51,7 +52,7 @@ const Dashboard: React.FC = () => {
   }, [data]);
 
   const handleAnalyze = async () => {
-    const apiKey = import.meta.env.VITE_GEMINI_API_KEY || apiKeyInput;
+    const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
     if (!apiKey) {
       alert("Please check API Key configuration.");
       return;
@@ -63,7 +64,6 @@ const Dashboard: React.FC = () => {
     try {
       const result = await analyzeStockWithGemini(ticker, data);
       setAnalysis(result);
-      // Save to DB
       await saveAnalysis(result, ticker);
     } catch (e) {
       console.error(e);
@@ -73,8 +73,7 @@ const Dashboard: React.FC = () => {
   };
 
   const getPriceChange = () => {
-    if (!current || !prev)
-      return { val: "0.00", percent: "0.00", trend: "neutral" as const };
+    if (!current || !prev) return { val: "0.00", percent: "0.00%", trend: "neutral" as const };
     const diff = current.close - prev.close;
     const percent = (diff / prev.close) * 100;
     return {
@@ -98,11 +97,26 @@ const Dashboard: React.FC = () => {
     }
   };
 
+  const handleToggleWatchlist = () => {
+    if (isInWatchlist(ticker)) {
+      removeFromWatchlist(ticker);
+      toast.success(`${ticker} removed from watchlist`);
+    } else {
+      addToWatchlist(ticker);
+      toast.success(`${ticker} added to watchlist`);
+    }
+  };
+
+  const handleSelectFromWatchlist = (selectedTicker: string) => {
+    setTicker(selectedTicker);
+    setSearchInput(selectedTicker);
+  };
+
   return (
     <div className="min-h-screen bg-terminal-black text-gray-200 font-sans selection:bg-green-900 selection:text-white pb-10">
       {/* Header */}
       <header className="border-b border-gray-800 bg-terminal-dark/50 backdrop-blur sticky top-0 z-50">
-        <div className="max-w-7xl mx-auto px-4 py-3 flex justify-between items-center">
+        <div className="max-w-7xl mx-auto px-4 py-3 flex justify-between items-center 2xl:max-w-none">
           <div className="flex items-center gap-2">
             <div className="w-3 h-3 bg-profit-green rounded-full shadow-[0_0_10px_#00ff9d]"></div>
             <h1 className="text-xl font-bold tracking-tight text-white font-mono">
@@ -113,6 +127,17 @@ const Dashboard: React.FC = () => {
           </div>
 
           <div className="flex items-center gap-4">
+            <button
+              onClick={() => {
+                const event = new KeyboardEvent("keydown", { key: "k", metaKey: true });
+                document.dispatchEvent(event);
+              }}
+              className="hidden md:flex items-center gap-2 text-xs font-mono text-gray-500 hover:text-gray-300 bg-gray-900 px-3 py-1.5 rounded border border-gray-800"
+            >
+              <Keyboard className="w-3 h-3" />
+              <span>Cmd+K</span>
+            </button>
+
             <Link
               to="/screener"
               className="text-xs font-mono bg-gray-900 px-3 py-1 rounded-full border border-gray-800 hover:bg-gray-800 text-profit-green transition-colors flex items-center gap-2"
@@ -126,14 +151,34 @@ const Dashboard: React.FC = () => {
             >
               VIEW HISTORY
             </Link>
+
+            {isAdmin() && (
+              <Link
+                to="/admin"
+                className="text-xs font-mono bg-purple-900/50 px-3 py-1 rounded-full border border-purple-700 hover:bg-purple-800 text-purple-300 transition-colors flex items-center gap-2"
+              >
+                <Shield className="w-3 h-3" />
+                ADMIN
+              </Link>
+            )}
+
+            <div className="flex items-center gap-2 border-l border-gray-700 pl-4">
+              <span className="text-xs text-gray-400">{user?.name}</span>
+              <button
+                onClick={logout}
+                className="p-1.5 text-gray-400 hover:text-red-400 transition-colors"
+                title="Logout"
+              >
+                <LogOut className="w-4 h-4" />
+              </button>
+            </div>
           </div>
         </div>
       </header>
 
-      <main className="max-w-7xl mx-auto px-4 mt-6">
-        {/* Controls Bar */}
+      <main className="max-w-7xl mx-auto px-4 mt-6 2xl:max-w-none">
         <div className="grid grid-cols-1 md:grid-cols-12 gap-4 mb-6">
-          {/* Sidebar / Input Area */}
+          {/* Sidebar */}
           <div className="col-span-12 md:col-span-3 space-y-4 flex flex-col">
             <div className="bg-terminal-gray border border-gray-800 p-4 rounded-lg">
               <label className="block text-xs font-mono text-gray-500 mb-1">
@@ -153,19 +198,30 @@ const Dashboard: React.FC = () => {
                 >
                   GO
                 </button>
+                <motion.button
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  onClick={handleToggleWatchlist}
+                  className={`px-3 rounded border transition-colors ${
+                    isInWatchlist(ticker)
+                      ? "bg-yellow-500/20 border-yellow-500/50 text-yellow-500"
+                      : "bg-gray-800 border-gray-700 text-gray-400 hover:text-yellow-500"
+                  }`}
+                  title={isInWatchlist(ticker) ? "Remove from Watchlist" : "Add to Watchlist"}
+                >
+                  <Star className={`w-4 h-4 ${isInWatchlist(ticker) ? "fill-current" : ""}`} />
+                </motion.button>
               </div>
             </div>
 
             <div className="bg-terminal-gray border border-gray-800 p-4 rounded-lg">
-              <label className="block text-xs font-mono text-gray-500 mb-2">
-                TIMEFRAME
-              </label>
-              <div className="flex gap-2">
-                {(["1M", "3M", "6M", "1Y"] as TimeFrame[]).map((tf) => (
+              <label className="block text-xs font-mono text-gray-500 mb-2">TIMEFRAME</label>
+              <div className="flex gap-2 flex-wrap">
+                {(["1M", "3M", "6M", "1Y", "YTD", "ALL"] as TimeFrame[]).map((tf) => (
                   <button
                     key={tf}
                     onClick={() => setTimeframe(tf)}
-                    className={`flex-1 py-1 text-xs font-mono rounded border ${
+                    className={`flex-1 py-1 px-2 text-xs font-mono rounded border ${
                       timeframe === tf
                         ? "bg-gray-800 border-profit-green text-profit-green"
                         : "bg-black border-gray-800 text-gray-500 hover:bg-gray-800"
@@ -180,16 +236,14 @@ const Dashboard: React.FC = () => {
             {/* Technical Summary */}
             <div className="bg-terminal-gray border border-gray-800 p-4 rounded-lg space-y-3">
               <div className="flex justify-between items-center">
-                <span className="text-xs text-gray-400 font-mono">
-                  RSI (14)
-                </span>
+                <span className="text-xs text-gray-400 font-mono">RSI (14)</span>
                 <span
                   className={`text-sm font-bold font-mono ${
                     (current?.rsi || 50) > 70
                       ? "text-loss-red"
                       : (current?.rsi || 50) < 30
-                      ? "text-profit-green"
-                      : "text-gray-300"
+                        ? "text-profit-green"
+                        : "text-gray-300"
                   }`}
                 >
                   {current?.rsi?.toFixed(2)}
@@ -206,9 +260,7 @@ const Dashboard: React.FC = () => {
                 <span className="text-xs text-gray-400 font-mono">MACD</span>
                 <span
                   className={`text-sm font-bold font-mono ${
-                    (current?.macdHistogram || 0) > 0
-                      ? "text-profit-green"
-                      : "text-loss-red"
+                    (current?.macdHistogram || 0) > 0 ? "text-profit-green" : "text-loss-red"
                   }`}
                 >
                   {current?.macdHistogram?.toFixed(4)}
@@ -216,9 +268,7 @@ const Dashboard: React.FC = () => {
               </div>
 
               <div className="flex justify-between items-center pt-2 border-t border-gray-800">
-                <span className="text-xs text-gray-400 font-mono">
-                  SMA Trend
-                </span>
+                <span className="text-xs text-gray-400 font-mono">SMA Trend</span>
                 <span
                   className={`text-sm font-bold font-mono ${
                     (current?.close || 0) > (current?.sma50 || 0)
@@ -226,34 +276,24 @@ const Dashboard: React.FC = () => {
                       : "text-loss-red"
                   }`}
                 >
-                  {(current?.close || 0) > (current?.sma50 || 0)
-                    ? "BULLISH"
-                    : "BEARISH"}
+                  {(current?.close || 0) > (current?.sma50 || 0) ? "BULLISH" : "BEARISH"}
                 </span>
               </div>
             </div>
 
-            {/* New Confidence Chart in Sidebar */}
             <div className="flex-1 flex flex-col">
               <ConfidenceChart data={data} />
             </div>
+
+            <WatchlistWidget onSelect={handleSelectFromWatchlist} />
           </div>
 
           {/* Main Chart Area */}
           <div className="col-span-12 md:col-span-9 space-y-4 flex flex-col">
-            {/* Top Stats */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               <StatCard
                 label="Last Price"
-                value={
-                  current?.close
-                    .toLocaleString("id-ID", {
-                      style: "currency",
-                      currency: "IDR",
-                    })
-                    .replace("Rp", "")
-                    .trim() || "0"
-                }
+                value={current?.close?.toLocaleString("id-ID") || "0"}
                 subValue={`${priceStats.val} (${priceStats.percent})`}
                 trend={priceStats.trend}
               />
@@ -264,9 +304,7 @@ const Dashboard: React.FC = () => {
               />
               <StatCard
                 label="Volatility"
-                value={Math.abs(
-                  (current?.bbUpper || 0) - (current?.bbLower || 0)
-                ).toFixed(0)}
+                value={Math.abs((current?.bbUpper || 0) - (current?.bbLower || 0)).toFixed(0)}
                 subValue="BB Width"
                 color="text-yellow-400"
               />
@@ -277,28 +315,23 @@ const Dashboard: React.FC = () => {
                   analysis?.signal === "BUY"
                     ? "text-profit-green"
                     : analysis?.signal === "SELL"
-                    ? "text-loss-red"
-                    : "text-gray-500"
+                      ? "text-loss-red"
+                      : "text-gray-500"
                 }
               />
             </div>
+          <AIChatAssistant />
 
-            <FinancialChart data={data} />
+            <FinancialChart data={data} ticker={ticker} />
           </div>
         </div>
 
-        {/* Bottom Section: AI & Tables */}
+        {/* Bottom Section */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <OraclePanel
-            analysis={analysis}
-            loading={loadingAI}
-            onAnalyze={handleAnalyze}
-          />
+          <OraclePanel analysis={analysis} loading={loadingAI} onAnalyze={handleAnalyze} />
 
           <div className="bg-terminal-gray border border-gray-800 rounded-lg p-6">
-            <h2 className="text-lg font-bold font-mono text-white mb-4 flex justify-between items-center">
-              <span>MARKET DEPTH LOG</span>
-            </h2>
+            <h2 className="text-lg font-bold font-mono text-white mb-4">MARKET DEPTH LOG</h2>
             <div className="overflow-x-auto">
               <table className="w-full text-left text-xs font-mono">
                 <thead className="border-b border-gray-700 text-gray-500">
@@ -325,8 +358,8 @@ const Dashboard: React.FC = () => {
                             (d.rsi || 50) > 70
                               ? "text-red-400"
                               : (d.rsi || 50) < 30
-                              ? "text-green-400"
-                              : ""
+                                ? "text-green-400"
+                                : ""
                           }`}
                         >
                           {d.rsi?.toFixed(1)}
