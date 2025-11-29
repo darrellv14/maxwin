@@ -34,6 +34,12 @@ const initDb = async () => {
       ADD COLUMN IF NOT EXISTS name VARCHAR(255)
     `);
     
+    // Add added_at column if it doesn't exist (for existing tables)
+    await pool.query(`
+      ALTER TABLE watchlist 
+      ADD COLUMN IF NOT EXISTS added_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    `);
+    
     console.log("Watchlist table initialized");
   } catch (error) {
     console.error("Error initializing watchlist table:", error);

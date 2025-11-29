@@ -12,7 +12,7 @@ import {
   ChevronUp,
 } from "lucide-react";
 import { usePortfolioStore, PortfolioPosition } from "../stores";
-import toast from "react-hot-toast";
+import { toast } from "sonner";
 
 interface AddPositionModalProps {
   isOpen: boolean;

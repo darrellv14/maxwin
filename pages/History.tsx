@@ -23,7 +23,7 @@ import {
   XCircle,
   Clock,
 } from "lucide-react";
-import toast from "react-hot-toast";
+import { toast } from "sonner";
 
 const ITEMS_PER_PAGE = 10;
 

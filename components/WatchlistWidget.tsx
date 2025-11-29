@@ -2,7 +2,7 @@ import React, { useEffect, useRef } from "react";
 import { motion } from "framer-motion";
 import { Star, StarOff, TrendingUp, TrendingDown, Trash2, X } from "lucide-react";
 import { useWatchlistStore } from "../stores";
-import toast from "react-hot-toast";
+import { toast } from "sonner";
 
 interface WatchlistWidgetProps {
   onSelect?: (ticker: string) => void;

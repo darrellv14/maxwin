@@ -10,7 +10,7 @@ import ConfidenceChart from "../components/ConfidenceChart";
 import WatchlistWidget from "../components/WatchlistWidget";
 import { Link, useSearchParams } from "react-router-dom";
 import { motion } from "framer-motion";
-import toast from "react-hot-toast";
+import { toast } from "sonner";
 import { Star, Keyboard, LogOut, Shield } from "lucide-react";
 import { useWatchlistStore } from "../stores/watchlistStore";
 import { logout, isAdmin, getUser } from "../services/authService";

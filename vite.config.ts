@@ -64,7 +64,7 @@ export default defineConfig(({ mode }) => {
                 return 'vendor-indicators';
               }
               // Other vendor libs
-              if (id.includes('zustand') || id.includes('react-hot-toast') || id.includes('cmdk')) {
+              if (id.includes('zustand') || id.includes('sonner') || id.includes('cmdk')) {
                 return 'vendor-utils';
               }
               // Router

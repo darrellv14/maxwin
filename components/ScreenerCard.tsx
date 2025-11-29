@@ -18,7 +18,7 @@ import {
 } from "lucide-react";
 import { AIAnalysisResult, SignalType } from "../types";
 import { useWatchlistStore } from "../stores";
-import toast from "react-hot-toast";
+import { toast } from "sonner";
 
 interface ScreenerCardProps {
   analysis?: AIAnalysisResult;

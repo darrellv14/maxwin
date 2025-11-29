@@ -8,7 +8,7 @@ import ChartLegend from "./ChartLegend";
 import ChartHeader from "./ChartHeader";
 import { IndicatorData } from "../../types";
 import { useWatchlistStore } from "../../stores";
-import toast from "react-hot-toast";
+import { toast } from "sonner";
 
 interface FinancialChartContainerProps {
   data: IndicatorData[];
