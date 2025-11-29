@@ -116,9 +116,11 @@ async function analyzeStock(req, res) {
 // ============ CHAT ============
 async function chat(req, res) {
   try {
-    const { prompt, type = "chat", context } = req.body;
+    // Support both 'prompt' and 'message' field names for compatibility
+    const { prompt, message, type = "chat", context } = req.body;
+    const userPrompt = prompt || message;
 
-    if (!prompt) {
+    if (!userPrompt) {
       return res.status(400).json({ success: false, message: "Prompt harus diisi" });
     }
 
@@ -185,7 +187,7 @@ Gunakan analogi dan contoh nyata dari pasar Indonesia.
 ${context ? `Topik: ${context}` : ""}`;
     }
 
-    const result = await model.generateContent(`${systemPrompt}\n\nUser: ${prompt}`);
+    const result = await model.generateContent(`${systemPrompt}\n\nUser: ${userPrompt}`);
     const response = await result.response;
     const text = response.text();
 

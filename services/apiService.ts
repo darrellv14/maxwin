@@ -189,7 +189,7 @@ export const chatApi = {
     type: "chat" | "analysis" | "education" = "chat",
     context?: string
   ): Promise<string> => {
-    const response = await fetch(`${API_BASE}/chat`, {
+    const response = await fetch(`${API_BASE}/ai?action=chat`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
