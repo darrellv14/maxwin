@@ -4,6 +4,19 @@ import { verifyToken } from "./auth.js";
 // Initialize watchlist table
 const initDb = async () => {
   try {
+    // First ensure users table exists (in case auth.js hasn't run yet)
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS users (
+        id SERIAL PRIMARY KEY,
+        email VARCHAR(255) UNIQUE NOT NULL,
+        password VARCHAR(255) NOT NULL,
+        name VARCHAR(255) NOT NULL,
+        role VARCHAR(50) DEFAULT 'user',
+        status VARCHAR(50) DEFAULT 'pending',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+    
     await pool.query(`
       CREATE TABLE IF NOT EXISTS watchlist (
         id SERIAL PRIMARY KEY,
@@ -20,7 +33,8 @@ const initDb = async () => {
   }
 };
 
-initDb();
+// Don't block module loading - init asynchronously
+initDb().catch(console.error);
 
 export default async function handler(req, res) {
   res.setHeader("Access-Control-Allow-Origin", "*");
@@ -43,6 +57,10 @@ export default async function handler(req, res) {
   }
 
   const userId = payload.userId;
+  
+  // Parse URL for query params
+  const url = new URL(req.url, `http://${req.headers.host}`);
+  const queryParams = Object.fromEntries(url.searchParams);
 
   try {
     // GET - Get user's watchlist
@@ -103,7 +121,7 @@ export default async function handler(req, res) {
 
     // DELETE - Remove from watchlist
     if (req.method === "DELETE") {
-      const { ticker } = req.query || req.body;
+      const ticker = queryParams.ticker || (req.body && req.body.ticker);
 
       if (!ticker) {
         return res.status(400).json({ success: false, message: "Ticker harus diisi" });
@@ -120,6 +138,6 @@ export default async function handler(req, res) {
     return res.status(405).json({ success: false, message: "Method tidak diizinkan" });
   } catch (error) {
     console.error("Watchlist error:", error);
-    return res.status(500).json({ success: false, message: "Server error" });
+    return res.status(500).json({ success: false, message: "Server error", error: error.message });
   }
 }
