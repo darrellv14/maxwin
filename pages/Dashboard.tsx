@@ -322,7 +322,7 @@ const Dashboard: React.FC = () => {
             </div>
           <AIChatAssistant />
 
-            <FinancialChart data={data} ticker={ticker} />
+            <FinancialChart data={data} />
           </div>
         </div>
 
@@ -352,7 +352,7 @@ const Dashboard: React.FC = () => {
                         className="border-b border-gray-800/50 hover:bg-gray-800/50 transition-colors"
                       >
                         <td className="py-2 text-gray-500">{d.date}</td>
-                        <td className="py-2 font-bold">{d.close.toFixed(0)}</td>
+                        <td className="py-2 font-bold">{d.close?.toFixed(0) ?? '-'}</td>
                         <td
                           className={`py-2 ${
                             (d.rsi || 50) > 70
@@ -365,7 +365,7 @@ const Dashboard: React.FC = () => {
                           {d.rsi?.toFixed(1)}
                         </td>
                         <td className="py-2 text-right text-gray-400">
-                          {d.volume.toLocaleString()}
+                          {d.volume?.toLocaleString() ?? '0'}
                         </td>
                       </tr>
                     ))}
