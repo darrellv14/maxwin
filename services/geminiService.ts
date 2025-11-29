@@ -64,6 +64,7 @@ export const analyzeStockWithGemini = async (
       takeProfit1: parsedResult.takeProfit1 || "N/A",
       takeProfit2: parsedResult.takeProfit2 || "N/A",
       predictionTime: parsedResult.predictionTime || "Unknown",
+      sentiment: parsedResult.sentiment || null,
     };
   } catch (error) {
     console.error("Analysis Error:", error);

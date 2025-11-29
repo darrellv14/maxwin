@@ -42,6 +42,8 @@ export default async function handler(req, res) {
 
     const prompt = `
       You are "The Oracle", a ruthless Wall Street Quantitative Developer and Senior Trader with BNSP Certified Technical Analyst and a Masters degree on Finance.
+      You have access to the latest market news, sentiment, and fundamental data up to your knowledge cutoff.
+      
       Analyze the following technical indicators for the asset: ${ticker}.
 
       Recent Data (Last 5 periods):
@@ -63,10 +65,15 @@ export default async function handler(req, res) {
       2. **Pattern Recognition:** Search for Cup and Handle, Head and Shoulders, Double Bottom/Top, Flags, Triangles. 
          - ONLY report a pattern if you are >80% confident.
          - Fallback: If no clear pattern, focus on Trend and Support/Resistance. Do NOT hallucinate.
+      3. **Sentiment & News Analysis:**
+         - Based on your knowledge, identify any recent news, events, or sentiment that could impact ${ticker}.
+         - Include earnings reports, corporate actions, sector trends, macroeconomic factors, or geopolitical events.
+         - ONLY include if you have relevant information. If no significant news, set sentiment to null.
 
       Task:
       Provide a trading signal, "Win Rate Probability", and a concrete trade plan (Entry, SL, TP).
-      Output purely in JSON format without markdown code blocks. PASTIKAN HASILNYA DALAM BAHASA INDONESIA PADA BAGIAN THE VERDICT ATAU REASONING
+      Also include any relevant market sentiment or news that could affect the price.
+      Output purely in JSON format without markdown code blocks. PASTIKAN HASILNYA DALAM BAHASA INDONESIA PADA BAGIAN REASONING DAN SENTIMENT.
       
       JSON Schema:
       {
@@ -77,7 +84,13 @@ export default async function handler(req, res) {
         "takeProfit1": "string value, e.g., '160.00'",
         "takeProfit2": "string value, e.g., '175.00'",
         "predictionTime": "string value, e.g., 'Next 2-3 Days'",
-        "reasoning": "A short, sharp, professional paragraph explaining why. Use financial jargon like 'divergence', 'overbought', 'momentum', 'consolidation'."
+        "reasoning": "A short, sharp, professional paragraph explaining why. Use financial jargon like 'divergence', 'overbought', 'momentum', 'consolidation'. DALAM BAHASA INDONESIA.",
+        "sentiment": {
+          "type": "BULLISH" | "BEARISH" | "NEUTRAL" | null,
+          "headline": "Brief headline of the news/event if any, null if none. DALAM BAHASA INDONESIA.",
+          "description": "Short description of the sentiment/news impact. DALAM BAHASA INDONESIA. null if no significant news.",
+          "source": "Source or type of news (e.g., 'Laporan Keuangan', 'Berita Sektor', 'Ekonomi Makro', 'Aksi Korporasi'). null if none."
+        }
       }
     `;
 

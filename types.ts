@@ -34,6 +34,13 @@ export enum SignalType {
   WAIT = "WAITING",
 }
 
+export interface SentimentData {
+  type: "BULLISH" | "BEARISH" | "NEUTRAL" | null;
+  headline: string | null;
+  description: string | null;
+  source: string | null;
+}
+
 export interface AIAnalysisResult {
   ticker?: string;
   signal: SignalType;
@@ -44,6 +51,7 @@ export interface AIAnalysisResult {
   takeProfit1: string;
   takeProfit2: string;
   predictionTime: string;
+  sentiment?: SentimentData | null;
 }
 
 // Harus match dengan period di /api/market handler:

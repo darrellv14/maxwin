@@ -95,6 +95,48 @@ const OraclePanel: React.FC<OraclePanelProps> = ({ analysis, loading, onAnalyze 
             </p>
           </div>
 
+          {/* Sentiment Section */}
+          {analysis.sentiment && analysis.sentiment.type && (
+            <div className={`mt-3 sm:mt-4 p-3 sm:p-4 rounded border ${
+              analysis.sentiment.type === "BULLISH" 
+                ? "bg-profit-green/10 border-profit-green/30" 
+                : analysis.sentiment.type === "BEARISH"
+                  ? "bg-loss-red/10 border-loss-red/30"
+                  : "bg-yellow-500/10 border-yellow-500/30"
+            }`}>
+              <div className="flex items-center gap-2 mb-2">
+                <span className={`text-lg ${
+                  analysis.sentiment.type === "BULLISH" 
+                    ? "text-profit-green" 
+                    : analysis.sentiment.type === "BEARISH"
+                      ? "text-loss-red"
+                      : "text-yellow-400"
+                }`}>
+                  {analysis.sentiment.type === "BULLISH" ? "📈" : analysis.sentiment.type === "BEARISH" ? "📉" : "📊"}
+                </span>
+                <div className="flex-1">
+                  <div className="text-[10px] sm:text-xs text-gray-500 font-mono uppercase">
+                    Sentimen {analysis.sentiment.source && `• ${analysis.sentiment.source}`}
+                  </div>
+                  <div className={`text-xs sm:text-sm font-bold ${
+                    analysis.sentiment.type === "BULLISH" 
+                      ? "text-profit-green" 
+                      : analysis.sentiment.type === "BEARISH"
+                        ? "text-loss-red"
+                        : "text-yellow-400"
+                  }`}>
+                    {analysis.sentiment.headline}
+                  </div>
+                </div>
+              </div>
+              {analysis.sentiment.description && (
+                <p className="text-gray-400 text-[10px] sm:text-xs font-mono leading-relaxed">
+                  {analysis.sentiment.description}
+                </p>
+              )}
+            </div>
+          )}
+
           <button
             onClick={onAnalyze}
             className="mt-3 sm:mt-4 w-full border border-gray-700 hover:bg-gray-800 text-gray-400 hover:text-white font-mono text-[10px] sm:text-xs py-1.5 sm:py-2 rounded transition-colors"
