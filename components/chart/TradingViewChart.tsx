@@ -142,7 +142,18 @@ const TradingViewChart = forwardRef<TradingViewChartHandle, TradingViewChartProp
       const bbLowerData: any[] = [];
 
       data.forEach((d) => {
-        const time = d.date;
+        // Convert date to appropriate format for lightweight-charts
+        // If ISO timestamp (contains 'T'), convert to Unix timestamp
+        // Otherwise use YYYY-MM-DD string
+        let time: string | number;
+        if (d.date.includes('T')) {
+          // Intraday data - use Unix timestamp (seconds)
+          time = Math.floor(new Date(d.date).getTime() / 1000);
+        } else {
+          // Daily data - use YYYY-MM-DD string
+          time = d.date;
+        }
+        
         const isUp = d.close >= d.open;
 
         candleData.push({

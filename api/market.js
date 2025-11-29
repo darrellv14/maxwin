@@ -86,8 +86,13 @@ export default async function handler(req, res) {
         startDate.setMonth(startDate.getMonth() - 3);
     }
 
+    // Store original values for smart fallback
+    const originalStartDate = new Date(startDate);
+    const originalInterval = interval;
+    const isIntraday = ["1D", "5D", "1M"].includes(period) && !isIndonesian;
+
     // ===========================================
-    // 3️⃣ CHART FETCH + AUTO-RETRY
+    // 3️⃣ CHART FETCH + SMART RETRY
     // ===========================================
     async function fetchChart() {
       try {
@@ -97,7 +102,7 @@ export default async function handler(req, res) {
           interval: interval,
         });
 
-        if (r.quotes && r.quotes.length > 0) return r;
+        if (r.quotes && r.quotes.length > 0) return { result: r, usedInterval: interval };
 
         // If empty, maybe range was bad.
         throw new Error("Empty quotes");
@@ -107,17 +112,22 @@ export default async function handler(req, res) {
           throw new Error("Ticker Not Found");
         }
 
-        // Retry with daily interval as fallback
-        return await yahooFinance.chart(ticker, {
-          period1: new Date(endDate.getFullYear() - 1, endDate.getMonth(), endDate.getDate()),
+        // Smart fallback: use same date range but with daily interval
+        console.log(`Fallback for ${ticker} ${period}: ${interval} -> 1d`);
+        const fallbackResult = await yahooFinance.chart(ticker, {
+          period1: originalStartDate,
           period2: endDate,
           interval: "1d",
         });
+        return { result: fallbackResult, usedInterval: "1d" };
       }
     }
 
-    const result = await fetchChart();
+    const { result, usedInterval } = await fetchChart();
     const quotes = result.quotes ?? [];
+
+    // Determine if we should use full timestamp (for intraday intervals)
+    const useFullTimestamp = ["5m", "15m", "30m", "1h"].includes(usedInterval);
 
     // Filter out quotes with null/undefined OHLC values (common in Indonesian stocks)
     const formattedData = quotes
@@ -132,7 +142,8 @@ export default async function handler(req, res) {
         !isNaN(q.close)
       )
       .map((q) => ({
-        date: q.date.toISOString().split("T")[0],
+        // Use full ISO timestamp for intraday, date only for daily/weekly
+        date: useFullTimestamp ? q.date.toISOString() : q.date.toISOString().split("T")[0],
         open: q.open,
         high: q.high,
         low: q.low,
