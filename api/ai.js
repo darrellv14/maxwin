@@ -3,36 +3,22 @@ import { setSecurityHeaders, rateLimit, sanitizeInput } from "./security.js";
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "");
 
-// ============ STOCK KEYWORDS FOR FILTERING ============
-const STOCK_KEYWORDS = [
-  "IHSG", "BEI", "BURSA", "IDX", "LQ45", "IDX30",
-  "SAHAM", "EMITEN", "LISTING", "IPO", "RIGHT ISSUE", "STOCK SPLIT",
-  "DIVIDEN", "LABA", "RUGI", "PENDAPATAN", "REVENUE", "PROFIT",
-  "INVESTOR", "ASING", "NET BUY", "NET SELL",
-  "MENGUAT", "MELEMAH", "RALLY", "KOREKSI", "BULLISH", "BEARISH",
-  "PERBANKAN", "PERTAMBANGAN", "PROPERTI", "ENERGI",
-];
-
-// ============ FETCH NEWS FROM PYTHON API ============
-// Fetch news from Python API endpoint
-async function fetchNewsFromPythonAPI(ticker, baseUrl) {
+// ============ FETCH SENTIMENT FROM PYTHON API ============
+// Python handles both news scraping and Gemini analysis (more reliable on Vercel)
+async function fetchSentimentFromPythonAPI(ticker, baseUrl) {
   const tickerClean = ticker.replace(".JK", "").toUpperCase();
   
-  // Use provided baseUrl or fallback to production
-  const apiBaseUrl = process.env.VERCEL_URL 
-    ? `https://${process.env.VERCEL_URL}` 
-    : (baseUrl || "https://moocuan.darrellvalentino.com");
+  // Use provided baseUrl or fallback
+  const apiBaseUrl = baseUrl || "https://moocuan.darrellvalentino.com";
+  const sentimentUrl = `${apiBaseUrl}/api/news-sentiment?ticker=${encodeURIComponent(tickerClean)}`;
   
-  const newsUrl = `${apiBaseUrl}/api/news?ticker=${encodeURIComponent(tickerClean)}`;
-  
-  console.log(`[NEWS] Fetching: ${newsUrl}`);
-  console.log(`[NEWS] VERCEL_URL: ${process.env.VERCEL_URL || 'not set'}`);
+  console.log(`[SENTIMENT] Fetching: ${sentimentUrl}`);
   
   try {
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 8000); // 8s timeout
+    const timeoutId = setTimeout(() => controller.abort(), 15000); // 15s timeout for scrape + Gemini
     
-    const response = await fetch(newsUrl, {
+    const response = await fetch(sentimentUrl, {
       method: "GET",
       headers: {
         "Accept": "application/json",
@@ -43,168 +29,24 @@ async function fetchNewsFromPythonAPI(ticker, baseUrl) {
     
     clearTimeout(timeoutId);
     
-    console.log(`[NEWS] Status: ${response.status}`);
+    console.log(`[SENTIMENT] Status: ${response.status}`);
     
     if (!response.ok) {
-      const errorText = await response.text();
-      console.error(`[NEWS] Error: ${response.status} - ${errorText}`);
-      return [];
+      console.error(`[SENTIMENT] Error: ${response.status}`);
+      return null;
     }
     
     const data = await response.json();
-    console.log(`[NEWS] Got ${data.articles?.length || 0} articles`);
+    console.log(`[SENTIMENT] Got sentiment: ${data.sentiment?.type || 'N/A'}`);
     
-    if (data.articles && data.articles.length > 0) {
-      console.log(`[NEWS] First: ${data.articles[0].judul?.slice(0, 50)}...`);
-    }
-    
-    return data.articles || [];
+    return data.sentiment || null;
   } catch (error) {
     if (error.name === 'AbortError') {
-      console.error('[NEWS] Timeout');
+      console.error('[SENTIMENT] Timeout');
     } else {
-      console.error('[NEWS] Error:', error.message);
+      console.error('[SENTIMENT] Error:', error.message);
     }
-    return [];
-  }
-}
-
-// ============ ANALYZE NEWS WITH GEMINI ============
-async function analyzeNewsWithGemini(articles, ticker, baseUrl = null, isIHSGFallback = false) {
-  if (!articles || articles.length === 0) {
-    // If no articles and we have baseUrl, try IHSG fallback
-    if (baseUrl && !isIHSGFallback) {
-      console.log(`[NEWS] No articles for ${ticker}, trying IHSG fallback...`);
-      try {
-        const ihsgArticles = await fetchNewsFromPythonAPI("IHSG", baseUrl);
-        if (ihsgArticles && ihsgArticles.length > 0) {
-          return analyzeNewsWithGemini(ihsgArticles, "IHSG", baseUrl, true);
-        }
-      } catch (e) {
-        console.error("[NEWS] IHSG fallback error:", e);
-      }
-    }
-    
-    return {
-      type: "NEUTRAL",
-      headline: "Tidak ada berita terkini",
-      description: "Tidak ditemukan berita relevan untuk saham ini. Analisis berdasarkan teknikal saja.",
-      source: "N/A",
-      confidence: 30,
-      isIHSGFallback: false,
-    };
-  }
-
-  try {
-    const tickerClean = ticker.replace(".JK", "");
-    
-    // Format articles with content if available
-    const newsText = articles.slice(0, 5).map((a, i) => {
-      let articleText = `${i + 1}. JUDUL: "${a.judul}"`;
-      if (a.konten && a.konten.length > 0) {
-        articleText += `\n   ISI: ${a.konten}`;
-      }
-      if (a.waktu) {
-        articleText += `\n   WAKTU: ${a.waktu}`;
-      }
-      return articleText;
-    }).join("\n\n");
-
-    // Different prompt for IHSG fallback vs normal analysis
-    const prompt = isIHSGFallback 
-      ? `Kamu adalah analis sentimen pasar saham Indonesia yang expert. Berita spesifik untuk saham yang diminta tidak ditemukan, jadi analisis berita IHSG (Indeks Harga Saham Gabungan) berikut untuk memberikan gambaran sentimen pasar secara umum:
-
-BERITA IHSG TERKINI:
-${newsText}
-
-TUGAS:
-1. Baca dan pahami setiap judul DAN isi berita (jika tersedia)
-2. Tentukan apakah sentimen pasar secara keseluruhan BULLISH, BEARISH, atau NEUTRAL
-3. Berikan analisis yang tajam tentang kondisi pasar hari ini
-
-PENTING:
-- Ini adalah FALLBACK karena tidak ada berita spesifik untuk saham yang diminta
-- Fokus pada kondisi pasar secara keseluruhan (IHSG)
-- Perhatikan data spesifik: pergerakan IHSG, net foreign buy/sell, dll
-
-Output dalam format JSON (tanpa markdown code block):
-{
-  "type": "BULLISH" | "BEARISH" | "NEUTRAL",
-  "headline": "Rangkuman kondisi pasar IHSG hari ini",
-  "description": "Analisis 2-3 kalimat tentang kondisi IHSG dan sentimen pasar. Jelaskan bahwa ini adalah analisis pasar umum karena tidak ada berita spesifik untuk saham yang diminta.",
-  "source": "Detik News (IHSG)",
-  "newsDate": "${articles[0]?.waktu || 'Terbaru'}",
-  "confidence": 0-100,
-  "keyNews": ["Berita IHSG penting 1", "Berita IHSG penting 2"],
-  "isIHSGFallback": true
-}`
-      : `Kamu adalah analis sentimen berita saham Indonesia yang expert. Analisis berita-berita berikut untuk saham ${tickerClean}:
-
-BERITA TERKINI:
-${newsText}
-
-TUGAS:
-1. Baca dan pahami setiap judul DAN isi berita (jika tersedia)
-2. PENTING: Cek apakah berita-berita ini BENAR-BENAR membahas tentang ${tickerClean}
-3. Jika berita RELEVAN dengan ${tickerClean}: Tentukan sentimen BULLISH, BEARISH, atau NEUTRAL
-4. Jika berita TIDAK RELEVAN dengan ${tickerClean}: Set "isRelevant" = false
-
-KRITERIA RELEVAN:
-- Berita menyebut nama perusahaan atau ticker ${tickerClean}
-- Berita tentang sektor/industri yang sama dengan ${tickerClean}
-- Berita tentang manajemen/pemilik perusahaan ${tickerClean}
-- TIDAK RELEVAN: Berita yang hanya kebetulan mengandung kata yang mirip tapi bukan tentang saham ini
-
-Output dalam format JSON (tanpa markdown code block):
-{
-  "type": "BULLISH" | "BEARISH" | "NEUTRAL",
-  "headline": "Rangkuman satu kalimat yang catchy tentang kondisi berita",
-  "description": "Analisis 2-3 kalimat yang menjelaskan MENGAPA sentimen tersebut dan APA dampaknya ke harga saham. Sertakan DATA SPESIFIK dari berita jika ada (angka laba, persentase, dll). Gunakan bahasa profesional.",
-  "source": "Detik News",
-  "newsDate": "${articles[0]?.waktu || 'Terbaru'}",
-  "confidence": 0-100,
-  "keyNews": ["Berita paling penting 1", "Berita paling penting 2"],
-  "isRelevant": true | false,
-  "isIHSGFallback": false
-}`;
-
-    const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
-    const result = await model.generateContent(prompt);
-    const response = await result.response;
-    const text = response.text();
-
-    if (!text) {
-      throw new Error("Empty response from Gemini");
-    }
-
-    const cleanText = text.replace(/```json\n?|\n?```/g, "").trim();
-    const sentiment = JSON.parse(cleanText);
-
-    // If Gemini says the news is NOT relevant, try IHSG fallback
-    if (sentiment.isRelevant === false && !isIHSGFallback) {
-      console.log(`News not relevant for ${ticker}, trying IHSG fallback...`);
-      try {
-        const ihsgArticles = await scrapeDetikNews("IHSG", 10);
-        if (ihsgArticles && ihsgArticles.length > 0) {
-          return analyzeNewsWithGemini(ihsgArticles, "IHSG", baseUrl, true);
-        }
-      } catch (e) {
-        console.error("[NEWS] IHSG fallback error:", e);
-      }
-    }
-
-    return sentiment;
-  } catch (error) {
-    console.error("[NEWS] Gemini analysis error:", error);
-    // Fallback to first article
-    return {
-      type: "NEUTRAL",
-      headline: articles[0]?.judul || "Berita tersedia",
-      description: `Ditemukan ${articles.length} berita terkait. Silakan review berita untuk analisis lebih lanjut.`,
-      source: "Detik News",
-      confidence: 40,
-      isIHSGFallback: false,
-    };
+    return null;
   }
 }
 
@@ -233,9 +75,9 @@ async function analyzeStock(req, res) {
     const baseUrl = `${protocol}://${host}`;
     console.log(`[AI] Base URL: ${baseUrl}`);
 
-    // Fetch news from Python API (more reliable on Vercel)
+    // Fetch sentiment from Python API (handles scraping + Gemini analysis)
     const isIndonesian = ticker.toUpperCase().endsWith(".JK") || ticker.toUpperCase() === "^JKSE";
-    const newsArticlesPromise = isIndonesian ? fetchNewsFromPythonAPI(ticker, baseUrl) : Promise.resolve([]);
+    const sentimentPromise = isIndonesian ? fetchSentimentFromPythonAPI(ticker, baseUrl) : Promise.resolve(null);
 
     const strategyPrompt = isIndonesian
       ? `1. **Strategy:** LONG-ONLY (Spot Market). Do NOT suggest Short Selling.
@@ -300,21 +142,20 @@ async function analyzeStock(req, res) {
     const cleanText = text.replace(/```json\n?|\n?```/g, "").trim();
     const parsedResult = JSON.parse(cleanText);
 
-    // Wait for news articles, then analyze with Gemini
-    const newsArticles = await newsArticlesPromise;
-    console.log(`[AI] Got ${newsArticles.length} news articles`);
-    const newsSentiment = await analyzeNewsWithGemini(newsArticles, ticker, baseUrl);
+    // Wait for news sentiment from Python API
+    const newsSentiment = await sentimentPromise;
+    console.log(`[AI] Got sentiment:`, newsSentiment);
 
     // Merge news sentiment with technical analysis
     parsedResult.sentiment = {
-      type: newsSentiment.type || "NEUTRAL",
-      headline: newsSentiment.headline || "Tidak ada berita terkini",
-      description: newsSentiment.description || "Tidak ditemukan berita signifikan",
-      source: newsSentiment.source || "Detik News",
-      newsDate: newsSentiment.newsDate || null,
-      confidence: newsSentiment.confidence || 50,
-      keyNews: newsSentiment.keyNews || [],
-      isIHSGFallback: newsSentiment.isIHSGFallback || false,
+      type: newsSentiment?.type || "NEUTRAL",
+      headline: newsSentiment?.headline || "Tidak ada berita terkini",
+      description: newsSentiment?.description || "Tidak ditemukan berita signifikan",
+      source: newsSentiment?.source || "Detik News",
+      newsDate: newsSentiment?.newsDate || null,
+      confidence: newsSentiment?.confidence || 50,
+      keyNews: newsSentiment?.keyNews || [],
+      isIHSGFallback: newsSentiment?.isIHSGFallback || false,
     };
 
     return res.json({
