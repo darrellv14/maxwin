@@ -8,6 +8,7 @@ import StatCard from "../components/StatCard";
 import OraclePanel from "../components/OraclePanel";
 import ConfidenceChart from "../components/ConfidenceChart";
 import WatchlistWidget from "../components/WatchlistWidget";
+import PortfolioWidget from "@/components/PortfolioWidget";
 import { Link, useSearchParams } from "react-router-dom";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
@@ -358,6 +359,8 @@ const Dashboard: React.FC = () => {
                 </span>
               </div>
             </div>
+
+            <PortfolioWidget />
 
             <div className="flex-1 flex flex-col">
               <ConfidenceChart data={data} />
