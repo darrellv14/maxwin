@@ -14,19 +14,23 @@ const STOCK_KEYWORDS = [
 ];
 
 // ============ FETCH NEWS FROM PYTHON API ============
-// Use hardcoded production URL because Vercel functions can't reliably call each other
+// Fetch news from Python API endpoint
 async function fetchNewsFromPythonAPI(ticker, baseUrl) {
   const tickerClean = ticker.replace(".JK", "").toUpperCase();
   
-  // Always use production URL - internal function calls are unreliable on Vercel
-  const productionUrl = "https://moocuan.darrellvalentino.com";
-  const newsUrl = `${productionUrl}/api/news?ticker=${encodeURIComponent(tickerClean)}`;
+  // Use provided baseUrl or fallback to production
+  const apiBaseUrl = process.env.VERCEL_URL 
+    ? `https://${process.env.VERCEL_URL}` 
+    : (baseUrl || "https://moocuan.darrellvalentino.com");
+  
+  const newsUrl = `${apiBaseUrl}/api/news?ticker=${encodeURIComponent(tickerClean)}`;
   
   console.log(`[NEWS] Fetching: ${newsUrl}`);
+  console.log(`[NEWS] VERCEL_URL: ${process.env.VERCEL_URL || 'not set'}`);
   
   try {
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+    const timeoutId = setTimeout(() => controller.abort(), 8000); // 8s timeout
     
     const response = await fetch(newsUrl, {
       method: "GET",
@@ -51,15 +55,15 @@ async function fetchNewsFromPythonAPI(ticker, baseUrl) {
     console.log(`[NEWS] Got ${data.articles?.length || 0} articles`);
     
     if (data.articles && data.articles.length > 0) {
-      console.log(`[NEWS] First article: ${data.articles[0].judul?.slice(0, 50)}...`);
+      console.log(`[NEWS] First: ${data.articles[0].judul?.slice(0, 50)}...`);
     }
     
     return data.articles || [];
   } catch (error) {
     if (error.name === 'AbortError') {
-      console.error('[NEWS] Timeout after 10s');
+      console.error('[NEWS] Timeout');
     } else {
-      console.error('[NEWS] Fetch error:', error.message);
+      console.error('[NEWS] Error:', error.message);
     }
     return [];
   }
