@@ -2,6 +2,102 @@ import { GoogleGenerativeAI } from "@google/generative-ai";
 import { setSecurityHeaders, rateLimit, sanitizeInput } from "./security.js";
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "");
+const GROK_API_KEY = process.env.GROK_API_KEY || "";
+
+// ============ GROK NEWS SENTIMENT ============
+async function fetchNewsSentiment(ticker) {
+  if (!GROK_API_KEY) {
+    console.log("Grok API key not configured, skipping news sentiment");
+    return null;
+  }
+
+  try {
+    const today = new Date().toLocaleDateString("id-ID", {
+      weekday: "long",
+      year: "numeric",
+      month: "long",
+      day: "numeric",
+    });
+
+    // Determine if Indonesian stock
+    const isIndonesian = ticker.toUpperCase().endsWith(".JK") || ticker.toUpperCase() === "^JKSE";
+    const tickerClean = ticker.replace(".JK", "");
+
+    const searchPrompt = isIndonesian
+      ? `Hari ini adalah ${today}. Cari dan analisis berita TERBARU tentang saham ${tickerClean} (${ticker}) di Bursa Efek Indonesia.
+
+Tugas:
+1. CARI berita terkini dari berbagai sumber (media keuangan, portal berita, X/Twitter)
+2. Fokus pada: laporan keuangan, aksi korporasi, berita sektor, sentimen pasar, rating analis
+3. Analisis dampak berita terhadap harga saham
+
+PENTING: Jika tidak ada berita terkini, cari informasi terbaru yang tersedia tentang perusahaan ini.`
+      : `Today is ${today}. Search and analyze the LATEST news about ${ticker}.
+
+Tasks:
+1. SEARCH for recent news from various sources (financial media, news portals, X/Twitter)
+2. Focus on: earnings, corporate actions, sector news, market sentiment, analyst ratings
+3. Analyze the impact on stock price
+
+IMPORTANT: If no recent news, find the most recent available information about this asset.`;
+
+    const response = await fetch("https://api.x.ai/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${GROK_API_KEY}`,
+      },
+      body: JSON.stringify({
+        model: "grok-3-latest",
+        messages: [
+          {
+            role: "system",
+            content: `You are a financial news analyst with real-time access to the latest news and social media. 
+Your job is to find and summarize the most recent news about stocks/assets.
+Always search for the latest information available.
+Be factual and cite sources when possible.
+Output in JSON format only, no markdown.`,
+          },
+          {
+            role: "user",
+            content: `${searchPrompt}
+
+Output JSON format (BAHASA INDONESIA untuk saham .JK, English untuk lainnya):
+{
+  "type": "BULLISH" | "BEARISH" | "NEUTRAL",
+  "headline": "Judul utama berita terpenting",
+  "description": "Rangkuman 2-3 kalimat tentang berita dan dampaknya ke harga saham",
+  "source": "Sumber berita (nama media/platform)",
+  "newsDate": "Tanggal berita jika diketahui",
+  "confidence": 0-100 (seberapa yakin dengan analisis sentiment)
+}`,
+          },
+        ],
+        temperature: 0.3,
+        stream: false,
+      }),
+    });
+
+    if (!response.ok) {
+      console.error("Grok API error:", response.status, await response.text());
+      return null;
+    }
+
+    const data = await response.json();
+    const content = data.choices?.[0]?.message?.content;
+
+    if (!content) return null;
+
+    // Parse JSON from response
+    const cleanContent = content.replace(/```json\n?|\n?```/g, "").trim();
+    const sentiment = JSON.parse(cleanContent);
+
+    return sentiment;
+  } catch (error) {
+    console.error("Grok news fetch error:", error);
+    return null;
+  }
+}
 
 // ============ STOCK ANALYSIS ============
 async function analyzeStock(req, res) {
@@ -19,6 +115,9 @@ async function analyzeStock(req, res) {
       return res.status(400).json({ error: "No data points provided" });
     }
 
+    // Fetch real-time news sentiment from Grok (parallel with Gemini)
+    const newsSentimentPromise = fetchNewsSentiment(ticker);
+
     const isIndonesian = ticker.toUpperCase().endsWith(".JK") || ticker.toUpperCase() === "^JKSE";
 
     const strategyPrompt = isIndonesian
@@ -31,9 +130,9 @@ async function analyzeStock(req, res) {
 
     const prompt = `
       You are "The Oracle", a ruthless Wall Street Quantitative Developer and Senior Trader with BNSP Certified Technical Analyst and a Masters degree on Finance.
-      You have access to the latest market news, sentiment, and fundamental data up to your knowledge cutoff.
       
-      Analyze the following technical indicators for the asset: ${ticker}.
+      Analyze the following TECHNICAL INDICATORS ONLY for the asset: ${ticker}.
+      Focus purely on chart patterns, price action, and indicators. Do NOT make up news or sentiment.
 
       Recent Data (Last 5 periods):
       ${recentData
@@ -51,40 +150,24 @@ async function analyzeStock(req, res) {
 
       IMPORTANT CONSTRAINTS:
       ${strategyPrompt}
-      2. **Pattern Recognition (REQUIRED - MUST INCLUDE):** Search for Cup and Handle, Head and Shoulders, Double Bottom/Top, Flags, Triangles. 
+      2. **Pattern Recognition:** Search for Cup and Handle, Head and Shoulders, Double Bottom/Top, Flags, Triangles. 
          - ONLY report a pattern if you are >80% confident.
-         - Fallback: If no clear pattern, focus on Trend and Support/Resistance. Do NOT hallucinate.
-      3. **Sentiment & News Analysis (REQUIRED - MUST INCLUDE):**
-         - You MUST search your knowledge for ANY recent news, events, or sentiment about ${ticker}.
-         - This is MANDATORY. Always provide sentiment data even if the news is from weeks/months ago.
-         - Search for: earnings reports, quarterly results, corporate actions (dividends, stock splits, rights issue), 
-           M&A activity, management changes, sector trends, regulatory news, macroeconomic factors, analyst ratings.
-         - For Indonesian stocks (.JK): Check for RUPS, laporan keuangan, aksi korporasi, berita sektor.
-         - For crypto/global assets: Check for regulatory news, adoption news, whale movements, protocol updates.
-         - If absolutely NO news exists, explain the company's general business outlook or sector condition.
-         - NEVER leave sentiment as null unless the ticker is completely unknown.
+         - Fallback: If no clear pattern, focus on Trend and Support/Resistance.
 
       Task:
-      Provide a trading signal, "Win Rate Probability", and a concrete trade plan (Entry, SL, TP).
-      Also include any relevant market sentiment or news that could affect the price.
-      Output purely in JSON format without markdown code blocks. PASTIKAN HASILNYA DALAM BAHASA INDONESIA PADA BAGIAN REASONING DAN SENTIMENT (Kecuali sahamnya bukan saham IHSG atau ^JKSE).
+      Provide a trading signal based on TECHNICAL ANALYSIS ONLY.
+      Output purely in JSON format without markdown code blocks. PASTIKAN HASILNYA DALAM BAHASA INDONESIA PADA BAGIAN REASONING (Kecuali sahamnya bukan saham IHSG atau ^JKSE).
       
       JSON Schema:
       {
         "signal": "BUY" | "SELL" | "HOLD",
-        "confidence": number, // 0-100
+        "confidence": number, // 0-100 based on technical indicators only
         "entryArea": "string range, e.g., '150.00 - 152.50'",
         "stopLoss": "string value, e.g., '145.00'",
         "takeProfit1": "string value, e.g., '160.00'",
         "takeProfit2": "string value, e.g., '175.00'",
         "predictionTime": "string value, e.g., 'Next 2-3 Days'",
-        "reasoning": "A short, sharp, professional paragraph explaining why. Use financial jargon like 'divergence', 'overbought', 'momentum', 'consolidation'. DALAM BAHASA INDONESIA.",
-        "sentiment": {
-          "type": "BULLISH" | "BEARISH" | "NEUTRAL",
-          "headline": "Brief headline of the news/event. WAJIB DIISI. DALAM BAHASA INDONESIA.",
-          "description": "Short description of the sentiment/news impact and why it matters for the stock. WAJIB DIISI. DALAM BAHASA INDONESIA (Kecuali sahamnya bukan saham IHSG atau ^JKSE).",
-          "source": "Source type: 'Laporan Keuangan', 'Berita Sektor', 'Ekonomi Makro', 'Aksi Korporasi', 'Rating Analis', 'Berita Perusahaan', or 'Outlook Bisnis'. WAJIB DIISI."
-        }
+        "reasoning": "A short, sharp, professional paragraph explaining the TECHNICAL reasoning. Use financial jargon like 'divergence', 'overbought', 'momentum', 'consolidation'. DALAM BAHASA INDONESIA."
       }
     `;
 
@@ -99,6 +182,29 @@ async function analyzeStock(req, res) {
 
     const cleanText = text.replace(/```json\n?|\n?```/g, "").trim();
     const parsedResult = JSON.parse(cleanText);
+
+    // Wait for Grok news sentiment
+    const grokSentiment = await newsSentimentPromise;
+
+    // Merge Grok sentiment with Gemini analysis
+    if (grokSentiment) {
+      parsedResult.sentiment = {
+        type: grokSentiment.type || "NEUTRAL",
+        headline: grokSentiment.headline || "Tidak ada berita terkini",
+        description: grokSentiment.description || "Tidak ditemukan berita signifikan",
+        source: grokSentiment.source || "Grok AI (Real-time Search)",
+        newsDate: grokSentiment.newsDate || null,
+        confidence: grokSentiment.confidence || 50,
+      };
+    } else {
+      // Fallback sentiment if Grok is not available
+      parsedResult.sentiment = {
+        type: "NEUTRAL",
+        headline: "Analisis berita tidak tersedia",
+        description: "Fitur pencarian berita real-time sedang tidak aktif. Analisis berdasarkan teknikal saja.",
+        source: "N/A",
+      };
+    }
 
     return res.json({
       success: true,
@@ -228,6 +334,19 @@ export default async function handler(req, res) {
   // Route: POST /api/ai?action=analyze or /api/ai/analyze - stock analysis
   if (action === "analyze" || path === "/analyze") {
     return analyzeStock(req, res);
+  }
+
+  // Route: POST /api/ai?action=news - get news sentiment only (via Grok)
+  if (action === "news" || path === "/news") {
+    const { ticker } = req.body;
+    if (!ticker) {
+      return res.status(400).json({ error: "Ticker is required" });
+    }
+    const sentiment = await fetchNewsSentiment(ticker);
+    return res.json({
+      success: !!sentiment,
+      sentiment: sentiment || { type: "NEUTRAL", headline: "Tidak ada data", description: "Grok API tidak tersedia" },
+    });
   }
 
   // Route: POST /api/ai?action=chat or /api/ai/chat - chat with AI
