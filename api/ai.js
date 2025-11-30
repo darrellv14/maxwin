@@ -30,47 +30,102 @@ async function fetchNewsArticles(ticker, baseUrl) {
 }
 
 // ============ ANALYZE NEWS WITH GEMINI ============
-async function analyzeNewsWithGemini(articles, ticker) {
+async function analyzeNewsWithGemini(articles, ticker, baseUrl = null, isIHSGFallback = false) {
   if (!articles || articles.length === 0) {
+    // If no articles and we have baseUrl, try IHSG fallback
+    if (baseUrl && !isIHSGFallback) {
+      console.log(`No articles for ${ticker}, trying IHSG fallback...`);
+      try {
+        const ihsgArticles = await fetchNewsArticles("IHSG", baseUrl);
+        if (ihsgArticles && ihsgArticles.length > 0) {
+          return analyzeNewsWithGemini(ihsgArticles, "IHSG", baseUrl, true);
+        }
+      } catch (e) {
+        console.error("IHSG fallback fetch error:", e);
+      }
+    }
+    
     return {
       type: "NEUTRAL",
       headline: "Tidak ada berita terkini",
       description: "Tidak ditemukan berita relevan untuk saham ini. Analisis berdasarkan teknikal saja.",
       source: "N/A",
       confidence: 30,
+      isIHSGFallback: false,
     };
   }
 
   try {
     const tickerClean = ticker.replace(".JK", "");
-    const newsText = articles.slice(0, 5).map((a, i) => 
-      `${i + 1}. "${a.judul}" (${a.waktu || 'Baru-baru ini'})`
-    ).join("\n");
+    
+    // Format articles with content if available
+    const newsText = articles.slice(0, 5).map((a, i) => {
+      let articleText = `${i + 1}. JUDUL: "${a.judul}"`;
+      if (a.konten && a.konten.length > 0) {
+        articleText += `\n   ISI: ${a.konten}`;
+      }
+      if (a.waktu) {
+        articleText += `\n   WAKTU: ${a.waktu}`;
+      }
+      return articleText;
+    }).join("\n\n");
 
-    const prompt = `Kamu adalah analis sentimen berita saham Indonesia yang expert. Analisis berita-berita berikut untuk saham ${tickerClean}:
+    // Different prompt for IHSG fallback vs normal analysis
+    const prompt = isIHSGFallback 
+      ? `Kamu adalah analis sentimen pasar saham Indonesia yang expert. Berita spesifik untuk saham yang diminta tidak ditemukan, jadi analisis berita IHSG (Indeks Harga Saham Gabungan) berikut untuk memberikan gambaran sentimen pasar secara umum:
+
+BERITA IHSG TERKINI:
+${newsText}
+
+TUGAS:
+1. Baca dan pahami setiap judul DAN isi berita (jika tersedia)
+2. Tentukan apakah sentimen pasar secara keseluruhan BULLISH, BEARISH, atau NEUTRAL
+3. Berikan analisis yang tajam tentang kondisi pasar hari ini
+
+PENTING:
+- Ini adalah FALLBACK karena tidak ada berita spesifik untuk saham yang diminta
+- Fokus pada kondisi pasar secara keseluruhan (IHSG)
+- Perhatikan data spesifik: pergerakan IHSG, net foreign buy/sell, dll
+
+Output dalam format JSON (tanpa markdown code block):
+{
+  "type": "BULLISH" | "BEARISH" | "NEUTRAL",
+  "headline": "Rangkuman kondisi pasar IHSG hari ini",
+  "description": "Analisis 2-3 kalimat tentang kondisi IHSG dan sentimen pasar. Jelaskan bahwa ini adalah analisis pasar umum karena tidak ada berita spesifik untuk saham yang diminta.",
+  "source": "Detik News (IHSG)",
+  "newsDate": "${articles[0]?.waktu || 'Terbaru'}",
+  "confidence": 0-100,
+  "keyNews": ["Berita IHSG penting 1", "Berita IHSG penting 2"],
+  "isIHSGFallback": true
+}`
+      : `Kamu adalah analis sentimen berita saham Indonesia yang expert. Analisis berita-berita berikut untuk saham ${tickerClean}:
 
 BERITA TERKINI:
 ${newsText}
 
 TUGAS:
-1. Baca dan pahami setiap judul berita
-2. Tentukan apakah secara keseluruhan berita ini BULLISH (positif untuk harga saham), BEARISH (negatif), atau NEUTRAL
-3. Berikan analisis yang tajam dan profesional
+1. Baca dan pahami setiap judul DAN isi berita (jika tersedia)
+2. PENTING: Cek apakah berita-berita ini BENAR-BENAR membahas tentang ${tickerClean}
+3. Jika berita RELEVAN dengan ${tickerClean}: Tentukan sentimen BULLISH, BEARISH, atau NEUTRAL
+4. Jika berita TIDAK RELEVAN dengan ${tickerClean}: Set "isRelevant" = false
 
-PENTING:
-- Fokus pada dampak berita terhadap pergerakan harga saham
-- Perhatikan kata kunci: laba, rugi, dividen, akuisisi, ekspansi, PHK, pailit, dll
-- Jika berita campur (ada positif dan negatif), tentukan mana yang lebih dominan
+KRITERIA RELEVAN:
+- Berita menyebut nama perusahaan atau ticker ${tickerClean}
+- Berita tentang sektor/industri yang sama dengan ${tickerClean}
+- Berita tentang manajemen/pemilik perusahaan ${tickerClean}
+- TIDAK RELEVAN: Berita yang hanya kebetulan mengandung kata yang mirip tapi bukan tentang saham ini
 
 Output dalam format JSON (tanpa markdown code block):
 {
   "type": "BULLISH" | "BEARISH" | "NEUTRAL",
   "headline": "Rangkuman satu kalimat yang catchy tentang kondisi berita",
-  "description": "Analisis 2-3 kalimat yang menjelaskan MENGAPA sentimen tersebut dan APA dampaknya ke harga saham. Gunakan bahasa profesional dengan istilah seperti 'katalis positif', 'tekanan jual', 'momentum bullish', dll.",
+  "description": "Analisis 2-3 kalimat yang menjelaskan MENGAPA sentimen tersebut dan APA dampaknya ke harga saham. Sertakan DATA SPESIFIK dari berita jika ada (angka laba, persentase, dll). Gunakan bahasa profesional.",
   "source": "Detik News",
   "newsDate": "${articles[0]?.waktu || 'Terbaru'}",
   "confidence": 0-100,
-  "keyNews": ["Berita paling penting 1", "Berita paling penting 2"]
+  "keyNews": ["Berita paling penting 1", "Berita paling penting 2"],
+  "isRelevant": true | false,
+  "isIHSGFallback": false
 }`;
 
     const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
@@ -85,6 +140,19 @@ Output dalam format JSON (tanpa markdown code block):
     const cleanText = text.replace(/```json\n?|\n?```/g, "").trim();
     const sentiment = JSON.parse(cleanText);
 
+    // If Gemini says the news is NOT relevant and we have baseUrl, try IHSG fallback
+    if (sentiment.isRelevant === false && baseUrl && !isIHSGFallback) {
+      console.log(`News not relevant for ${ticker}, trying IHSG fallback...`);
+      try {
+        const ihsgArticles = await fetchNewsArticles("IHSG", baseUrl);
+        if (ihsgArticles && ihsgArticles.length > 0) {
+          return analyzeNewsWithGemini(ihsgArticles, "IHSG", baseUrl, true);
+        }
+      } catch (e) {
+        console.error("IHSG fallback fetch error:", e);
+      }
+    }
+
     return sentiment;
   } catch (error) {
     console.error("Gemini news analysis error:", error);
@@ -95,6 +163,7 @@ Output dalam format JSON (tanpa markdown code block):
       description: `Ditemukan ${articles.length} berita terkait. Silakan review berita untuk analisis lebih lanjut.`,
       source: "Detik News",
       confidence: 40,
+      isIHSGFallback: false,
     };
   }
 }
@@ -187,9 +256,9 @@ async function analyzeStock(req, res) {
     const cleanText = text.replace(/```json\n?|\n?```/g, "").trim();
     const parsedResult = JSON.parse(cleanText);
 
-    // Wait for news articles, then analyze with Gemini
+    // Wait for news articles, then analyze with Gemini (pass baseUrl for IHSG fallback)
     const newsArticles = await newsArticlesPromise;
-    const newsSentiment = await analyzeNewsWithGemini(newsArticles, ticker);
+    const newsSentiment = await analyzeNewsWithGemini(newsArticles, ticker, baseUrl);
 
     // Merge news sentiment with technical analysis
     parsedResult.sentiment = {
@@ -200,6 +269,7 @@ async function analyzeStock(req, res) {
       newsDate: newsSentiment.newsDate || null,
       confidence: newsSentiment.confidence || 50,
       keyNews: newsSentiment.keyNews || [],
+      isIHSGFallback: newsSentiment.isIHSGFallback || false,
     };
 
     return res.json({
