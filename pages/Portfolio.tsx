@@ -36,18 +36,21 @@ const Portfolio: React.FC = () => {
     isLoading,
     error,
     fetchPositions,
-    addPosition,
+    addTransaction,
     removePosition,
-    updatePosition,
+    getTotalValue,
+    getTotalCost,
+    getTotalPnL,
+    getTotalPnLPercent,
   } = usePortfolioStore();
 
   const [showAddModal, setShowAddModal] = useState(false);
   const [editingPosition, setEditingPosition] = useState<PortfolioPosition | null>(null);
   const [formData, setFormData] = useState({
     ticker: "",
-    quantity: "",
+    shares: "",
     avgPrice: "",
-    notes: "",
+    name: "",
   });
 
   const user = getUser();
@@ -58,77 +61,91 @@ const Portfolio: React.FC = () => {
 
   // Calculate portfolio statistics
   const stats = useMemo<PortfolioStats>(() => {
-    let totalValue = 0;
-    let totalCost = 0;
     let topGainer: PortfolioPosition | null = null;
     let topLoser: PortfolioPosition | null = null;
+    let maxGain = -Infinity;
+    let maxLoss = Infinity;
 
     positions.forEach((pos) => {
-      const cost = pos.quantity * pos.avgPrice;
-      const value = pos.quantity * (pos.currentPrice || pos.avgPrice);
-      const pnl = value - cost;
-      const pnlPercent = (pnl / cost) * 100;
-
-      totalCost += cost;
-      totalValue += value;
-
-      if (!topGainer || pnlPercent > ((topGainer.currentPrice || topGainer.avgPrice) - topGainer.avgPrice) / topGainer.avgPrice * 100) {
+      const pnlPercent = ((pos.currentPrice || pos.avgPrice) - pos.avgPrice) / pos.avgPrice * 100;
+      
+      if (pnlPercent > maxGain) {
+        maxGain = pnlPercent;
         topGainer = pos;
       }
-      if (!topLoser || pnlPercent < ((topLoser.currentPrice || topLoser.avgPrice) - topLoser.avgPrice) / topLoser.avgPrice * 100) {
+      if (pnlPercent < maxLoss) {
+        maxLoss = pnlPercent;
         topLoser = pos;
       }
     });
 
-    const totalPnL = totalValue - totalCost;
-    const totalPnLPercent = totalCost > 0 ? (totalPnL / totalCost) * 100 : 0;
-
-    return { totalValue, totalCost, totalPnL, totalPnLPercent, topGainer, topLoser };
-  }, [positions]);
+    return {
+      totalValue: getTotalValue(),
+      totalCost: getTotalCost(),
+      totalPnL: getTotalPnL(),
+      totalPnLPercent: getTotalPnLPercent(),
+      topGainer,
+      topLoser,
+    };
+  }, [positions, getTotalValue, getTotalCost, getTotalPnL, getTotalPnLPercent]);
 
   const handleAddPosition = async () => {
-    if (!formData.ticker || !formData.quantity || !formData.avgPrice) {
+    if (!formData.ticker || !formData.shares || !formData.avgPrice) {
       toast.error("Please fill in all required fields");
       return;
     }
 
     try {
-      await addPosition({
+      await addTransaction({
         ticker: formData.ticker.toUpperCase(),
-        quantity: parseFloat(formData.quantity),
-        avgPrice: parseFloat(formData.avgPrice),
-        notes: formData.notes,
+        type: "buy",
+        shares: parseFloat(formData.shares),
+        price: parseFloat(formData.avgPrice),
+        notes: formData.name,
       });
       toast.success(`Added ${formData.ticker.toUpperCase()} to portfolio`);
       setShowAddModal(false);
-      setFormData({ ticker: "", quantity: "", avgPrice: "", notes: "" });
+      setFormData({ ticker: "", shares: "", avgPrice: "", name: "" });
     } catch (err) {
-      toast.error("Failed to add position");
+      toast.error((err as Error).message || "Failed to add position");
     }
   };
 
   const handleUpdatePosition = async () => {
     if (!editingPosition) return;
 
+    const currentShares = editingPosition.shares;
+    const newShares = parseFloat(formData.shares);
+    const diff = newShares - currentShares;
+
+    if (diff === 0) {
+      toast.info("No changes to make");
+      setEditingPosition(null);
+      setFormData({ ticker: "", shares: "", avgPrice: "", name: "" });
+      return;
+    }
+
     try {
-      await updatePosition(editingPosition.id, {
-        quantity: parseFloat(formData.quantity),
-        avgPrice: parseFloat(formData.avgPrice),
-        notes: formData.notes,
+      await addTransaction({
+        ticker: editingPosition.ticker,
+        type: diff > 0 ? "buy" : "sell",
+        shares: Math.abs(diff),
+        price: parseFloat(formData.avgPrice),
+        notes: formData.name,
       });
       toast.success(`Updated ${editingPosition.ticker}`);
       setEditingPosition(null);
-      setFormData({ ticker: "", quantity: "", avgPrice: "", notes: "" });
+      setFormData({ ticker: "", shares: "", avgPrice: "", name: "" });
     } catch (err) {
-      toast.error("Failed to update position");
+      toast.error((err as Error).message || "Failed to update position");
     }
   };
 
-  const handleDeletePosition = async (id: string, ticker: string) => {
+  const handleDeletePosition = async (ticker: string) => {
     if (!confirm(`Remove ${ticker} from portfolio?`)) return;
 
     try {
-      await removePosition(id);
+      await removePosition(ticker);
       toast.success(`Removed ${ticker} from portfolio`);
     } catch (err) {
       toast.error("Failed to remove position");
@@ -139,16 +156,16 @@ const Portfolio: React.FC = () => {
     setEditingPosition(pos);
     setFormData({
       ticker: pos.ticker,
-      quantity: pos.quantity.toString(),
+      shares: pos.shares.toString(),
       avgPrice: pos.avgPrice.toString(),
-      notes: pos.notes || "",
+      name: pos.name || "",
     });
   };
 
   const calculatePnL = (pos: PortfolioPosition) => {
     const currentPrice = pos.currentPrice || pos.avgPrice;
-    const value = pos.quantity * currentPrice;
-    const cost = pos.quantity * pos.avgPrice;
+    const value = pos.shares * currentPrice;
+    const cost = pos.shares * pos.avgPrice;
     const pnl = value - cost;
     const pnlPercent = (pnl / cost) * 100;
     return { value, cost, pnl, pnlPercent };
@@ -372,12 +389,12 @@ const Portfolio: React.FC = () => {
                               <div className="w-2 h-2 rounded-full bg-cyan-400"></div>
                               <span className="font-mono font-semibold text-gray-100">{pos.ticker}</span>
                             </div>
-                            {pos.notes && (
-                              <div className="text-xs text-gray-500 mt-1">{pos.notes}</div>
+                            {pos.name && (
+                              <div className="text-xs text-gray-500 mt-1">{pos.name}</div>
                             )}
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-right font-mono text-gray-300">
-                            {pos.quantity.toLocaleString()}
+                            {pos.shares.toLocaleString()}
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-right font-mono text-gray-300">
                             ${pos.avgPrice.toFixed(2)}
@@ -404,7 +421,7 @@ const Portfolio: React.FC = () => {
                                 <Edit2 className="w-4 h-4 text-blue-400" />
                               </button>
                               <button
-                                onClick={() => handleDeletePosition(pos.id, pos.ticker)}
+                                onClick={() => handleDeletePosition(pos.ticker)}
                                 className="p-2 hover:bg-gray-700 rounded-lg transition-colors"
                                 aria-label="Delete position"
                               >
@@ -453,7 +470,7 @@ const Portfolio: React.FC = () => {
             onClick={() => {
               setShowAddModal(false);
               setEditingPosition(null);
-              setFormData({ ticker: "", quantity: "", avgPrice: "", notes: "" });
+              setFormData({ ticker: "", shares: "", avgPrice: "", name: "" });
             }}
           >
             <motion.div
@@ -484,12 +501,12 @@ const Portfolio: React.FC = () => {
 
                 <div>
                   <label className="block text-sm font-mono text-gray-400 mb-2">
-                    Quantity *
+                    Shares *
                   </label>
                   <input
                     type="number"
-                    value={formData.quantity}
-                    onChange={(e) => setFormData({ ...formData, quantity: e.target.value })}
+                    value={formData.shares}
+                    onChange={(e) => setFormData({ ...formData, shares: e.target.value })}
                     placeholder="100"
                     className="w-full px-4 py-2 bg-gray-900 border border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500 text-gray-100 font-mono"
                   />
@@ -511,12 +528,12 @@ const Portfolio: React.FC = () => {
 
                 <div>
                   <label className="block text-sm font-mono text-gray-400 mb-2">
-                    Notes (Optional)
+                    Name (Optional)
                   </label>
                   <textarea
-                    value={formData.notes}
-                    onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-                    placeholder="Add notes about this position..."
+                    value={formData.name}
+                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                    placeholder="Company name or notes..."
                     rows={3}
                     className="w-full px-4 py-2 bg-gray-900 border border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500 text-gray-100 resize-none"
                   />
@@ -528,7 +545,7 @@ const Portfolio: React.FC = () => {
                   onClick={() => {
                     setShowAddModal(false);
                     setEditingPosition(null);
-                    setFormData({ ticker: "", quantity: "", avgPrice: "", notes: "" });
+                    setFormData({ ticker: "", shares: "", avgPrice: "", name: "" });
                   }}
                   className="flex-1 px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg transition-colors"
                 >

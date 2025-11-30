@@ -123,7 +123,7 @@ const AddPositionModal: React.FC<AddPositionModalProps> = ({ isOpen, onClose, on
 const PortfolioWidget: React.FC = () => {
   const {
     positions,
-    addPosition,
+    addTransaction,
     removePosition,
     getTotalValue,
     getTotalCost,
@@ -132,6 +132,20 @@ const PortfolioWidget: React.FC = () => {
   } = usePortfolioStore();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isExpanded, setIsExpanded] = useState(true);
+
+  const handleAddPosition = async (position: Omit<PortfolioPosition, "id" | "addedAt" | "updatedAt">) => {
+    try {
+      await addTransaction({
+        ticker: position.ticker,
+        type: "buy",
+        shares: position.shares,
+        price: position.avgPrice,
+        notes: position.name,
+      });
+    } catch (error) {
+      toast.error("Failed to add position");
+    }
+  };
 
   const totalValue = getTotalValue();
   const totalCost = getTotalCost();
@@ -257,7 +271,7 @@ const PortfolioWidget: React.FC = () => {
                         </div>
                         <button
                           onClick={() => {
-                            removePosition(pos.id);
+                            removePosition(pos.ticker);
                             toast.success("Position removed");
                           }}
                           className="p-1 opacity-0 group-hover:opacity-100 hover:bg-red-500/20 rounded transition-all"
@@ -278,7 +292,7 @@ const PortfolioWidget: React.FC = () => {
       <AddPositionModal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
-        onAdd={addPosition}
+        onAdd={handleAddPosition}
       />
     </motion.div>
   );
