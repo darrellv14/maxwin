@@ -11,7 +11,7 @@ from datetime import datetime
 # ============ NEWS SCRAPER (copied from news.py to avoid import issues) ============
 class NewsScraper:
     """News scraper for Detik with article content fetching for AI analysis"""
-    
+
     DETIK_SEARCH_URL = "https://www.detik.com/search/searchall"
 
     COMPANY_NAMES = {
@@ -50,12 +50,38 @@ class NewsScraper:
     }
 
     STOCK_KEYWORDS = [
-        "IHSG", "BEI", "BURSA", "IDX", "LQ45", "IDX30",
-        "SAHAM", "EMITEN", "LISTING", "IPO", "RIGHT ISSUE", "STOCK SPLIT",
-        "DIVIDEN", "LABA", "RUGI", "PENDAPATAN", "REVENUE", "PROFIT",
-        "INVESTOR", "ASING", "NET BUY", "NET SELL",
-        "MENGUAT", "MELEMAH", "RALLY", "KOREKSI", "BULLISH", "BEARISH",
-        "PERBANKAN", "PERTAMBANGAN", "PROPERTI", "ENERGI",
+        "IHSG",
+        "BEI",
+        "BURSA",
+        "IDX",
+        "LQ45",
+        "IDX30",
+        "SAHAM",
+        "EMITEN",
+        "LISTING",
+        "IPO",
+        "RIGHT ISSUE",
+        "STOCK SPLIT",
+        "DIVIDEN",
+        "LABA",
+        "RUGI",
+        "PENDAPATAN",
+        "REVENUE",
+        "PROFIT",
+        "INVESTOR",
+        "ASING",
+        "NET BUY",
+        "NET SELL",
+        "MENGUAT",
+        "MELEMAH",
+        "RALLY",
+        "KOREKSI",
+        "BULLISH",
+        "BEARISH",
+        "PERBANKAN",
+        "PERTAMBANGAN",
+        "PROPERTI",
+        "ENERGI",
     ]
 
     @staticmethod
@@ -97,17 +123,20 @@ class NewsScraper:
             req = urllib.request.Request(url, headers=headers)
             with urllib.request.urlopen(req, context=ctx, timeout=timeout) as resp:
                 html = resp.read().decode("utf-8", "ignore")
-            
-            paragraphs = re.findall(r'<p[^>]*>([^<]{50,})</p>', html, re.DOTALL)
-            
+
+            paragraphs = re.findall(r"<p[^>]*>([^<]{50,})</p>", html, re.DOTALL)
+
             content_parts = []
             for p in paragraphs:
-                p_clean = re.sub(r'\s+', ' ', p).strip()
-                if len(p_clean) > 50 and not any(skip in p_clean.lower() for skip in ['baca juga', 'simak video', 'saksikan']):
+                p_clean = re.sub(r"\s+", " ", p).strip()
+                if len(p_clean) > 50 and not any(
+                    skip in p_clean.lower()
+                    for skip in ["baca juga", "simak video", "saksikan"]
+                ):
                     content_parts.append(p_clean)
                     if len(content_parts) >= 2:
                         break
-            
+
             return " ".join(content_parts)[:400]
         except Exception as e:
             print(f"Article fetch error for {url}: {e}")
@@ -119,67 +148,74 @@ class NewsScraper:
         ctx = NewsScraper._get_ssl_context()
         headers = NewsScraper._get_headers()
         search_terms = NewsScraper._get_search_terms(ticker_clean)
-        
+
         is_ihsg = ticker_clean in ["IHSG", "^JKSE", "JKSE"]
         if is_ihsg:
             search_terms = ["IHSG", "INDEKS", "BEI", "BURSA EFEK", "LQ45", "IDX"]
-        
+
         articles = []
-        
+
         try:
             search_query = "IHSG bursa saham" if is_ihsg else ticker_clean
             search_url = f"{NewsScraper.DETIK_SEARCH_URL}?query={urllib.parse.quote(search_query)}"
             req = urllib.request.Request(search_url, headers=headers)
-            
+
             with urllib.request.urlopen(req, context=ctx, timeout=10) as response:
                 html = response.read().decode("utf-8", "ignore")
-            
+
             patterns = [
                 r'media__title[^>]*>\s*<a[^>]*href="([^"]+)"[^>]*>([^<]+)</a>',
                 r'<h3[^>]*>\s*<a[^>]*href="([^"]+)"[^>]*>([^<]+)</a>',
             ]
-            
+
             matches = []
             for pattern in patterns:
                 found = re.findall(pattern, html, re.DOTALL | re.IGNORECASE)
                 matches.extend(found)
-            
+
             seen_links = set()
             for link, title in matches:
                 if len(articles) >= limit:
                     break
-                
+
                 if link in seen_links:
                     continue
-                
-                title_clean = re.sub(r'\s+', ' ', title).strip()
+
+                title_clean = re.sub(r"\s+", " ", title).strip()
                 is_finance = "finance.detik.com" in link.lower()
-                
+
                 if is_ihsg:
-                    if not NewsScraper._has_stock_keyword(title_clean) and not is_finance:
+                    if (
+                        not NewsScraper._has_stock_keyword(title_clean)
+                        and not is_finance
+                    ):
                         continue
                 else:
                     if not NewsScraper._is_about_ticker(title_clean, search_terms):
                         continue
-                    if not is_finance and not NewsScraper._has_stock_keyword(title_clean):
+                    if not is_finance and not NewsScraper._has_stock_keyword(
+                        title_clean
+                    ):
                         continue
-                
+
                 seen_links.add(link)
-                
+
                 content = ""
                 if len(articles) < 3:
                     content = NewsScraper._fetch_article_content(link, ctx, headers)
-                
-                articles.append({
-                    "judul": title_clean,
-                    "link": link,
-                    "konten": content,
-                    "source": "Detik Finance" if is_finance else "Detik",
-                })
-                
+
+                articles.append(
+                    {
+                        "judul": title_clean,
+                        "link": link,
+                        "konten": content,
+                        "source": "Detik Finance" if is_finance else "Detik",
+                    }
+                )
+
         except Exception as e:
             print(f"Search error: {e}")
-        
+
         return articles[:limit]
 
 
@@ -192,30 +228,27 @@ def call_gemini(prompt: str) -> dict:
     api_key = os.environ.get("GEMINI_API_KEY", "")
     if not api_key:
         return None
-    
+
     url = f"{GEMINI_API_URL}?key={api_key}"
-    
+
     payload = {
         "contents": [{"parts": [{"text": prompt}]}],
         "generationConfig": {
             "temperature": 0.7,
             "maxOutputTokens": 1024,
-        }
+        },
     }
-    
+
     try:
         data = json.dumps(payload).encode("utf-8")
         req = urllib.request.Request(
-            url,
-            data=data,
-            headers={"Content-Type": "application/json"},
-            method="POST"
+            url, data=data, headers={"Content-Type": "application/json"}, method="POST"
         )
-        
+
         ctx = ssl.create_default_context()
         with urllib.request.urlopen(req, context=ctx, timeout=15) as response:
             result = json.loads(response.read().decode("utf-8"))
-        
+
         # Extract text from Gemini response
         if result.get("candidates"):
             text = result["candidates"][0]["content"]["parts"][0]["text"]
@@ -228,7 +261,9 @@ def call_gemini(prompt: str) -> dict:
         return None
 
 
-def analyze_news_sentiment(articles: list, ticker: str, is_ihsg_fallback: bool = False) -> dict:
+def analyze_news_sentiment(
+    articles: list, ticker: str, is_ihsg_fallback: bool = False
+) -> dict:
     """Analyze news sentiment using Gemini"""
     if not articles:
         return {
@@ -241,9 +276,9 @@ def analyze_news_sentiment(articles: list, ticker: str, is_ihsg_fallback: bool =
             "keyNews": [],
             "isIHSGFallback": False,
         }
-    
+
     ticker_clean = ticker.replace(".JK", "").upper()
-    
+
     # Format articles for prompt
     news_text = ""
     for i, a in enumerate(articles[:5]):
@@ -251,7 +286,7 @@ def analyze_news_sentiment(articles: list, ticker: str, is_ihsg_fallback: bool =
         if a.get("konten"):
             news_text += f'   ISI: {a["konten"]}\n'
         news_text += "\n"
-    
+
     if is_ihsg_fallback:
         prompt = f"""Kamu adalah analis sentimen pasar saham Indonesia. Analisis berita IHSG berikut:
 
@@ -292,9 +327,9 @@ Format JSON (tanpa markdown):
   "isRelevant": true | false,
   "isIHSGFallback": false
 }}"""
-    
+
     result = call_gemini(prompt)
-    
+
     if result:
         # If not relevant, try IHSG fallback
         if result.get("isRelevant") == False and not is_ihsg_fallback:
@@ -302,11 +337,15 @@ Format JSON (tanpa markdown):
             if ihsg_articles:
                 return analyze_news_sentiment(ihsg_articles, "IHSG", True)
         return result
-    
+
     # Fallback if Gemini fails
     return {
         "type": "NEUTRAL",
-        "headline": articles[0].get("judul", "Berita tersedia") if articles else "Tidak ada berita",
+        "headline": (
+            articles[0].get("judul", "Berita tersedia")
+            if articles
+            else "Tidak ada berita"
+        ),
         "description": f"Ditemukan {len(articles)} berita terkait.",
         "source": "Detik News",
         "newsDate": "Terbaru",
@@ -335,10 +374,10 @@ class handler(BaseHTTPRequestHandler):
 
             # Fetch news
             articles = NewsScraper.get_stock_news(ticker_clean, limit=10)
-            
+
             # Analyze sentiment
             sentiment = analyze_news_sentiment(articles, ticker_clean)
-            
+
             # If no articles found, try IHSG fallback
             if not articles:
                 ihsg_articles = NewsScraper.get_stock_news("IHSG", limit=10)
