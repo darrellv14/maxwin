@@ -10,16 +10,18 @@ import {
   Trash2,
   Edit2,
   RefreshCw,
-  ArrowLeft,
   BarChart3,
-  Activity,
-  Wallet,
-  Target,
   AlertCircle,
+  Keyboard,
+  Shield,
+  User,
+  LogOut,
+  Wallet,
 } from "lucide-react";
 import { usePortfolioStore, PortfolioPosition } from "../stores";
 import { toast } from "sonner";
-import { getUser, logout } from "../services/authService";
+import { getUser, logout, isAdmin } from "../services/authService";
+import { LOGO_SIZES } from "../constants/logo";
 
 interface PortfolioStats {
   totalValue: number;
@@ -59,7 +61,6 @@ const Portfolio: React.FC = () => {
     fetchPositions();
   }, [fetchPositions]);
 
-  // Calculate portfolio statistics
   const stats = useMemo<PortfolioStats>(() => {
     let topGainer: PortfolioPosition | null = null;
     let topLoser: PortfolioPosition | null = null;
@@ -67,8 +68,8 @@ const Portfolio: React.FC = () => {
     let maxLoss = Infinity;
 
     positions.forEach((pos) => {
-      const pnlPercent = ((pos.currentPrice || pos.avgPrice) - pos.avgPrice) / pos.avgPrice * 100;
-      
+      const pnlPercent = (((pos.currentPrice || pos.avgPrice) - pos.avgPrice) / pos.avgPrice) * 100;
+
       if (pnlPercent > maxGain) {
         maxGain = pnlPercent;
         topGainer = pos;
@@ -147,7 +148,7 @@ const Portfolio: React.FC = () => {
     try {
       await removePosition(ticker);
       toast.success(`Removed ${ticker} from portfolio`);
-    } catch (err) {
+    } catch {
       toast.error("Failed to remove position");
     }
   };
@@ -172,69 +173,215 @@ const Portfolio: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-black text-gray-100">
-      {/* Header */}
-      <header className="border-b border-gray-800 bg-gray-900/50 backdrop-blur-md sticky top-0 z-40">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex justify-between items-center">
-          <div className="flex items-center gap-4">
-            <Link to="/">
-              <motion.button
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-                className="p-2 hover:bg-gray-800 rounded-lg transition-colors"
-              >
-                <ArrowLeft className="w-5 h-5" />
-              </motion.button>
-            </Link>
-            <div>
-              <h1 className="text-2xl font-bold bg-gradient-to-r from-blue-400 to-cyan-400 bg-clip-text text-transparent flex items-center gap-2">
-                <Wallet className="w-7 h-7 text-cyan-400" />
-                Portfolio
+    <div className="min-h-screen bg-terminal-black text-gray-200 font-sans selection:bg-green-900 selection:text-white pb-6 md:pb-10">
+      <header className="border-b border-gray-800 bg-terminal-dark/50 backdrop-blur sticky top-0 z-50">
+        <div className="max-w-7xl mx-auto px-3 sm:px-4 py-2 sm:py-3 flex justify-between items-center 2xl:max-w-none">
+          <div className="flex items-center gap-2 sm:gap-3">
+            <Link to="/" className="flex items-center gap-2 sm:gap-3">
+              <img
+                src={LOGO_SIZES.sm}
+                srcSet={`${LOGO_SIZES.sm} 1x, ${LOGO_SIZES.smRetina} 2x`}
+                alt="MooCuan Logo"
+                className="w-8 h-8 sm:w-10 sm:h-10 object-contain"
+              />
+              <h1 className="text-base sm:text-xl font-bold tracking-tight text-white font-mono hidden xs:block">
+                MOO<span className="text-profit-green">CUAN</span>
               </h1>
-              <p className="text-sm text-gray-400 mt-1">Track your investments</p>
+            </Link>
+            <div className="h-4 sm:h-6 w-px bg-gray-700 mx-2" />
+            <div className="flex items-center gap-1.5">
+              <Wallet className="w-4 h-4 sm:w-5 sm:h-5 text-profit-green" />
+              <span className="text-[10px] sm:text-xs font-mono text-gray-400">PORTFOLIO</span>
             </div>
           </div>
 
-          <div className="flex items-center gap-3">
-            <motion.button
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-              onClick={() => fetchPositions()}
-              className="px-4 py-2 bg-gray-800 hover:bg-gray-700 rounded-lg transition-colors flex items-center gap-2"
+          <div className="hidden md:flex items-center gap-3 lg:gap-4">
+            <button
+              onClick={() => {
+                const event = new KeyboardEvent("keydown", { key: "k", metaKey: true });
+                document.dispatchEvent(event);
+              }}
+              className="hidden lg:flex items-center gap-2 text-xs font-mono text-gray-400 hover:text-gray-200 bg-gray-900 px-3 py-1.5 rounded border border-gray-800"
+              aria-label="Open command palette (Cmd+K)"
             >
-              <RefreshCw className="w-4 h-4" />
-              <span className="hidden sm:inline">Refresh</span>
-            </motion.button>
-            <motion.button
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-              onClick={() => setShowAddModal(true)}
-              className="px-4 py-2 bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700 rounded-lg transition-all flex items-center gap-2 font-semibold"
+              <Keyboard className="w-3 h-3" />
+              <span>Cmd+K</span>
+            </button>
+
+            <Link
+              to="/screener"
+              className="text-xs font-mono bg-gray-900 px-3 py-1 rounded-full border border-gray-800 hover:bg-gray-800 text-profit-green transition-colors flex items-center gap-2"
             >
-              <Plus className="w-4 h-4" />
-              Add Position
-            </motion.button>
+              <span className="w-2 h-2 bg-profit-green rounded-full animate-pulse" />
+              <span className="hidden lg:inline">AI SCREENER</span>
+              <span className="lg:hidden">AI</span>
+            </Link>
+            <Link
+              to="/history"
+              className="text-xs font-mono bg-gray-900 px-3 py-1 rounded-full border border-gray-800 hover:bg-gray-800 text-gray-300 transition-colors"
+            >
+              <span className="hidden lg:inline">VIEW HISTORY</span>
+              <span className="lg:hidden">HISTORY</span>
+            </Link>
+            {isAdmin() && (
+              <Link
+                to="/admin"
+                className="text-xs font-mono bg-purple-900/50 px-3 py-1 rounded-full border border-purple-700 hover:bg-purple-800 text-purple-300 transition-colors flex items-center gap-2"
+              >
+                <Shield className="w-3 h-3" />
+                <span className="hidden lg:inline">ADMIN</span>
+              </Link>
+            )}
+            <Link
+              to="/account"
+              className="text-xs font-mono bg-gray-900 px-3 py-1 rounded-full border border-gray-800 hover:bg-gray-800 text-gray-300 transition-colors flex items-center gap-2"
+            >
+              <User className="w-3 h-3" />
+              <span className="hidden lg:inline">ACCOUNT</span>
+              <span className="lg:hidden">ACC</span>
+            </Link>
+            <div className="flex items-center gap-2 border-l border-gray-700 pl-4">
+              <span className="text-xs text-gray-400 hidden lg:block">{user?.name}</span>
+              <button
+                onClick={logout}
+                className="p-1.5 text-gray-400 hover:text-red-400 transition-colors"
+                title="Logout"
+              >
+                <LogOut className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+
+          <div className="flex md:hidden items-center gap-2">
+            <Link
+              to="/account"
+              className="text-[10px] font-mono bg-gray-900 px-2 py-1 rounded-full border border-gray-800 text-gray-300"
+            >
+              👤
+            </Link>
+            <Link
+              to="/screener"
+              className="text-[10px] font-mono bg-gray-900 px-2 py-1 rounded-full border border-gray-800 text-profit-green"
+            >
+              AI
+            </Link>
+            <Link
+              to="/history"
+              className="text-[10px] font-mono bg-gray-900 px-2 py-1 rounded-full border border-gray-800 text-gray-300"
+            >
+              📊
+            </Link>
+            {isAdmin() && (
+              <Link
+                to="/admin"
+                className="text-[10px] font-mono bg-purple-900/50 px-2 py-1 rounded-full border border-purple-700 text-purple-300"
+              >
+                <Shield className="w-3 h-3" />
+              </Link>
+            )}
+            <button
+              onClick={logout}
+              className="p-1 text-gray-400 hover:text-red-400 transition-colors"
+            >
+              <LogOut className="w-4 h-4" />
+            </button>
           </div>
         </div>
       </header>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Portfolio Summary Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+      <main className="max-w-7xl mx-auto px-3 sm:px-4 mt-4 sm:mt-6 2xl:max-w-none">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4 mb-4 sm:mb-6">
+          <div>
+            <h2 className="text-lg sm:text-xl md:text-2xl font-bold font-mono text-white flex items-center gap-2">
+              <Wallet className="w-5 h-5 text-profit-green" />
+              PORTFOLIO OVERVIEW
+            </h2>
+            <p className="text-gray-500 text-xs sm:text-sm mt-1">
+              Monitor posisi saham dan crypto yang tersimpan di MooCuan
+            </p>
+          </div>
+          <div className="flex gap-2">
+            <motion.button
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+              onClick={() => fetchPositions()}
+              className="flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-1.5 sm:py-2 bg-gray-900 border border-gray-700 text-gray-300 text-xs sm:text-sm rounded-lg font-mono hover:bg-gray-800 transition-colors"
+            >
+              <RefreshCw className={`w-3 h-3 sm:w-4 sm:h-4 ${isLoading ? "animate-spin" : ""}`} />
+              <span className="hidden xs:inline">REFRESH</span>
+            </motion.button>
+            <motion.button
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+              onClick={() => setShowAddModal(true)}
+              className="flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-1.5 sm:py-2 bg-profit-green text-black text-xs sm:text-sm rounded-lg font-mono font-bold hover:bg-profit-green/90 transition-colors"
+            >
+              <Plus className="w-3 h-3 sm:w-4 sm:h-4" />
+              <span className="hidden xs:inline">ADD POSITION</span>
+              <span className="xs:hidden">ADD</span>
+            </motion.button>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-2 sm:gap-4 mb-4 sm:mb-6">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            className="bg-gray-800/50 backdrop-blur-sm border border-gray-700 rounded-xl p-6"
+            className="bg-terminal-gray border border-gray-800 rounded-lg p-3 sm:p-4"
           >
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-gray-400 text-sm font-mono">TOTAL VALUE</span>
-              <DollarSign className="w-5 h-5 text-green-400" />
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-[10px] sm:text-xs text-gray-500 font-mono uppercase">
+                  Total Value
+                </p>
+                <p className="text-lg sm:text-2xl font-bold font-mono text-profit-green mt-1">
+                  {stats.totalValue.toLocaleString("id-ID")}
+                </p>
+                <p className="text-[10px] sm:text-xs text-gray-500 mt-1">
+                  Cost: {stats.totalCost.toLocaleString("id-ID")}
+                </p>
+              </div>
+              <div className="w-8 h-8 sm:w-10 sm:h-10 bg-profit-green/10 rounded-lg flex items-center justify-center border border-profit-green/30">
+                <DollarSign className="w-4 h-4 sm:w-5 sm:h-5 text-profit-green" />
+              </div>
             </div>
-            <div className="text-2xl font-bold text-green-400">
-              ${stats.totalValue.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-            </div>
-            <div className="text-xs text-gray-500 mt-1">
-              Cost: ${stats.totalCost.toLocaleString("en-US", { minimumFractionDigits: 2 })}
+          </motion.div>
+
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.05 }}
+            className="bg-terminal-gray border border-gray-800 rounded-lg p-3 sm:p-4"
+          >
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-[10px] sm:text-xs text-gray-500 font-mono uppercase">
+                  Unrealized P&amp;L
+                </p>
+                <p
+                  className={`text-lg sm:text-2xl font-bold font-mono ${
+                    stats.totalPnL >= 0 ? "text-profit-green" : "text-loss-red"
+                  } mt-1`}
+                >
+                  {stats.totalPnL >= 0 ? "+" : ""}
+                  {stats.totalPnL.toLocaleString("id-ID")}
+                </p>
+                <p
+                  className={`text-[10px] sm:text-xs mt-1 ${
+                    stats.totalPnLPercent >= 0 ? "text-profit-green" : "text-loss-red"
+                  }`}
+                >
+                  {stats.totalPnLPercent >= 0 ? "+" : ""}
+                  {stats.totalPnLPercent.toFixed(2)}%
+                </p>
+              </div>
+              <div className="w-8 h-8 sm:w-10 sm:h-10 bg-gray-900 rounded-lg flex items-center justify-center border border-gray-700">
+                {stats.totalPnL >= 0 ? (
+                  <TrendingUp className="w-4 h-4 sm:w-5 sm:h-5 text-profit-green" />
+                ) : (
+                  <TrendingDown className="w-4 h-4 sm:w-5 sm:h-5 text-loss-red" />
+                )}
+              </div>
             </div>
           </motion.div>
 
@@ -242,190 +389,198 @@ const Portfolio: React.FC = () => {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.1 }}
-            className="bg-gray-800/50 backdrop-blur-sm border border-gray-700 rounded-xl p-6"
+            className="bg-terminal-gray border border-gray-800 rounded-lg p-3 sm:p-4"
           >
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-gray-400 text-sm font-mono">P&L</span>
-              {stats.totalPnL >= 0 ? (
-                <TrendingUp className="w-5 h-5 text-green-400" />
-              ) : (
-                <TrendingDown className="w-5 h-5 text-red-400" />
-              )}
-            </div>
-            <div className={`text-2xl font-bold ${stats.totalPnL >= 0 ? "text-green-400" : "text-red-400"}`}>
-              {stats.totalPnL >= 0 ? "+" : ""}${stats.totalPnL.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-            </div>
-            <div className={`text-xs mt-1 ${stats.totalPnLPercent >= 0 ? "text-green-500" : "text-red-500"}`}>
-              {stats.totalPnLPercent >= 0 ? "+" : ""}{stats.totalPnLPercent.toFixed(2)}%
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-[10px] sm:text-xs text-gray-500 font-mono uppercase">
+                  Top Gainer
+                </p>
+                {stats.topGainer ? (
+                  <>
+                    <p className="text-base sm:text-xl font-bold font-mono text-white mt-1">
+                      {stats.topGainer.ticker.replace(".JK", "")}
+                    </p>
+                    <p className="text-[10px] sm:text-xs text-profit-green mt-1">
+                      +
+                      {(
+                        (((stats.topGainer.currentPrice || stats.topGainer.avgPrice) -
+                          stats.topGainer.avgPrice) /
+                          stats.topGainer.avgPrice) *
+                        100
+                      ).toFixed(2)}
+                      %
+                    </p>
+                  </>
+                ) : (
+                  <p className="text-[10px] sm:text-xs text-gray-500 mt-1">No positions</p>
+                )}
+              </div>
+              <div className="w-8 h-8 sm:w-10 sm:h-10 bg-profit-green/10 rounded-lg flex items-center justify-center border border-profit-green/30">
+                <TrendingUp className="w-4 h-4 sm:w-5 sm:h-5 text-profit-green" />
+              </div>
             </div>
           </motion.div>
 
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.2 }}
-            className="bg-gray-800/50 backdrop-blur-sm border border-gray-700 rounded-xl p-6"
+            transition={{ delay: 0.15 }}
+            className="bg-terminal-gray border border-gray-800 rounded-lg p-3 sm:p-4"
           >
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-gray-400 text-sm font-mono">TOP GAINER</span>
-              <TrendingUp className="w-5 h-5 text-green-400" />
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-[10px] sm:text-xs text-gray-500 font-mono uppercase">
+                  Top Loser
+                </p>
+                {stats.topLoser ? (
+                  <>
+                    <p className="text-base sm:text-xl font-bold font-mono text-white mt-1">
+                      {stats.topLoser.ticker.replace(".JK", "")}
+                    </p>
+                    <p className="text-[10px] sm:text-xs text-loss-red mt-1">
+                      {(
+                        (((stats.topLoser.currentPrice || stats.topLoser.avgPrice) -
+                          stats.topLoser.avgPrice) /
+                          stats.topLoser.avgPrice) *
+                        100
+                      ).toFixed(2)}
+                      %
+                    </p>
+                  </>
+                ) : (
+                  <p className="text-[10px] sm:text-xs text-gray-500 mt-1">No positions</p>
+                )}
+              </div>
+              <div className="w-8 h-8 sm:w-10 sm:h-10 bg-loss-red/10 rounded-lg flex items-center justify-center border border-loss-red/30">
+                <TrendingDown className="w-4 h-4 sm:w-5 sm:h-5 text-loss-red" />
+              </div>
             </div>
-            {stats.topGainer ? (
-              <>
-                <div className="text-xl font-bold text-gray-100">{stats.topGainer.ticker}</div>
-                <div className="text-xs text-green-400 mt-1">
-                  +{(((stats.topGainer.currentPrice || stats.topGainer.avgPrice) - stats.topGainer.avgPrice) / stats.topGainer.avgPrice * 100).toFixed(2)}%
-                </div>
-              </>
-            ) : (
-              <div className="text-sm text-gray-500">No positions</div>
-            )}
-          </motion.div>
-
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.3 }}
-            className="bg-gray-800/50 backdrop-blur-sm border border-gray-700 rounded-xl p-6"
-          >
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-gray-400 text-sm font-mono">TOP LOSER</span>
-              <TrendingDown className="w-5 h-5 text-red-400" />
-            </div>
-            {stats.topLoser ? (
-              <>
-                <div className="text-xl font-bold text-gray-100">{stats.topLoser.ticker}</div>
-                <div className="text-xs text-red-400 mt-1">
-                  {(((stats.topLoser.currentPrice || stats.topLoser.avgPrice) - stats.topLoser.avgPrice) / stats.topLoser.avgPrice * 100).toFixed(2)}%
-                </div>
-              </>
-            ) : (
-              <div className="text-sm text-gray-500">No positions</div>
-            )}
           </motion.div>
         </div>
 
-        {/* Positions Table */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.4 }}
-          className="bg-gray-800/50 backdrop-blur-sm border border-gray-700 rounded-xl overflow-hidden"
+          transition={{ delay: 0.2 }}
+          className="bg-terminal-gray border border-gray-800 rounded-lg overflow-hidden"
         >
-          <div className="px-6 py-4 border-b border-gray-700 flex items-center justify-between">
-            <h2 className="text-lg font-semibold text-gray-100 flex items-center gap-2">
-              <BarChart3 className="w-5 h-5 text-cyan-400" />
-              Positions ({positions.length})
-            </h2>
+          <div className="px-3 sm:px-4 py-2 sm:py-3 border-b border-gray-800 flex items-center justify-between">
+            <h3 className="text-sm sm:text-lg font-semibold text-white font-mono flex items-center gap-2">
+              <BarChart3 className="w-4 h-4 text-profit-green" />
+              POSITIONS
+              <span className="text-[10px] sm:text-xs text-gray-500">({positions.length})</span>
+            </h3>
           </div>
 
           {isLoading ? (
-            <div className="p-8 text-center text-gray-400">
-              <RefreshCw className="w-8 h-8 animate-spin mx-auto mb-2" />
-              Loading positions...
+            <div className="py-10 sm:py-12 text-center text-gray-400">
+              <RefreshCw className="w-6 h-6 sm:w-8 sm:h-8 animate-spin mx-auto mb-3" />
+              <p className="font-mono text-xs sm:text-sm">Loading positions...</p>
             </div>
           ) : error ? (
-            <div className="p-8 text-center text-red-400">
-              <AlertCircle className="w-8 h-8 mx-auto mb-2" />
-              {error}
+            <div className="py-10 sm:py-12 text-center text-loss-red">
+              <AlertCircle className="w-6 h-6 sm:w-8 sm:h-8 mx-auto mb-3" />
+              <p className="font-mono text-xs sm:text-sm">{error}</p>
             </div>
           ) : positions.length === 0 ? (
-            <div className="p-12 text-center">
-              <PieChart className="w-16 h-16 mx-auto mb-4 text-gray-600" />
-              <p className="text-gray-400 mb-4">No positions yet</p>
+            <div className="py-10 sm:py-12 text-center">
+              <PieChart className="w-10 h-10 sm:w-12 sm:h-12 mx-auto mb-3 text-gray-700" />
+              <p className="text-gray-400 font-mono text-xs sm:text-sm mb-3">
+                Belum ada posisi di portfolio
+              </p>
               <button
                 onClick={() => setShowAddModal(true)}
-                className="px-6 py-3 bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700 rounded-lg transition-all font-semibold"
+                className="inline-flex items-center gap-2 px-4 sm:px-6 py-2.5 bg-profit-green text-black rounded-lg font-mono text-xs sm:text-sm font-bold hover:bg-profit-green/90 transition-colors"
               >
-                Add Your First Position
+                <Plus className="w-4 h-4" />
+                ADD YOUR FIRST POSITION
               </button>
             </div>
           ) : (
             <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead className="bg-gray-900/50">
-                  <tr>
-                    <th className="px-6 py-3 text-left text-xs font-mono uppercase tracking-wider text-gray-400">
-                      Ticker
-                    </th>
-                    <th className="px-6 py-3 text-right text-xs font-mono uppercase tracking-wider text-gray-400">
-                      Quantity
-                    </th>
-                    <th className="px-6 py-3 text-right text-xs font-mono uppercase tracking-wider text-gray-400">
-                      Avg Price
-                    </th>
-                    <th className="px-6 py-3 text-right text-xs font-mono uppercase tracking-wider text-gray-400">
-                      Current
-                    </th>
-                    <th className="px-6 py-3 text-right text-xs font-mono uppercase tracking-wider text-gray-400">
-                      Value
-                    </th>
-                    <th className="px-6 py-3 text-right text-xs font-mono uppercase tracking-wider text-gray-400">
-                      P&L
-                    </th>
-                    <th className="px-6 py-3 text-right text-xs font-mono uppercase tracking-wider text-gray-400">
-                      P&L %
-                    </th>
-                    <th className="px-6 py-3 text-right text-xs font-mono uppercase tracking-wider text-gray-400">
-                      Actions
-                    </th>
+              <table className="w-full min-w-[700px] text-left">
+                <thead className="bg-black/80 border-b border-gray-800">
+                  <tr className="text-[10px] sm:text-xs font-mono text-gray-500 uppercase">
+                    <th className="px-3 sm:px-4 py-2.5 text-left">Ticker</th>
+                    <th className="px-3 sm:px-4 py-2.5 text-right">Quantity</th>
+                    <th className="px-3 sm:px-4 py-2.5 text-right">Avg Price</th>
+                    <th className="px-3 sm:px-4 py-2.5 text-right">Current</th>
+                    <th className="px-3 sm:px-4 py-2.5 text-right">Value</th>
+                    <th className="px-3 sm:px-4 py-2.5 text-right">P&amp;L</th>
+                    <th className="px-3 sm:px-4 py-2.5 text-right">P&amp;L %</th>
+                    <th className="px-3 sm:px-4 py-2.5 text-right">Actions</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-700">
+                <tbody className="divide-y divide-gray-800 text-[11px] sm:text-xs md:text-sm font-mono">
                   <AnimatePresence>
                     {positions.map((pos, idx) => {
-                      const { value, cost, pnl, pnlPercent } = calculatePnL(pos);
+                      const { value, pnl, pnlPercent } = calculatePnL(pos);
                       return (
                         <motion.tr
                           key={pos.id}
-                          initial={{ opacity: 0, x: -20 }}
+                          initial={{ opacity: 0, x: -10 }}
                           animate={{ opacity: 1, x: 0 }}
-                          exit={{ opacity: 0, x: 20 }}
-                          transition={{ delay: idx * 0.05 }}
-                          className="hover:bg-gray-700/30 transition-colors"
+                          exit={{ opacity: 0, x: 10 }}
+                          transition={{ delay: idx * 0.03 }}
+                          className="hover:bg-gray-900/60 transition-colors"
                         >
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <div className="flex items-center gap-2">
-                              <div className="w-2 h-2 rounded-full bg-cyan-400"></div>
-                              <span className="font-mono font-semibold text-gray-100">{pos.ticker}</span>
+                          <td className="px-3 sm:px-4 py-2.5">
+                            <div className="flex flex-col">
+                              <div className="flex items-center gap-2">
+                                <span className="w-2 h-2 rounded-full bg-profit-green" />
+                                <span className="font-bold text-white">
+                                  {pos.ticker.replace(".JK", "")}
+                                </span>
+                              </div>
+                              {pos.name && (
+                                <span className="text-[10px] text-gray-500 mt-0.5">{pos.name}</span>
+                              )}
                             </div>
-                            {pos.name && (
-                              <div className="text-xs text-gray-500 mt-1">{pos.name}</div>
-                            )}
                           </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-right font-mono text-gray-300">
-                            {pos.shares.toLocaleString()}
+                          <td className="px-3 sm:px-4 py-2.5 text-right text-gray-300">
+                            {pos.shares.toLocaleString("id-ID")}
                           </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-right font-mono text-gray-300">
-                            ${pos.avgPrice.toFixed(2)}
+                          <td className="px-3 sm:px-4 py-2.5 text-right text-gray-300">
+                            {pos.avgPrice.toLocaleString("id-ID")}
                           </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-right font-mono text-gray-300">
-                            ${(pos.currentPrice || pos.avgPrice).toFixed(2)}
+                          <td className="px-3 sm:px-4 py-2.5 text-right text-gray-300">
+                            {(pos.currentPrice || pos.avgPrice).toLocaleString("id-ID")}
                           </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-right font-mono text-gray-100 font-semibold">
-                            ${value.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          <td className="px-3 sm:px-4 py-2.5 text-right text-white font-semibold">
+                            {value.toLocaleString("id-ID")}
                           </td>
-                          <td className={`px-6 py-4 whitespace-nowrap text-right font-mono font-semibold ${pnl >= 0 ? "text-green-400" : "text-red-400"}`}>
-                            {pnl >= 0 ? "+" : ""}${pnl.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          <td
+                            className={`px-3 sm:px-4 py-2.5 text-right font-semibold ${
+                              pnl >= 0 ? "text-profit-green" : "text-loss-red"
+                            }`}
+                          >
+                            {pnl >= 0 ? "+" : ""}
+                            {pnl.toLocaleString("id-ID")}
                           </td>
-                          <td className={`px-6 py-4 whitespace-nowrap text-right font-mono font-semibold ${pnlPercent >= 0 ? "text-green-400" : "text-red-400"}`}>
-                            {pnlPercent >= 0 ? "+" : ""}{pnlPercent.toFixed(2)}%
+                          <td
+                            className={`px-3 sm:px-4 py-2.5 text-right font-semibold ${
+                              pnlPercent >= 0 ? "text-profit-green" : "text-loss-red"
+                            }`}
+                          >
+                            {pnlPercent >= 0 ? "+" : ""}
+                            {pnlPercent.toFixed(2)}%
                           </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-right">
-                            <div className="flex items-center justify-end gap-2">
+                          <td className="px-3 sm:px-4 py-2.5 text-right">
+                            <div className="flex items-center justify-end gap-1.5 sm:gap-2">
                               <button
                                 onClick={() => openEditModal(pos)}
-                                className="p-2 hover:bg-gray-700 rounded-lg transition-colors"
+                                className="p-1.5 sm:p-2 rounded-lg hover:bg-gray-800 border border-transparent hover:border-gray-700 transition-colors"
                                 aria-label="Edit position"
                               >
-                                <Edit2 className="w-4 h-4 text-blue-400" />
+                                <Edit2 className="w-3 h-3 sm:w-4 sm:h-4 text-blue-400" />
                               </button>
                               <button
                                 onClick={() => handleDeletePosition(pos.ticker)}
-                                className="p-2 hover:bg-gray-700 rounded-lg transition-colors"
+                                className="p-1.5 sm:p-2 rounded-lg hover:bg-gray-800 border border-transparent hover:border-gray-700 transition-colors"
                                 aria-label="Delete position"
                               >
-                                <Trash2 className="w-4 h-4 text-red-400" />
+                                <Trash2 className="w-3 h-3 sm:w-4 sm:h-4 text-loss-red" />
                               </button>
                             </div>
                           </td>
@@ -439,27 +594,29 @@ const Portfolio: React.FC = () => {
           )}
         </motion.div>
 
-        {/* Allocation Chart Placeholder */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.5 }}
-          className="mt-8 bg-gray-800/50 backdrop-blur-sm border border-gray-700 rounded-xl p-6"
+          transition={{ delay: 0.25 }}
+          className="mt-4 sm:mt-6 bg-terminal-gray border border-gray-800 rounded-lg p-4 sm:p-6"
         >
-          <h2 className="text-lg font-semibold text-gray-100 flex items-center gap-2 mb-4">
-            <PieChart className="w-5 h-5 text-cyan-400" />
-            Allocation
-          </h2>
-          <div className="h-64 flex items-center justify-center text-gray-500">
-            <div className="text-center">
-              <Activity className="w-12 h-12 mx-auto mb-2 opacity-50" />
-              <p>Allocation chart coming soon</p>
+          <div className="flex items-center justify-between mb-3 sm:mb-4">
+            <h3 className="text-sm sm:text-lg font-bold font-mono text-white flex items-center gap-2">
+              <PieChart className="w-4 h-4 text-profit-green" />
+              ALLOCATION (COMING SOON)
+            </h3>
+            <span className="text-[10px] sm:text-xs text-gray-500 font-mono">
+              Visual breakdown of your positions
+            </span>
+          </div>
+          <div className="h-40 sm:h-56 flex items-center justify-center text-gray-500">
+            <div className="text-center text-[11px] sm:text-xs font-mono">
+              Allocation chart will show sector and asset distribution of your portfolio.
             </div>
           </div>
         </motion.div>
-      </div>
+      </main>
 
-      {/* Add/Edit Modal */}
       <AnimatePresence>
         {(showAddModal || editingPosition) && (
           <motion.div
@@ -478,15 +635,15 @@ const Portfolio: React.FC = () => {
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.9, opacity: 0 }}
               onClick={(e) => e.stopPropagation()}
-              className="bg-gray-800 border border-gray-700 rounded-xl p-6 max-w-md w-full"
+              className="bg-terminal-gray border border-gray-800 rounded-xl p-4 sm:p-6 max-w-md w-full"
             >
-              <h3 className="text-xl font-bold mb-4 text-gray-100">
+              <h3 className="text-base sm:text-xl font-bold mb-3 sm:mb-4 text-white font-mono">
                 {editingPosition ? "Edit Position" : "Add New Position"}
               </h3>
 
-              <div className="space-y-4">
+              <div className="space-y-3 sm:space-y-4">
                 <div>
-                  <label className="block text-sm font-mono text-gray-400 mb-2">
+                  <label className="block text-[10px] sm:text-xs font-mono text-gray-500 mb-1.5">
                     Ticker *
                   </label>
                   <input
@@ -495,65 +652,66 @@ const Portfolio: React.FC = () => {
                     onChange={(e) => setFormData({ ...formData, ticker: e.target.value })}
                     placeholder="e.g., BBCA.JK"
                     disabled={!!editingPosition}
-                    className="w-full px-4 py-2 bg-gray-900 border border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500 text-gray-100 font-mono disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="w-full px-3 sm:px-4 py-2.5 bg-black border border-gray-700 rounded-lg text-white text-xs sm:text-sm placeholder-gray-600 focus:outline-none focus:border-profit-green font-mono disabled:opacity-50 disabled:cursor-not-allowed"
                   />
                 </div>
 
-                <div>
-                  <label className="block text-sm font-mono text-gray-400 mb-2">
-                    Shares *
-                  </label>
-                  <input
-                    type="number"
-                    value={formData.shares}
-                    onChange={(e) => setFormData({ ...formData, shares: e.target.value })}
-                    placeholder="100"
-                    className="w-full px-4 py-2 bg-gray-900 border border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500 text-gray-100 font-mono"
-                  />
+                <div className="grid grid-cols-2 gap-3 sm:gap-4">
+                  <div>
+                    <label className="block text-[10px] sm:text-xs font-mono text-gray-500 mb-1.5">
+                      Shares *
+                    </label>
+                    <input
+                      type="number"
+                      value={formData.shares}
+                      onChange={(e) => setFormData({ ...formData, shares: e.target.value })}
+                      placeholder="100"
+                      className="w-full px-3 sm:px-4 py-2.5 bg-black border border-gray-700 rounded-lg text-white text-xs sm:text-sm placeholder-gray-600 focus:outline-none focus:border-profit-green font-mono"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] sm:text-xs font-mono text-gray-500 mb-1.5">
+                      Average Price *
+                    </label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      value={formData.avgPrice}
+                      onChange={(e) => setFormData({ ...formData, avgPrice: e.target.value })}
+                      placeholder="10500"
+                      className="w-full px-3 sm:px-4 py-2.5 bg-black border border-gray-700 rounded-lg text-white text-xs sm:text-sm placeholder-gray-600 focus:outline-none focus:border-profit-green font-mono"
+                    />
+                  </div>
                 </div>
 
                 <div>
-                  <label className="block text-sm font-mono text-gray-400 mb-2">
-                    Average Price *
-                  </label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    value={formData.avgPrice}
-                    onChange={(e) => setFormData({ ...formData, avgPrice: e.target.value })}
-                    placeholder="10500.00"
-                    className="w-full px-4 py-2 bg-gray-900 border border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500 text-gray-100 font-mono"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-mono text-gray-400 mb-2">
-                    Name (Optional)
+                  <label className="block text-[10px] sm:text-xs font-mono text-gray-500 mb-1.5">
+                    Name / Notes (Optional)
                   </label>
                   <textarea
                     value={formData.name}
                     onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                     placeholder="Company name or notes..."
                     rows={3}
-                    className="w-full px-4 py-2 bg-gray-900 border border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500 text-gray-100 resize-none"
+                    className="w-full px-3 sm:px-4 py-2.5 bg-black border border-gray-700 rounded-lg text-white text-xs sm:text-sm placeholder-gray-600 focus:outline-none focus:border-profit-green font-mono resize-none"
                   />
                 </div>
               </div>
 
-              <div className="flex gap-3 mt-6">
+              <div className="flex gap-2 sm:gap-3 mt-4 sm:mt-6">
                 <button
                   onClick={() => {
                     setShowAddModal(false);
                     setEditingPosition(null);
                     setFormData({ ticker: "", shares: "", avgPrice: "", name: "" });
                   }}
-                  className="flex-1 px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg transition-colors"
+                  className="flex-1 px-3 sm:px-4 py-2.5 bg-gray-800 hover:bg-gray-700 rounded-lg text-xs sm:text-sm font-mono text-gray-200 border border-gray-700 transition-colors"
                 >
                   Cancel
                 </button>
                 <button
                   onClick={editingPosition ? handleUpdatePosition : handleAddPosition}
-                  className="flex-1 px-4 py-2 bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700 rounded-lg transition-all font-semibold"
+                  className="flex-1 px-3 sm:px-4 py-2.5 bg-profit-green hover:bg-profit-green/90 rounded-lg text-xs sm:text-sm font-mono font-bold text-black transition-colors"
                 >
                   {editingPosition ? "Update" : "Add Position"}
                 </button>

@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { getToken } from "../services/authService";
 
 const API_URL = import.meta.env.VITE_API_URL || "https://moocuan.darrellvalentino.com";
 
@@ -29,12 +30,8 @@ interface PortfolioStore {
   transactions: Transaction[];
   isLoading: boolean;
   error: string | null;
-
-  // Fetch data from backend
   fetchPositions: () => Promise<void>;
   fetchTransactions: () => Promise<void>;
-
-  // Position actions (via backend API)
   addTransaction: (data: {
     ticker: string;
     type: "buy" | "sell";
@@ -43,8 +40,6 @@ interface PortfolioStore {
     notes?: string;
   }) => Promise<void>;
   removePosition: (ticker: string) => Promise<void>;
-
-  // Calculations
   getTotalValue: () => number;
   getTotalCost: () => number;
   getTotalPnL: () => number;
@@ -60,7 +55,12 @@ export const usePortfolioStore = create<PortfolioStore>()((set, get) => ({
   fetchPositions: async () => {
     set({ isLoading: true, error: null });
     try {
-      const token = localStorage.getItem("token");
+      const token = getToken();
+      if (!token) {
+        set({ error: "Not authenticated", isLoading: false });
+        return;
+      }
+
       const response = await fetch(`${API_URL}/api/portfolio/positions`, {
         headers: {
           Authorization: `Bearer ${token}`,
@@ -85,7 +85,12 @@ export const usePortfolioStore = create<PortfolioStore>()((set, get) => ({
 
   fetchTransactions: async () => {
     try {
-      const token = localStorage.getItem("token");
+      const token = getToken();
+      if (!token) {
+        set({ error: "Not authenticated" });
+        return;
+      }
+
       const response = await fetch(`${API_URL}/api/portfolio/transactions`, {
         headers: {
           Authorization: `Bearer ${token}`,
@@ -109,7 +114,12 @@ export const usePortfolioStore = create<PortfolioStore>()((set, get) => ({
   addTransaction: async (transactionData) => {
     set({ isLoading: true, error: null });
     try {
-      const token = localStorage.getItem("token");
+      const token = getToken();
+      if (!token) {
+        set({ error: "Not authenticated", isLoading: false });
+        throw new Error("Not authenticated");
+      }
+
       const response = await fetch(`${API_URL}/api/portfolio/transaction`, {
         method: "POST",
         headers: {
@@ -124,7 +134,6 @@ export const usePortfolioStore = create<PortfolioStore>()((set, get) => ({
         throw new Error(data.message || "Failed to add transaction");
       }
 
-      // Refresh positions after transaction
       await get().fetchPositions();
       set({ isLoading: false });
     } catch (error) {
@@ -136,7 +145,12 @@ export const usePortfolioStore = create<PortfolioStore>()((set, get) => ({
   removePosition: async (ticker) => {
     set({ isLoading: true, error: null });
     try {
-      const token = localStorage.getItem("token");
+      const token = getToken();
+      if (!token) {
+        set({ error: "Not authenticated", isLoading: false });
+        throw new Error("Not authenticated");
+      }
+
       const response = await fetch(`${API_URL}/api/portfolio/position/${ticker}`, {
         method: "DELETE",
         headers: {
@@ -146,7 +160,6 @@ export const usePortfolioStore = create<PortfolioStore>()((set, get) => ({
 
       if (!response.ok) throw new Error("Failed to remove position");
 
-      // Refresh positions
       await get().fetchPositions();
       set({ isLoading: false });
     } catch (error) {

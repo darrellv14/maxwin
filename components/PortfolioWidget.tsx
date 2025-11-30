@@ -1,16 +1,6 @@
 import React, { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import {
-  Briefcase,
-  Plus,
-  TrendingUp,
-  TrendingDown,
-  X,
-  DollarSign,
-  PieChart,
-  ChevronDown,
-  ChevronUp,
-} from "lucide-react";
+import { Briefcase, Plus, X, DollarSign, PieChart, ChevronDown, ChevronUp } from "lucide-react";
 import { usePortfolioStore, PortfolioPosition } from "../stores";
 import { toast } from "sonner";
 
@@ -58,49 +48,55 @@ const AddPositionModal: React.FC<AddPositionModalProps> = ({ isOpen, onClose, on
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 0.95 }}
             className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 
-              w-full max-w-md bg-terminal-dark border border-gray-700 rounded-xl p-6 z-50"
+              w-full max-w-md bg-terminal-gray border border-gray-800 rounded-xl p-5 sm:p-6 z-50"
           >
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-mono font-bold text-white">Add Position</h3>
-              <button onClick={onClose} className="p-1 hover:bg-gray-800 rounded">
-                <X className="w-5 h-5 text-gray-500" />
+              <h3 className="text-base sm:text-lg font-mono font-bold text-white">ADD POSITION</h3>
+              <button onClick={onClose} className="p-1 hover:bg-gray-800 rounded transition-colors">
+                <X className="w-4 h-4 text-gray-500" />
               </button>
             </div>
 
             <form onSubmit={handleSubmit} className="space-y-4">
               <div>
-                <label className="block text-sm text-gray-400 mb-1 font-mono">Ticker</label>
+                <label className="block text-[10px] sm:text-xs text-gray-400 mb-1 font-mono uppercase">
+                  Ticker
+                </label>
                 <input
                   type="text"
                   value={ticker}
                   onChange={(e) => setTicker(e.target.value)}
                   placeholder="e.g., BBCA.JK"
-                  className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 
-                    text-white font-mono text-sm focus:border-terminal-green outline-none"
+                  className="w-full bg-black border border-gray-700 rounded-lg px-3 py-2 
+                    text-white font-mono text-sm focus:border-terminal-green outline-none placeholder-gray-600"
                 />
               </div>
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm text-gray-400 mb-1 font-mono">Shares</label>
+                  <label className="block text-[10px] sm:text-xs text-gray-400 mb-1 font-mono uppercase">
+                    Shares
+                  </label>
                   <input
                     type="number"
                     value={shares}
                     onChange={(e) => setShares(e.target.value)}
                     placeholder="100"
-                    className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 
-                      text-white font-mono text-sm focus:border-terminal-green outline-none"
+                    className="w-full bg-black border border-gray-700 rounded-lg px-3 py-2 
+                      text-white font-mono text-sm focus:border-terminal-green outline-none placeholder-gray-600"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm text-gray-400 mb-1 font-mono">Avg Price</label>
+                  <label className="block text-[10px] sm:text-xs text-gray-400 mb-1 font-mono uppercase">
+                    Avg Price
+                  </label>
                   <input
                     type="number"
                     value={avgPrice}
                     onChange={(e) => setAvgPrice(e.target.value)}
                     placeholder="10000"
-                    className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 
-                      text-white font-mono text-sm focus:border-terminal-green outline-none"
+                    className="w-full bg-black border border-gray-700 rounded-lg px-3 py-2 
+                      text-white font-mono text-sm focus:border-terminal-green outline-none placeholder-gray-600"
                   />
                 </div>
               </div>
@@ -108,7 +104,7 @@ const AddPositionModal: React.FC<AddPositionModalProps> = ({ isOpen, onClose, on
               <button
                 type="submit"
                 className="w-full bg-terminal-green hover:bg-terminal-green/80 text-black 
-                  font-mono font-bold py-2.5 rounded-lg transition-colors"
+                  font-mono font-bold py-2.5 rounded-lg transition-colors text-sm"
               >
                 Add Position
               </button>
@@ -126,14 +122,15 @@ const PortfolioWidget: React.FC = () => {
     addTransaction,
     removePosition,
     getTotalValue,
-    getTotalCost,
     getTotalPnL,
     getTotalPnLPercent,
   } = usePortfolioStore();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isExpanded, setIsExpanded] = useState(true);
 
-  const handleAddPosition = async (position: Omit<PortfolioPosition, "id" | "addedAt" | "updatedAt">) => {
+  const handleAddPosition = async (
+    position: Omit<PortfolioPosition, "id" | "addedAt" | "updatedAt">
+  ) => {
     try {
       await addTransaction({
         ticker: position.ticker,
@@ -148,7 +145,6 @@ const PortfolioWidget: React.FC = () => {
   };
 
   const totalValue = getTotalValue();
-  const totalCost = getTotalCost();
   const totalPnL = getTotalPnL();
   const totalPnLPercent = getTotalPnLPercent();
   const isProfit = totalPnL >= 0;
@@ -157,37 +153,57 @@ const PortfolioWidget: React.FC = () => {
     <motion.div
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
-      className="bg-terminal-darker rounded-xl border border-gray-800 overflow-hidden"
+      className="bg-terminal-gray rounded-xl border border-gray-800 overflow-hidden flex flex-col"
     >
       {/* Header */}
-      <div
-        className="flex items-center justify-between px-4 py-3 border-b border-gray-800 cursor-pointer"
+      <button
+        type="button"
+        className="flex items-center justify-between px-3 sm:px-4 py-2.5 sm:py-3 border-b border-gray-800 bg-black/40 cursor-pointer"
         onClick={() => setIsExpanded(!isExpanded)}
       >
         <div className="flex items-center gap-2">
-          <Briefcase className="w-4 h-4 text-blue-500" />
-          <h3 className="text-sm font-mono text-gray-400">Portfolio</h3>
-          <span className="text-xs text-gray-600">({positions.length})</span>
+          <div className="w-7 h-7 bg-black/60 border border-gray-700 rounded-lg flex items-center justify-center">
+            <Briefcase className="w-3.5 h-3.5 text-blue-400" />
+          </div>
+          <div className="flex flex-col items-start">
+            <span className="text-[10px] sm:text-xs font-mono text-gray-500">PORTFOLIO</span>
+            <span className="text-xs sm:text-sm font-mono text-gray-200">
+              {positions.length} <span className="text-gray-500">positions</span>
+            </span>
+          </div>
         </div>
-        <div className="flex items-center gap-2">
+
+        <div className="flex items-center gap-1.5 sm:gap-2">
+          <div
+            className={`hidden sm:flex items-center gap-1 px-2 py-0.5 rounded-full border text-[10px] font-mono ${
+              isProfit
+                ? "border-terminal-green/60 text-terminal-green bg-terminal-green/10"
+                : "border-terminal-red/60 text-terminal-red bg-terminal-red/10"
+            }`}
+          >
+            <span>
+              {isProfit ? "+" : ""}
+              {totalPnLPercent.toFixed(2)}%
+            </span>
+          </div>
           <button
             onClick={(e) => {
               e.stopPropagation();
               setIsModalOpen(true);
             }}
-            className="p-1 hover:bg-gray-800 rounded"
+            className="p-1 hover:bg-gray-800 rounded-lg transition-colors"
           >
-            <Plus className="w-4 h-4 text-gray-500" />
+            <Plus className="w-3.5 h-3.5 text-gray-400" />
           </button>
           {isExpanded ? (
-            <ChevronUp className="w-4 h-4 text-gray-500" />
+            <ChevronUp className="w-3.5 h-3.5 text-gray-500" />
           ) : (
-            <ChevronDown className="w-4 h-4 text-gray-500" />
+            <ChevronDown className="w-3.5 h-3.5 text-gray-500" />
           )}
         </div>
-      </div>
+      </button>
 
-      <AnimatePresence>
+      <AnimatePresence initial={false}>
         {isExpanded && (
           <motion.div
             initial={{ height: 0, opacity: 0 }}
@@ -195,13 +211,13 @@ const PortfolioWidget: React.FC = () => {
             exit={{ height: 0, opacity: 0 }}
           >
             {/* Summary Stats */}
-            <div className="grid grid-cols-2 gap-3 p-4 border-b border-gray-800">
-              <div className="bg-gray-800/50 rounded-lg p-3">
-                <div className="flex items-center gap-1 text-xs text-gray-500 mb-1">
+            <div className="grid grid-cols-2 gap-2 sm:gap-3 p-3 sm:p-4 border-b border-gray-800 bg-black/30">
+              <div className="bg-black/60 rounded-lg p-2.5 sm:p-3">
+                <div className="flex items-center gap-1 text-[10px] sm:text-xs text-gray-500 mb-1">
                   <DollarSign className="w-3 h-3" />
-                  Total Value
+                  <span className="font-mono">Total Value</span>
                 </div>
-                <div className="font-mono font-bold text-white">
+                <div className="font-mono font-bold text-white text-xs sm:text-sm">
                   {totalValue.toLocaleString("id-ID", {
                     style: "currency",
                     currency: "IDR",
@@ -209,13 +225,15 @@ const PortfolioWidget: React.FC = () => {
                   })}
                 </div>
               </div>
-              <div className="bg-gray-800/50 rounded-lg p-3">
-                <div className="flex items-center gap-1 text-xs text-gray-500 mb-1">
+              <div className="bg-black/60 rounded-lg p-2.5 sm:p-3">
+                <div className="flex items-center gap-1 text-[10px] sm:text-xs text-gray-500 mb-1">
                   <PieChart className="w-3 h-3" />
-                  Total P&L
+                  <span className="font-mono">Total P&amp;L</span>
                 </div>
                 <div
-                  className={`font-mono font-bold ${isProfit ? "text-terminal-green" : "text-terminal-red"}`}
+                  className={`font-mono font-bold text-xs sm:text-sm ${
+                    isProfit ? "text-terminal-green" : "text-terminal-red"
+                  }`}
                 >
                   {isProfit ? "+" : ""}
                   {totalPnLPercent.toFixed(2)}%
@@ -226,17 +244,17 @@ const PortfolioWidget: React.FC = () => {
             {/* Positions */}
             {positions.length === 0 ? (
               <div className="text-center py-6 px-4">
-                <Briefcase className="w-8 h-8 text-gray-700 mx-auto mb-2" />
-                <p className="text-gray-500 text-xs font-mono">No positions yet</p>
+                <Briefcase className="w-7 h-7 text-gray-700 mx-auto mb-2" />
+                <p className="text-gray-500 text-[11px] sm:text-xs font-mono">No positions yet</p>
                 <button
                   onClick={() => setIsModalOpen(true)}
-                  className="mt-2 text-xs text-terminal-green hover:underline font-mono"
+                  className="mt-2 text-[11px] sm:text-xs text-terminal-green hover:underline font-mono"
                 >
                   Add your first position
                 </button>
               </div>
             ) : (
-              <div className="divide-y divide-gray-800 max-h-[300px] overflow-y-auto">
+              <div className="divide-y divide-gray-800 max-h-[280px] overflow-y-auto">
                 {positions.map((pos) => {
                   const currentValue = (pos.currentPrice || pos.avgPrice) * pos.shares;
                   const costBasis = pos.avgPrice * pos.shares;
@@ -247,26 +265,30 @@ const PortfolioWidget: React.FC = () => {
                   return (
                     <div
                       key={pos.id}
-                      className="flex items-center justify-between px-4 py-3 hover:bg-gray-800/30 group"
+                      className="flex items-center justify-between px-3 sm:px-4 py-2.5 sm:py-3 hover:bg-gray-800/40 group transition-colors"
                     >
                       <div>
-                        <div className="font-mono font-bold text-white text-sm">
+                        <div className="font-mono font-bold text-white text-xs sm:text-sm">
                           {pos.ticker.replace(".JK", "")}
                         </div>
-                        <div className="text-xs text-gray-500 font-mono">
+                        <div className="text-[10px] sm:text-xs text-gray-500 font-mono">
                           {pos.shares} shares @ {pos.avgPrice.toLocaleString("id-ID")}
                         </div>
                       </div>
                       <div className="flex items-center gap-3">
                         <div className="text-right">
                           <div
-                            className={`text-xs font-mono ${isPosProfit ? "text-terminal-green" : "text-terminal-red"}`}
+                            className={`text-[10px] sm:text-xs font-mono ${
+                              isPosProfit ? "text-terminal-green" : "text-terminal-red"
+                            }`}
                           >
                             {isPosProfit ? "+" : ""}
                             {pnlPercent.toFixed(2)}%
                           </div>
-                          <div className="text-xs text-gray-500 font-mono">
-                            {currentValue.toLocaleString("id-ID", { maximumFractionDigits: 0 })}
+                          <div className="text-[10px] sm:text-xs text-gray-500 font-mono">
+                            {currentValue.toLocaleString("id-ID", {
+                              maximumFractionDigits: 0,
+                            })}
                           </div>
                         </div>
                         <button
