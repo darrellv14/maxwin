@@ -3,6 +3,7 @@ import { verifyToken } from "./auth.js";
 import { setSecurityHeaders, sanitizeInput } from "./security.js";
 
 // Initialize portfolio tables
+// Initialize portfolio tables
 const initDb = async () => {
   try {
     // Ensure users table exists first
@@ -17,7 +18,7 @@ const initDb = async () => {
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )
     `);
-    
+
     // Positions table
     await pool.query(`
       CREATE TABLE IF NOT EXISTS portfolio_positions (
@@ -33,7 +34,7 @@ const initDb = async () => {
       )
     `);
 
-    // Transactions table
+    // Transactions table (new schema)
     await pool.query(`
       CREATE TABLE IF NOT EXISTS portfolio_transactions (
         id SERIAL PRIMARY KEY,
@@ -46,6 +47,16 @@ const initDb = async () => {
         notes TEXT,
         transaction_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )
+    `);
+
+    // 🔥 IMPORTANT: kalau tabel lama sudah terlanjur ada, tambahkan kolom yang kurang
+    await pool.query(`
+      ALTER TABLE portfolio_transactions
+      ADD COLUMN IF NOT EXISTS shares       DECIMAL(15, 4) NOT NULL DEFAULT 0,
+      ADD COLUMN IF NOT EXISTS price        DECIMAL(15, 2) NOT NULL DEFAULT 0,
+      ADD COLUMN IF NOT EXISTS total_value  DECIMAL(15, 2) NOT NULL DEFAULT 0,
+      ADD COLUMN IF NOT EXISTS notes        TEXT,
+      ADD COLUMN IF NOT EXISTS transaction_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     `);
 
     console.log("Portfolio tables initialized");
