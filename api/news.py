@@ -8,15 +8,52 @@ from datetime import datetime
 
 
 class DetikScraper:
-    # Use tag/saham page for stock-specific news
-    TAG_URL = "https://www.detik.com/tag/saham"
+    # Use finance.detik.com for stock-specific news only
+    FINANCE_URL = "https://finance.detik.com/search/searchall"
     SEARCH_URL = "https://www.detik.com/search/searchnews"
+
+    # Konglomerat Indonesia - untuk deteksi berita bisnis
+    KONGLOMERAT = {
+        "AGUAN": ["Aguan", "Aguan Salim", "Salim Group"],
+        "PRAJOGO": ["Prajogo", "Prajogo Pangestu", "Barito"],
+        "HARTONO": ["Hartono", "Robert Budi Hartono", "Michael Hartono", "Djarum"],
+        "WIDJAJA": ["Widjaja", "Eka Tjipta Widjaja", "Sinar Mas"],
+        "TAHIR": ["Tahir", "Dato Tahir", "Mayapada"],
+        "TANOTO": ["Tanoto", "Sukanto Tanoto", "RGE", "Royal Golden Eagle"],
+        "BAKRIE": ["Bakrie", "Aburizal Bakrie", "Nirwan Bakrie"],
+        "RIADY": ["Riady", "Mochtar Riady", "James Riady", "Lippo"],
+        "CIPUTRA": ["Ciputra"],
+        "SURYA": ["Surya Paloh", "Chairul Tanjung", "CT Corp"],
+        "HAPSORO": ["Happy Hapsoro", "Hapsoro"],
+        "KATUARI": ["Katuari", "Garibaldi Thohir", "Erick Thohir"],
+        "LIEM": ["Liem", "Anthony Salim", "Salim"],
+        "SOERYADJAYA": ["Soeryadjaya", "Edwin Soeryadjaya"],
+    }
+
+    # Strict stock/finance keywords - berita HARUS mengandung salah satu ini
+    STOCK_KEYWORDS = [
+        # Bursa & Index
+        "IHSG", "BEI", "BURSA", "IDX", "JKSE", "LQ45", "IDX30",
+        # Trading terms
+        "SAHAM", "EMITEN", "LISTING", "IPO", "RIGHT ISSUE", "STOCK SPLIT",
+        "BUYBACK", "TENDER OFFER", "DELISTING", "SUSPEND",
+        # Corporate actions
+        "DIVIDEN", "LABA", "RUGI", "PENDAPATAN", "REVENUE", "PROFIT",
+        "EARNING", "KINERJA KEUANGAN", "LAPORAN KEUANGAN",
+        # Investor
+        "INVESTOR", "ASING", "DOMESTIK", "NET BUY", "NET SELL", "FOREIGN",
+        # Market movement
+        "MENGUAT", "MELEMAH", "RALLY", "KOREKSI", "BULLISH", "BEARISH",
+        "NAIK", "TURUN", "ANJLOK", "MEROKET", "REBOUND",
+        # Sectors
+        "PERBANKAN", "PERTAMBANGAN", "PROPERTI", "TELEKOMUNIKASI",
+        "CONSUMER", "ENERGI", "INFRASTRUKTUR",
+    ]
 
     @staticmethod
     def get_stock_news(ticker, limit=10):
         """
-        Fetch news from Detik's saham tag page and filter by ticker.
-        This ensures we only get stock-related news.
+        Fetch news from Detik Finance - more focused on stock news.
         """
         try:
             ctx = ssl.create_default_context()
@@ -29,8 +66,8 @@ class DetikScraper:
                 "Accept-Language": "id-ID,id;q=0.9,en-US;q=0.8,en;q=0.7",
             }
 
-            # First try: Search with ticker + saham on tag page
-            search_url = f"{DetikScraper.SEARCH_URL}?query={urllib.parse.quote(ticker + ' saham')}"
+            # Search on finance.detik.com for more relevant results
+            search_url = f"{DetikScraper.FINANCE_URL}?query={urllib.parse.quote(ticker + ' saham')}&siteid=2"
 
             req = urllib.request.Request(search_url, headers=headers)
             with urllib.request.urlopen(req, context=ctx, timeout=10) as response:
@@ -38,16 +75,20 @@ class DetikScraper:
 
             articles = DetikScraper._parse_articles(html, ticker, limit)
 
-            # If no results, try fetching from tag/saham page
-            if len(articles) < 3:
-                req = urllib.request.Request(DetikScraper.TAG_URL, headers=headers)
+            # If not enough results, also search general with stricter filter
+            if len(articles) < 5:
+                search_url2 = f"{DetikScraper.SEARCH_URL}?query={urllib.parse.quote(ticker + ' saham bursa')}"
+                req = urllib.request.Request(search_url2, headers=headers)
                 with urllib.request.urlopen(req, context=ctx, timeout=10) as response:
                     html = response.read().decode("utf-8")
 
-                tag_articles = DetikScraper._parse_articles(
-                    html, ticker, limit - len(articles)
-                )
-                articles.extend(tag_articles)
+                more_articles = DetikScraper._parse_articles(html, ticker, limit - len(articles))
+                
+                # Add unique articles only
+                existing_links = {a["link"] for a in articles}
+                for art in more_articles:
+                    if art["link"] not in existing_links:
+                        articles.append(art)
 
             return articles[:limit]
 
@@ -57,34 +98,38 @@ class DetikScraper:
 
     @staticmethod
     def _parse_articles(html, ticker, limit):
-        """Parse articles from Detik HTML - return all stock-related news for Gemini to analyze"""
+        """Parse articles - STRICTLY filter for stock/finance news only"""
         articles = []
         ticker_upper = ticker.upper().replace(".JK", "")
 
-        # Common company name mappings for major stocks
+        # Company name mappings
         company_names = {
-            "BBCA": ["BCA", "Bank Central Asia"],
-            "BBRI": ["BRI", "Bank Rakyat Indonesia", "Bank BRI"],
-            "BMRI": ["Mandiri", "Bank Mandiri"],
-            "BBNI": ["BNI", "Bank Negara Indonesia"],
-            "TLKM": ["Telkom", "Telekomunikasi Indonesia"],
-            "ASII": ["Astra", "Astra International"],
-            "UNVR": ["Unilever"],
-            "GOTO": ["GoTo", "Gojek Tokopedia"],
-            "BREN": ["Barito", "Barito Renewables"],
-            "BRMS": ["Bumi Resources Minerals"],
-            "BUMI": ["Bumi Resources"],
-            "ANTM": ["Antam", "Aneka Tambang"],
-            "INDF": ["Indofood"],
-            "ICBP": ["Indofood CBP"],
-            "EXCL": ["XL", "XL Axiata"],
-            "ISAT": ["Indosat", "Indosat Ooredoo"],
-            "ADRO": ["Adaro"],
-            "PTBA": ["Bukit Asam"],
-            "PGAS": ["PGN", "Perusahaan Gas Negara"],
-            "SMGR": ["Semen Indonesia"],
-            "INTP": ["Indocement"],
-            "IHSG": ["IHSG", "Indeks Harga Saham Gabungan", "bursa", "BEI"],
+            "BBCA": ["BCA", "BANK CENTRAL ASIA"],
+            "BBRI": ["BRI", "BANK RAKYAT INDONESIA", "BANK BRI"],
+            "BMRI": ["MANDIRI", "BANK MANDIRI"],
+            "BBNI": ["BNI", "BANK NEGARA INDONESIA"],
+            "TLKM": ["TELKOM", "TELEKOMUNIKASI INDONESIA"],
+            "ASII": ["ASTRA", "ASTRA INTERNATIONAL"],
+            "UNVR": ["UNILEVER"],
+            "GOTO": ["GOTO", "GOJEK", "TOKOPEDIA"],
+            "BREN": ["BARITO", "BARITO RENEWABLES"],
+            "BRMS": ["BUMI RESOURCES MINERALS"],
+            "BUMI": ["BUMI RESOURCES"],
+            "ANTM": ["ANTAM", "ANEKA TAMBANG"],
+            "INDF": ["INDOFOOD"],
+            "ICBP": ["INDOFOOD CBP"],
+            "EXCL": ["XL", "XL AXIATA"],
+            "ISAT": ["INDOSAT", "INDOSAT OOREDOO"],
+            "ADRO": ["ADARO"],
+            "PTBA": ["BUKIT ASAM"],
+            "PGAS": ["PGN", "PERUSAHAAN GAS NEGARA"],
+            "SMGR": ["SEMEN INDONESIA"],
+            "INTP": ["INDOCEMENT"],
+            "ACES": ["ACE HARDWARE"],
+            "MYOR": ["MAYORA"],
+            "KLBF": ["KALBE", "KALBE FARMA"],
+            "CPIN": ["CHAROEN POKPHAND"],
+            "RATU": ["RATU PRABU", "RATU PRABU ENERGI"],  # Specific for RATU
         }
 
         # Get search terms for this ticker
@@ -92,60 +137,64 @@ class DetikScraper:
         if ticker_upper in company_names:
             search_terms.extend(company_names[ticker_upper])
 
-        # General stock market keywords - always relevant for context
-        stock_keywords = ["IHSG", "BURSA", "BEI", "SAHAM", "INVESTOR", "ASING", "EMITEN", "DIVIDEN", "LABA", "RUGI"]
-
         # Pattern to extract articles
         pattern = r'media__title[^>]*>\s*<a[^>]*href="([^"]+)"[^>]*>([^<]+)</a>'
-        
-        # Date pattern
         date_pattern = r'<div[^>]*class="[^"]*media__date[^"]*"[^>]*>.*?<span[^>]*>([^<]+)</span>'
+        
         dates = re.findall(date_pattern, html, re.DOTALL | re.IGNORECASE)
-
         matches = re.findall(pattern, html, re.DOTALL | re.IGNORECASE)
 
-        # Separate into ticker-specific and general market news
-        ticker_news = []
-        market_news = []
-
         for i, (link, title) in enumerate(matches):
+            if len(articles) >= limit:
+                break
+                
             title_clean = title.strip()
             title_clean = re.sub(r"\s+", " ", title_clean)
             title_upper = title_clean.upper()
 
-            article = {
-                "judul": title_clean,
-                "link": link.strip(),
-                "waktu": dates[i].strip() if i < len(dates) else "",
-            }
-
-            # Check if directly about ticker
-            is_ticker_specific = False
-            for term in search_terms:
-                if term.upper() in title_upper:
-                    is_ticker_specific = True
+            # STRICT FILTER: Must be from finance domain OR contain stock keywords
+            is_finance_url = "finance.detik.com" in link.lower()
+            
+            # Check if contains ANY stock keyword
+            has_stock_keyword = any(kw in title_upper for kw in DetikScraper.STOCK_KEYWORDS)
+            
+            # Check if about this specific ticker/company
+            is_about_ticker = any(term in title_upper for term in search_terms)
+            
+            # Check if mentions any konglomerat (business news indicator)
+            mentions_konglomerat = False
+            for konglo, names in DetikScraper.KONGLOMERAT.items():
+                if any(name.upper() in title_upper for name in names):
+                    mentions_konglomerat = True
                     break
 
-            # Check if general stock news
-            is_stock_news = False
-            for kw in stock_keywords:
-                if kw in title_upper:
-                    is_stock_news = True
-                    break
+            # ACCEPTANCE CRITERIA (must meet at least one):
+            # 1. From finance.detik.com AND about ticker
+            # 2. Contains stock keyword AND about ticker
+            # 3. About ticker AND mentions konglomerat
+            # 4. Contains multiple stock keywords (general market news)
+            
+            should_include = False
+            
+            if is_about_ticker and (is_finance_url or has_stock_keyword):
+                should_include = True
+            elif is_about_ticker and mentions_konglomerat:
+                should_include = True
+            elif has_stock_keyword and is_finance_url:
+                # General market news from finance section
+                stock_keyword_count = sum(1 for kw in DetikScraper.STOCK_KEYWORDS if kw in title_upper)
+                if stock_keyword_count >= 2:
+                    should_include = True
 
-            if is_ticker_specific:
-                ticker_news.append(article)
-            elif is_stock_news:
-                market_news.append(article)
+            if should_include:
+                article = {
+                    "judul": title_clean,
+                    "link": link.strip(),
+                    "waktu": dates[i].strip() if i < len(dates) else "",
+                }
+                articles.append(article)
 
-        # Prioritize ticker-specific news, then add general market news
-        # Return mix: up to limit articles (prefer ticker news)
-        result = ticker_news[:limit]
-        remaining = limit - len(result)
-        if remaining > 0:
-            result.extend(market_news[:remaining])
-
-        return result
+        return articles
 
 
 class handler(BaseHTTPRequestHandler):
