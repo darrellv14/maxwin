@@ -10,7 +10,7 @@ async function fetchSentimentFromPythonAPI(ticker, baseUrl) {
   
   // Use provided baseUrl or fallback
   const apiBaseUrl = baseUrl || "https://moocuan.darrellvalentino.com";
-  const sentimentUrl = `${apiBaseUrl}/api/news-sentiment?ticker=${encodeURIComponent(tickerClean)}`;
+  const sentimentUrl = `${apiBaseUrl}/api/news_sentiment?ticker=${encodeURIComponent(tickerClean)}`;
   
   console.log(`[SENTIMENT] Fetching: ${sentimentUrl}`);
   
