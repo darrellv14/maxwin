@@ -25,10 +25,6 @@
       "destination": "/api/portfolio.js"
     },
     {
-      "source": "/api/news_sentiment",
-      "destination": "/api/news_sentiment.py"
-    },
-    {
       "source": "/api/:path",
       "destination": "/api/:path.js"
     },

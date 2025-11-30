@@ -3,50 +3,167 @@ import { setSecurityHeaders, rateLimit, sanitizeInput } from "./security.js";
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "");
 
-// ============ FETCH SENTIMENT FROM PYTHON API ============
-// Use /api/news with sentiment=true parameter (more reliable than separate endpoint)
-async function fetchSentimentFromPythonAPI(ticker, baseUrl) {
+// ============ FETCH NEWS AND ANALYZE SENTIMENT ============
+async function fetchAndAnalyzeNews(ticker, baseUrl) {
   const tickerClean = ticker.replace(".JK", "").toUpperCase();
-  
-  // Use provided baseUrl or fallback
   const apiBaseUrl = baseUrl || "https://moocuan.darrellvalentino.com";
-  const sentimentUrl = `${apiBaseUrl}/api/news?ticker=${encodeURIComponent(tickerClean)}&sentiment=true`;
-  
-  console.log(`[SENTIMENT] Fetching: ${sentimentUrl}`);
-  
+  const newsUrl = `${apiBaseUrl}/api/news?ticker=${encodeURIComponent(tickerClean)}`;
+
+  console.log(`[NEWS] Fetching from: ${newsUrl}`);
+
   try {
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 15000); // 15s timeout for scrape + Gemini
-    
-    const response = await fetch(sentimentUrl, {
+    const timeoutId = setTimeout(() => controller.abort(), 12000);
+
+    const response = await fetch(newsUrl, {
       method: "GET",
-      headers: {
-        "Accept": "application/json",
-        "User-Agent": "MooCuan-AI/1.0",
-      },
+      headers: { "Accept": "application/json" },
       signal: controller.signal,
     });
-    
+
     clearTimeout(timeoutId);
-    
-    console.log(`[SENTIMENT] Status: ${response.status}`);
-    
+
     if (!response.ok) {
-      console.error(`[SENTIMENT] Error: ${response.status}`);
+      console.error(`[NEWS] HTTP ${response.status}`);
       return null;
     }
-    
+
     const data = await response.json();
-    console.log(`[SENTIMENT] Got sentiment: ${data.sentiment?.type || 'N/A'}`);
-    
-    return data.sentiment || null;
+    const articles = data.articles || [];
+
+    console.log(`[NEWS] Got ${articles.length} articles`);
+
+    if (articles.length === 0) {
+      // Try IHSG fallback
+      console.log(`[NEWS] No articles for ${tickerClean}, trying IHSG fallback...`);
+      const ihsgResponse = await fetch(`${apiBaseUrl}/api/news?ticker=IHSG`, {
+        signal: AbortSignal.timeout(12000),
+      });
+      
+      if (ihsgResponse.ok) {
+        const ihsgData = await ihsgResponse.json();
+        if (ihsgData.articles && ihsgData.articles.length > 0) {
+          return analyzeNewsWithGemini(ihsgData.articles, "IHSG", true);
+        }
+      }
+      
+      return null;
+    }
+
+    // Analyze with Gemini
+    return await analyzeNewsWithGemini(articles, tickerClean, false);
   } catch (error) {
-    if (error.name === 'AbortError') {
-      console.error('[SENTIMENT] Timeout');
+    if (error.name === "AbortError") {
+      console.error("[NEWS] Timeout");
     } else {
-      console.error('[SENTIMENT] Error:', error.message);
+      console.error("[NEWS] Error:", error.message);
     }
     return null;
+  }
+}
+
+// Analyze news sentiment with Gemini
+async function analyzeNewsWithGemini(articles, ticker, isIHSGFallback = false) {
+  if (!articles || articles.length === 0) {
+    return {
+      type: "NEUTRAL",
+      headline: "Tidak ada berita terkini",
+      description: "Tidak ditemukan berita relevan.",
+      source: "N/A",
+      newsDate: null,
+      confidence: 30,
+      keyNews: [],
+      isIHSGFallback: false,
+    };
+  }
+
+  try {
+    const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
+
+    // Format articles for Gemini
+    let newsText = "";
+    articles.slice(0, 5).forEach((article, i) => {
+      newsText += `${i + 1}. JUDUL: "${article.judul}"\n`;
+      if (article.konten) {
+        newsText += `   ISI: ${article.konten}\n`;
+      }
+      newsText += `   LINK: ${article.link}\n\n`;
+    });
+
+    const prompt = isIHSGFallback
+      ? `Kamu adalah analis sentimen pasar saham Indonesia. Analisis berita IHSG berikut:
+
+BERITA IHSG TERKINI:
+${newsText}
+
+Berikan analisis sentimen pasar dalam format JSON (tanpa markdown):
+{
+  "type": "BULLISH" | "BEARISH" | "NEUTRAL",
+  "headline": "Rangkuman kondisi pasar dalam 1 kalimat",
+  "description": "Analisis dampak ke pasar saham 2-3 kalimat",
+  "source": "Detik News (IHSG)",
+  "newsDate": "Terbaru",
+  "confidence": 0-100,
+  "keyNews": ["Poin penting 1", "Poin penting 2"],
+  "isIHSGFallback": true
+}`
+      : `Kamu adalah analis sentimen berita saham Indonesia. Analisis berita untuk ${ticker}:
+
+BERITA TERKINI:
+${newsText}
+
+TUGAS:
+1. Cek apakah berita BENAR-BENAR tentang ${ticker}
+2. Jika relevan: Tentukan sentimen BULLISH, BEARISH, atau NEUTRAL
+3. Jika TIDAK relevan sama sekali: Set isRelevant = false
+
+Format JSON (tanpa markdown):
+{
+  "type": "BULLISH" | "BEARISH" | "NEUTRAL",
+  "headline": "Rangkuman berita dalam 1 kalimat",
+  "description": "Analisis dampak ke harga saham dengan DATA SPESIFIK dari berita, 2-3 kalimat",
+  "source": "Detik News",
+  "newsDate": "Terbaru",
+  "confidence": 0-100,
+  "keyNews": ["Berita penting 1", "Berita penting 2"],
+  "isRelevant": true | false,
+  "isIHSGFallback": false
+}`;
+
+    const result = await model.generateContent(prompt);
+    const response = await result.response;
+    const text = response.text();
+
+    if (!text) {
+      console.error("[SENTIMENT] No response from Gemini");
+      return null;
+    }
+
+    const cleanText = text.replace(/```json\n?|\n?```/g, "").trim();
+    const sentiment = JSON.parse(cleanText);
+
+    // If not relevant and not already fallback, try IHSG
+    if (sentiment.isRelevant === false && !isIHSGFallback) {
+      console.log(`[SENTIMENT] Not relevant, will use IHSG fallback`);
+      return null; // Caller will handle IHSG fallback
+    }
+
+    console.log(`[SENTIMENT] Analysis complete: ${sentiment.type}`);
+    return sentiment;
+  } catch (error) {
+    console.error("[SENTIMENT] Gemini error:", error.message);
+    
+    // Return fallback with first article headline
+    return {
+      type: "NEUTRAL",
+      headline: articles[0]?.judul?.substring(0, 100) || "Berita tersedia",
+      description: `Ditemukan ${articles.length} berita terkait ${ticker}.`,
+      source: "Detik News",
+      newsDate: "Terbaru",
+      confidence: 40,
+      keyNews: [],
+      isIHSGFallback: isIHSGFallback,
+    };
   }
 }
 
@@ -75,9 +192,9 @@ async function analyzeStock(req, res) {
     const baseUrl = `${protocol}://${host}`;
     console.log(`[AI] Base URL: ${baseUrl}`);
 
-    // Fetch sentiment from Python API (handles scraping + Gemini analysis)
+    // Fetch and analyze news sentiment for Indonesian stocks
     const isIndonesian = ticker.toUpperCase().endsWith(".JK") || ticker.toUpperCase() === "^JKSE";
-    const sentimentPromise = isIndonesian ? fetchSentimentFromPythonAPI(ticker, baseUrl) : Promise.resolve(null);
+    const sentimentPromise = isIndonesian ? fetchAndAnalyzeNews(ticker, baseUrl) : Promise.resolve(null);
 
     const strategyPrompt = isIndonesian
       ? `1. **Strategy:** LONG-ONLY (Spot Market). Do NOT suggest Short Selling.
