@@ -3,61 +3,164 @@ import { setSecurityHeaders, rateLimit, sanitizeInput } from "./security.js";
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "");
 
-// ============ FETCH NEWS AND ANALYZE SENTIMENT ============
-async function fetchAndAnalyzeNews(ticker, baseUrl) {
+// ============ NEWS SCRAPING FROM DETIK ============
+const COMPANY_NAMES = {
+  BBCA: ["BCA", "BANK CENTRAL ASIA"],
+  BBRI: ["BRI", "BANK RAKYAT INDONESIA"],
+  BMRI: ["MANDIRI", "BANK MANDIRI"],
+  BBNI: ["BNI", "BANK NEGARA INDONESIA"],
+  TLKM: ["TELKOM"],
+  ASII: ["ASTRA"],
+  UNVR: ["UNILEVER"],
+  GOTO: ["GOTO", "GOJEK", "TOKOPEDIA"],
+  ANTM: ["ANTAM", "ANEKA TAMBANG"],
+  INDF: ["INDOFOOD"],
+  ADRO: ["ADARO"],
+  PTBA: ["BUKIT ASAM"],
+  INCO: ["VALE", "INCO"],
+};
+
+function isRelevantTitle(title, ticker) {
+  const titleUpper = title.toUpperCase();
   const tickerClean = ticker.replace(".JK", "").toUpperCase();
-  const apiBaseUrl = baseUrl || "https://moocuan.darrellvalentino.com";
-  const newsUrl = `${apiBaseUrl}/api/news?ticker=${encodeURIComponent(tickerClean)}`;
+  
+  if (titleUpper.includes(tickerClean)) return true;
+  
+  const names = COMPANY_NAMES[tickerClean] || [];
+  return names.some(name => titleUpper.includes(name.toUpperCase()));
+}
 
-  console.log(`[NEWS] Fetching from: ${newsUrl}`);
-
+async function fetchArticleContent(url) {
   try {
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 12000);
-
-    const response = await fetch(newsUrl, {
-      method: "GET",
-      headers: { "Accept": "application/json" },
-      signal: controller.signal,
+    const response = await fetch(url, {
+      headers: {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+      },
+      signal: AbortSignal.timeout(7000),
     });
+    
+    if (!response.ok) return "";
+    
+    const html = await response.text();
+    const contentMatch = html.match(/<div[^>]*class="[^"]*detail__body-text[^"]*"[^>]*>([\s\S]*?)<\/div>/i);
+    
+    if (!contentMatch) return "";
+    
+    let content = contentMatch[1]
+      .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, "")
+      .replace(/<style\b[^<]*(?:(?!<\/style>)<[^<]*)*<\/style>/gi, "")
+      .replace(/<[^>]+>/g, " ")
+      .replace(/\s+/g, " ")
+      .trim();
+    
+    return content.substring(0, 500);
+  } catch (error) {
+    return "";
+  }
+}
 
-    clearTimeout(timeoutId);
-
+async function scrapeDetikNews(ticker, limit = 8) {
+  const tickerClean = ticker.replace(".JK", "").toUpperCase();
+  const searchUrl = `https://www.detik.com/search/searchnews?query=${encodeURIComponent(tickerClean)}`;
+  
+  console.log(`[NEWS] Scraping: ${searchUrl}`);
+  
+  try {
+    const response = await fetch(searchUrl, {
+      headers: {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+      },
+      signal: AbortSignal.timeout(10000),
+    });
+    
     if (!response.ok) {
       console.error(`[NEWS] HTTP ${response.status}`);
-      return null;
+      return [];
     }
+    
+    const html = await response.text();
+    const articles = [];
+    const seen = new Set();
+    
+    const articleBlockPattern = /<article[^>]*>([\s\S]*?)<\/article>/gi;
+    const linkPattern = /<a[^>]*href="([^"]+)"[^>]*>/i;
+    const titlePattern = /<h3[^>]*class="[^"]*media__title[^"]*"[^>]*>([^<]+)<\/h3>/i;
+    
+    const articleBlocks = [...html.matchAll(articleBlockPattern)];
+    console.log(`[NEWS] Found ${articleBlocks.length} article blocks`);
+    
+    for (const block of articleBlocks) {
+      if (articles.length >= limit) break;
+      
+      const articleHtml = block[1];
+      const linkMatch = articleHtml.match(linkPattern);
+      const titleMatch = articleHtml.match(titlePattern);
+      
+      if (!linkMatch || !titleMatch) continue;
+      
+      const link = linkMatch[1];
+      const title = titleMatch[1].trim();
+      
+      if (seen.has(link)) continue;
+      seen.add(link);
+      
+      const isFinance = link.includes("finance.detik.com");
+      
+      if (!isRelevantTitle(title, tickerClean)) {
+        continue;
+      }
+      
+      articles.push({
+        judul: title,
+        link: link,
+        source: isFinance ? "Detik Finance" : "Detik",
+      });
+    }
+    
+    // Fetch content for first 3 articles
+    if (articles.length > 0) {
+      console.log(`[NEWS] Fetching content for ${Math.min(3, articles.length)} articles`);
+      const contentPromises = articles.slice(0, 3).map(async (article, index) => {
+        const content = await fetchArticleContent(article.link);
+        articles[index].konten = content;
+      });
+      await Promise.all(contentPromises);
+    }
+    
+    console.log(`[NEWS] Scraped ${articles.length} articles`);
+    return articles;
+  } catch (error) {
+    console.error(`[NEWS] Error:`, error.message);
+    return [];
+  }
+}
 
-    const data = await response.json();
-    const articles = data.articles || [];
-
-    console.log(`[NEWS] Got ${articles.length} articles`);
-
+// ============ FETCH NEWS AND ANALYZE SENTIMENT ============
+async function fetchAndAnalyzeNews(ticker) {
+  const tickerClean = ticker.replace(".JK", "").toUpperCase();
+  
+  console.log(`[NEWS] Starting scrape for ${tickerClean}`);
+  
+  try {
+    // Scrape directly from Detik
+    let articles = await scrapeDetikNews(tickerClean, 8);
+    
     if (articles.length === 0) {
       // Try IHSG fallback
-      console.log(`[NEWS] No articles for ${tickerClean}, trying IHSG fallback...`);
-      const ihsgResponse = await fetch(`${apiBaseUrl}/api/news?ticker=IHSG`, {
-        signal: AbortSignal.timeout(12000),
-      });
+      console.log(`[NEWS] No articles for ${tickerClean}, trying IHSG...`);
+      articles = await scrapeDetikNews("IHSG", 8);
       
-      if (ihsgResponse.ok) {
-        const ihsgData = await ihsgResponse.json();
-        if (ihsgData.articles && ihsgData.articles.length > 0) {
-          return analyzeNewsWithGemini(ihsgData.articles, "IHSG", true);
-        }
+      if (articles.length > 0) {
+        return analyzeNewsWithGemini(articles, "IHSG", true);
       }
       
       return null;
     }
-
+    
     // Analyze with Gemini
     return await analyzeNewsWithGemini(articles, tickerClean, false);
   } catch (error) {
-    if (error.name === "AbortError") {
-      console.error("[NEWS] Timeout");
-    } else {
-      console.error("[NEWS] Error:", error.message);
-    }
+    console.error("[NEWS] Error:", error.message);
     return null;
   }
 }
@@ -183,18 +286,9 @@ async function analyzeStock(req, res) {
       return res.status(400).json({ error: "No data points provided" });
     }
 
-    // Get base URL for internal API calls
-    let protocol = req.headers["x-forwarded-proto"] || "https";
-    if (protocol.includes(",")) {
-      protocol = protocol.split(",")[0].trim();
-    }
-    const host = req.headers.host || req.headers["x-forwarded-host"] || "moocuan.darrellvalentino.com";
-    const baseUrl = `${protocol}://${host}`;
-    console.log(`[AI] Base URL: ${baseUrl}`);
-
     // Fetch and analyze news sentiment for Indonesian stocks
     const isIndonesian = ticker.toUpperCase().endsWith(".JK") || ticker.toUpperCase() === "^JKSE";
-    const sentimentPromise = isIndonesian ? fetchAndAnalyzeNews(ticker, baseUrl) : Promise.resolve(null);
+    const sentimentPromise = isIndonesian ? fetchAndAnalyzeNews(ticker) : Promise.resolve(null);
 
     const strategyPrompt = isIndonesian
       ? `1. **Strategy:** LONG-ONLY (Spot Market). Do NOT suggest Short Selling.
