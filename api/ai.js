@@ -2,99 +2,29 @@ import { GoogleGenerativeAI } from "@google/generative-ai";
 import { setSecurityHeaders, rateLimit, sanitizeInput } from "./security.js";
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "");
-const GROK_API_KEY = process.env.GROK_API_KEY || "";
 
-// ============ GROK NEWS SENTIMENT ============
-async function fetchNewsSentiment(ticker) {
-  if (!GROK_API_KEY) {
-    console.log("Grok API key not configured, skipping news sentiment");
-    return null;
-  }
-
+// ============ DETIK NEWS SENTIMENT ============
+async function fetchNewsSentiment(ticker, baseUrl) {
   try {
-    const today = new Date().toLocaleDateString("id-ID", {
-      weekday: "long",
-      year: "numeric",
-      month: "long",
-      day: "numeric",
-    });
-
-    // Determine if Indonesian stock
-    const isIndonesian = ticker.toUpperCase().endsWith(".JK") || ticker.toUpperCase() === "^JKSE";
-    const tickerClean = ticker.replace(".JK", "");
-
-    const searchPrompt = isIndonesian
-      ? `Hari ini adalah ${today}. Cari dan analisis berita TERBARU tentang saham ${tickerClean} (${ticker}) di Bursa Efek Indonesia.
-
-Tugas:
-1. CARI berita terkini dari berbagai sumber (media keuangan, portal berita, X/Twitter)
-2. Fokus pada: laporan keuangan, aksi korporasi, berita sektor, sentimen pasar, rating analis
-3. Analisis dampak berita terhadap harga saham
-
-PENTING: Jika tidak ada berita terkini, cari informasi terbaru yang tersedia tentang perusahaan ini.`
-      : `Today is ${today}. Search and analyze the LATEST news about ${ticker}.
-
-Tasks:
-1. SEARCH for recent news from various sources (financial media, news portals, X/Twitter)
-2. Focus on: earnings, corporate actions, sector news, market sentiment, analyst ratings
-3. Analyze the impact on stock price
-
-IMPORTANT: If no recent news, find the most recent available information about this asset.`;
-
-    const response = await fetch("https://api.x.ai/v1/chat/completions", {
-      method: "POST",
+    // Call our internal Detik News API endpoint
+    const newsUrl = `${baseUrl}/api/news?ticker=${encodeURIComponent(ticker)}`;
+    
+    const response = await fetch(newsUrl, {
+      method: "GET",
       headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${GROK_API_KEY}`,
+        "Accept": "application/json",
       },
-      body: JSON.stringify({
-        model: "grok-3-latest",
-        messages: [
-          {
-            role: "system",
-            content: `You are a financial news analyst with real-time access to the latest news and social media. 
-Your job is to find and summarize the most recent news about stocks/assets.
-Always search for the latest information available.
-Be factual and cite sources when possible.
-Output in JSON format only, no markdown.`,
-          },
-          {
-            role: "user",
-            content: `${searchPrompt}
-
-Output JSON format (BAHASA INDONESIA untuk saham .JK, English untuk lainnya):
-{
-  "type": "BULLISH" | "BEARISH" | "NEUTRAL",
-  "headline": "Judul utama berita terpenting",
-  "description": "Rangkuman 2-3 kalimat tentang berita dan dampaknya ke harga saham",
-  "source": "Sumber berita (nama media/platform)",
-  "newsDate": "Tanggal berita jika diketahui",
-  "confidence": 0-100 (seberapa yakin dengan analisis sentiment)
-}`,
-          },
-        ],
-        temperature: 0.3,
-        stream: false,
-      }),
     });
 
     if (!response.ok) {
-      console.error("Grok API error:", response.status, await response.text());
+      console.error("Detik News API error:", response.status);
       return null;
     }
 
     const data = await response.json();
-    const content = data.choices?.[0]?.message?.content;
-
-    if (!content) return null;
-
-    // Parse JSON from response
-    const cleanContent = content.replace(/```json\n?|\n?```/g, "").trim();
-    const sentiment = JSON.parse(cleanContent);
-
-    return sentiment;
+    return data.sentiment || null;
   } catch (error) {
-    console.error("Grok news fetch error:", error);
+    console.error("Detik news fetch error:", error);
     return null;
   }
 }
@@ -115,10 +45,14 @@ async function analyzeStock(req, res) {
       return res.status(400).json({ error: "No data points provided" });
     }
 
-    // Fetch real-time news sentiment from Grok (parallel with Gemini)
-    const newsSentimentPromise = fetchNewsSentiment(ticker);
+    // Get base URL for internal API calls
+    const protocol = req.headers["x-forwarded-proto"] || "https";
+    const host = req.headers.host || "localhost:3000";
+    const baseUrl = `${protocol}://${host}`;
 
+    // Fetch news sentiment from Detik News API (parallel with Gemini)
     const isIndonesian = ticker.toUpperCase().endsWith(".JK") || ticker.toUpperCase() === "^JKSE";
+    const newsSentimentPromise = isIndonesian ? fetchNewsSentiment(ticker, baseUrl) : Promise.resolve(null);
 
     const strategyPrompt = isIndonesian
       ? `1. **Strategy:** LONG-ONLY (Spot Market). Do NOT suggest Short Selling.
@@ -183,25 +117,27 @@ async function analyzeStock(req, res) {
     const cleanText = text.replace(/```json\n?|\n?```/g, "").trim();
     const parsedResult = JSON.parse(cleanText);
 
-    // Wait for Grok news sentiment
-    const grokSentiment = await newsSentimentPromise;
+    // Wait for Detik news sentiment
+    const detikSentiment = await newsSentimentPromise;
 
-    // Merge Grok sentiment with Gemini analysis
-    if (grokSentiment) {
+    // Merge Detik sentiment with Gemini analysis
+    if (detikSentiment) {
       parsedResult.sentiment = {
-        type: grokSentiment.type || "NEUTRAL",
-        headline: grokSentiment.headline || "Tidak ada berita terkini",
-        description: grokSentiment.description || "Tidak ditemukan berita signifikan",
-        source: grokSentiment.source || "Grok AI (Real-time Search)",
-        newsDate: grokSentiment.newsDate || null,
-        confidence: grokSentiment.confidence || 50,
+        type: detikSentiment.type || "NEUTRAL",
+        headline: detikSentiment.headline || "Tidak ada berita terkini",
+        description: detikSentiment.description || "Tidak ditemukan berita signifikan",
+        source: detikSentiment.source || "Detik News",
+        newsDate: detikSentiment.newsDate || null,
+        confidence: detikSentiment.confidence || 50,
       };
     } else {
-      // Fallback sentiment if Grok is not available
+      // Fallback sentiment if Detik is not available or non-Indonesian stock
       parsedResult.sentiment = {
         type: "NEUTRAL",
-        headline: "Analisis berita tidak tersedia",
-        description: "Fitur pencarian berita real-time sedang tidak aktif. Analisis berdasarkan teknikal saja.",
+        headline: isIndonesian ? "Analisis berita tidak tersedia" : "News analysis not available for non-IDX stocks",
+        description: isIndonesian 
+          ? "Fitur pencarian berita sedang tidak aktif. Analisis berdasarkan teknikal saja."
+          : "News sentiment analysis is only available for Indonesian stocks (.JK). Technical analysis only.",
         source: "N/A",
       };
     }
