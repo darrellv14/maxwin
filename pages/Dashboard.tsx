@@ -383,6 +383,7 @@ const Dashboard: React.FC = () => {
               </>
             ) : (
               <>
+                {/* Top Stats */}
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                   <StatCard
                     label="Last Price"
@@ -413,61 +414,65 @@ const Dashboard: React.FC = () => {
                     }
                   />
                 </div>
+
+                {/* Chat Assistant (kalau kamu mau tetap di sini) */}
                 <AIChatAssistant />
+
+                {/* Main Financial Chart */}
                 <FinancialChart data={data} ticker={ticker} />
+
+                {/* 🔽 Oracle + Market Depth dipindah ke sini, tepat di bawah chart */}
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
+                  <OraclePanel analysis={analysis} loading={loadingAI} onAnalyze={handleAnalyze} />
+
+                  <div className="bg-terminal-gray border border-gray-800 rounded-lg p-4 sm:p-6">
+                    <h2 className="text-sm sm:text-lg font-bold font-mono text-white mb-3 sm:mb-4">
+                      MARKET DEPTH LOG
+                    </h2>
+                    <div className="overflow-x-auto -mx-4 sm:mx-0 px-4 sm:px-0">
+                      <table className="w-full text-left text-[10px] sm:text-xs font-mono min-w-[300px]">
+                        <thead className="border-b border-gray-700 text-gray-500">
+                          <tr>
+                            <th className="pb-2">DATE</th>
+                            <th className="pb-2">CLOSE</th>
+                            <th className="pb-2">RSI</th>
+                            <th className="pb-2 text-right">VOLUME</th>
+                          </tr>
+                        </thead>
+                        <tbody className="text-gray-300">
+                          {[...data]
+                            .reverse()
+                            .slice(0, 8)
+                            .map((d, i) => (
+                              <tr
+                                key={i}
+                                className="border-b border-gray-800/50 hover:bg-gray-800/50 transition-colors"
+                              >
+                                <td className="py-2 text-gray-500">{d.date}</td>
+                                <td className="py-2 font-bold">{d.close?.toFixed(0) ?? "-"}</td>
+                                <td
+                                  className={`py-2 ${
+                                    (d.rsi || 50) > 70
+                                      ? "text-red-400"
+                                      : (d.rsi || 50) < 30
+                                        ? "text-green-400"
+                                        : ""
+                                  }`}
+                                >
+                                  {d.rsi?.toFixed(1)}
+                                </td>
+                                <td className="py-2 text-right text-gray-400">
+                                  {d.volume?.toLocaleString() ?? "0"}
+                                </td>
+                              </tr>
+                            ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </div>
               </>
             )}
-          </div>
-        </div>
-
-        {/* Bottom Section */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
-          <OraclePanel analysis={analysis} loading={loadingAI} onAnalyze={handleAnalyze} />
-
-          <div className="bg-terminal-gray border border-gray-800 rounded-lg p-4 sm:p-6">
-            <h2 className="text-sm sm:text-lg font-bold font-mono text-white mb-3 sm:mb-4">
-              MARKET DEPTH LOG
-            </h2>
-            <div className="overflow-x-auto -mx-4 sm:mx-0 px-4 sm:px-0">
-              <table className="w-full text-left text-[10px] sm:text-xs font-mono min-w-[300px]">
-                <thead className="border-b border-gray-700 text-gray-500">
-                  <tr>
-                    <th className="pb-2">DATE</th>
-                    <th className="pb-2">CLOSE</th>
-                    <th className="pb-2">RSI</th>
-                    <th className="pb-2 text-right">VOLUME</th>
-                  </tr>
-                </thead>
-                <tbody className="text-gray-300">
-                  {[...data]
-                    .reverse()
-                    .slice(0, 8)
-                    .map((d, i) => (
-                      <tr
-                        key={i}
-                        className="border-b border-gray-800/50 hover:bg-gray-800/50 transition-colors"
-                      >
-                        <td className="py-2 text-gray-500">{d.date}</td>
-                        <td className="py-2 font-bold">{d.close?.toFixed(0) ?? "-"}</td>
-                        <td
-                          className={`py-2 ${
-                            (d.rsi || 50) > 70
-                              ? "text-red-400"
-                              : (d.rsi || 50) < 30
-                                ? "text-green-400"
-                                : ""
-                          }`}
-                        >
-                          {d.rsi?.toFixed(1)}
-                        </td>
-                        <td className="py-2 text-right text-gray-400">
-                          {d.volume?.toLocaleString() ?? "0"}
-                        </td>
-                      </tr>
-                    ))}
-                </tbody>
-              </table>
-            </div>
           </div>
         </div>
       </main>
