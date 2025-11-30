@@ -13,146 +13,62 @@ const STOCK_KEYWORDS = [
   "PERBANKAN", "PERTAMBANGAN", "PROPERTI", "ENERGI",
 ];
 
-// ============ DIRECT NEWS SCRAPER ============
-async function scrapeDetikNews(ticker, limit = 10) {
+// ============ FETCH NEWS FROM PYTHON API ============
+// Python urllib works better on Vercel than JS fetch for Detik
+async function fetchNewsFromPythonAPI(ticker, baseUrl) {
   const tickerClean = ticker.replace(".JK", "").toUpperCase();
-  const isIHSG = ["IHSG", "^JKSE", "JKSE"].includes(tickerClean);
-  
-  // Simple search - just use ticker directly
-  const searchQuery = isIHSG ? "IHSG bursa saham" : tickerClean;
   
   try {
-    const searchUrl = `https://www.detik.com/search/searchall?query=${encodeURIComponent(searchQuery)}`;
-    console.log(`[NEWS] Scraping: ${searchUrl}`);
+    // Use absolute URL to Python news API
+    const newsUrl = `${baseUrl}/api/news?ticker=${encodeURIComponent(tickerClean)}`;
+    console.log(`[NEWS] Fetching from Python API: ${newsUrl}`);
     
-    const response = await fetch(searchUrl, {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 8000); // 8 second timeout
+    
+    const response = await fetch(newsUrl, {
+      method: "GET",
       headers: {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
-        "Accept-Language": "id-ID,id;q=0.9,en-US;q=0.8,en;q=0.7",
+        "Accept": "application/json",
       },
+      signal: controller.signal,
     });
     
-    console.log(`[NEWS] Response status: ${response.status}`);
+    clearTimeout(timeoutId);
+    
+    console.log(`[NEWS] Python API status: ${response.status}`);
     
     if (!response.ok) {
-      console.error(`[NEWS] Detik search failed: ${response.status}`);
+      console.error(`[NEWS] Python API error: ${response.status}`);
       return [];
     }
     
-    const html = await response.text();
-    console.log(`[NEWS] HTML length: ${html.length}`);
-    
-    // Extract articles from search results
-    const articles = [];
-    const seenLinks = new Set();
-    
-    // More robust patterns for Detik search results
-    // Pattern 1: media__title links
-    const pattern1 = /href="(https:\/\/[^"]*detik\.com[^"]+)"[^>]*>\s*([^<]{10,}?)\s*<\/a>/gi;
-    
-    let match;
-    let matchCount = 0;
-    
-    while ((match = pattern1.exec(html)) !== null && articles.length < limit) {
-      matchCount++;
-      const [, link, title] = match;
-      
-      // Skip non-article links
-      if (!link.includes('/d-') && !link.includes('/read/')) continue;
-      if (seenLinks.has(link)) continue;
-      
-      const titleClean = title.replace(/\s+/g, ' ').trim();
-      
-      // Skip very short titles (likely not article titles)
-      if (titleClean.length < 20) continue;
-      
-      const isFinance = link.toLowerCase().includes("finance.detik.com");
-      
-      // For IHSG: needs stock keywords or be from finance
-      // For stocks: just take from finance.detik.com or has stock keywords
-      const hasKeyword = STOCK_KEYWORDS.some(kw => titleClean.toUpperCase().includes(kw));
-      
-      if (!hasKeyword && !isFinance) continue;
-      
-      seenLinks.add(link);
-      
-      // Fetch content for top 3 articles
-      let konten = "";
-      if (articles.length < 3) {
-        try {
-          konten = await fetchArticleContent(link);
-        } catch (e) {
-          console.error(`[NEWS] Content fetch error:`, e.message);
-        }
-      }
-      
-      articles.push({
-        judul: titleClean,
-        link,
-        konten,
-        source: isFinance ? "Detik Finance" : "Detik",
-      });
-      
-      console.log(`[NEWS] Found: ${titleClean.slice(0, 50)}...`);
-    }
-    
-    console.log(`[NEWS] Total matches: ${matchCount}, Articles: ${articles.length}`);
-    return articles;
+    const data = await response.json();
+    console.log(`[NEWS] Got ${data.articles?.length || 0} articles from Python API`);
+    return data.articles || [];
   } catch (error) {
-    console.error("[NEWS] Scrape error:", error.message || error);
+    if (error.name === 'AbortError') {
+      console.error('[NEWS] Python API timeout');
+    } else {
+      console.error('[NEWS] Python API error:', error.message);
+    }
     return [];
   }
 }
 
-async function fetchArticleContent(url) {
-  try {
-    const response = await fetch(url, {
-      headers: {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-        "Accept": "text/html",
-      },
-    });
-    
-    if (!response.ok) return "";
-    
-    const html = await response.text();
-    
-    // Extract paragraphs with substantial content
-    const paragraphs = [];
-    const pRegex = /<p[^>]*>([^<]{50,})<\/p>/g;
-    let match;
-    
-    while ((match = pRegex.exec(html)) !== null && paragraphs.length < 2) {
-      const text = match[1].replace(/\s+/g, ' ').trim();
-      // Skip navigation/footer text
-      if (text.length > 50 && 
-          !text.toLowerCase().includes('baca juga') && 
-          !text.toLowerCase().includes('simak video') &&
-          !text.toLowerCase().includes('saksikan')) {
-        paragraphs.push(text);
-      }
-    }
-    
-    return paragraphs.join(' ').slice(0, 400);
-  } catch (error) {
-    return "";
-  }
-}
-
 // ============ ANALYZE NEWS WITH GEMINI ============
-async function analyzeNewsWithGemini(articles, ticker, isIHSGFallback = false) {
+async function analyzeNewsWithGemini(articles, ticker, baseUrl = null, isIHSGFallback = false) {
   if (!articles || articles.length === 0) {
-    // If no articles, try IHSG fallback
-    if (!isIHSGFallback) {
-      console.log(`No articles for ${ticker}, trying IHSG fallback...`);
+    // If no articles and we have baseUrl, try IHSG fallback
+    if (baseUrl && !isIHSGFallback) {
+      console.log(`[NEWS] No articles for ${ticker}, trying IHSG fallback...`);
       try {
-        const ihsgArticles = await scrapeDetikNews("IHSG", 10);
+        const ihsgArticles = await fetchNewsFromPythonAPI("IHSG", baseUrl);
         if (ihsgArticles && ihsgArticles.length > 0) {
-          return analyzeNewsWithGemini(ihsgArticles, "IHSG", true);
+          return analyzeNewsWithGemini(ihsgArticles, "IHSG", baseUrl, true);
         }
       } catch (e) {
-        console.error("IHSG fallback error:", e);
+        console.error("[NEWS] IHSG fallback error:", e);
       }
     }
     
@@ -257,16 +173,16 @@ Output dalam format JSON (tanpa markdown code block):
       try {
         const ihsgArticles = await scrapeDetikNews("IHSG", 10);
         if (ihsgArticles && ihsgArticles.length > 0) {
-          return analyzeNewsWithGemini(ihsgArticles, "IHSG", true);
+          return analyzeNewsWithGemini(ihsgArticles, "IHSG", baseUrl, true);
         }
       } catch (e) {
-        console.error("IHSG fallback error:", e);
+        console.error("[NEWS] IHSG fallback error:", e);
       }
     }
 
     return sentiment;
   } catch (error) {
-    console.error("Gemini news analysis error:", error);
+    console.error("[NEWS] Gemini analysis error:", error);
     // Fallback to first article
     return {
       type: "NEUTRAL",
@@ -295,9 +211,18 @@ async function analyzeStock(req, res) {
       return res.status(400).json({ error: "No data points provided" });
     }
 
-    // Scrape news directly (no self-fetch which causes issues on Vercel)
+    // Get base URL for internal API calls
+    let protocol = req.headers["x-forwarded-proto"] || "https";
+    if (protocol.includes(",")) {
+      protocol = protocol.split(",")[0].trim();
+    }
+    const host = req.headers.host || req.headers["x-forwarded-host"] || "moocuan.darrellvalentino.com";
+    const baseUrl = `${protocol}://${host}`;
+    console.log(`[AI] Base URL: ${baseUrl}`);
+
+    // Fetch news from Python API (more reliable on Vercel)
     const isIndonesian = ticker.toUpperCase().endsWith(".JK") || ticker.toUpperCase() === "^JKSE";
-    const newsArticlesPromise = isIndonesian ? scrapeDetikNews(ticker, 10) : Promise.resolve([]);
+    const newsArticlesPromise = isIndonesian ? fetchNewsFromPythonAPI(ticker, baseUrl) : Promise.resolve([]);
 
     const strategyPrompt = isIndonesian
       ? `1. **Strategy:** LONG-ONLY (Spot Market). Do NOT suggest Short Selling.
@@ -364,7 +289,8 @@ async function analyzeStock(req, res) {
 
     // Wait for news articles, then analyze with Gemini
     const newsArticles = await newsArticlesPromise;
-    const newsSentiment = await analyzeNewsWithGemini(newsArticles, ticker);
+    console.log(`[AI] Got ${newsArticles.length} news articles`);
+    const newsSentiment = await analyzeNewsWithGemini(newsArticles, ticker, baseUrl);
 
     // Merge news sentiment with technical analysis
     parsedResult.sentiment = {
