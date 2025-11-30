@@ -49,7 +49,6 @@ const initDb = async () => {
       )
     `);
 
-    // 🔥 IMPORTANT: kalau tabel lama sudah terlanjur ada, tambahkan kolom yang kurang
     await pool.query(`
       ALTER TABLE portfolio_transactions
       ADD COLUMN IF NOT EXISTS shares       DECIMAL(15, 4) NOT NULL DEFAULT 0,
