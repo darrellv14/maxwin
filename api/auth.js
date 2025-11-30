@@ -166,7 +166,6 @@ const initDb = async () => {
   }
 };
 
-// Initialize on module load
 initDb();
 
 // Auth API handler
