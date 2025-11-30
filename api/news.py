@@ -57,7 +57,7 @@ class DetikScraper:
 
     @staticmethod
     def _parse_articles(html, ticker, limit):
-        """Parse articles from Detik HTML and filter by relevance to ticker"""
+        """Parse articles from Detik HTML - return all stock-related news for Gemini to analyze"""
         articles = []
         ticker_upper = ticker.upper().replace(".JK", "")
 
@@ -92,70 +92,60 @@ class DetikScraper:
         if ticker_upper in company_names:
             search_terms.extend(company_names[ticker_upper])
 
-        # Pattern to extract articles - multiple patterns for robustness
-        patterns = [
-            # Main pattern for media__title
-            r'<h3[^>]*class="[^"]*media__title[^"]*"[^>]*>\s*<a[^>]*href="([^"]+)"[^>]*>([^<]+)</a>',
-            # Alternative pattern with title attribute
-            r'<a[^>]*href="(https?://[^"]*(?:finance|news)\.detik\.com/[^"]+)"[^>]*title="([^"]+)"',
-            # Pattern for list items
-            r'<article[^>]*>.*?<a[^>]*href="([^"]*detik\.com[^"]*)"[^>]*>([^<]+)</a>',
-        ]
+        # General stock market keywords - always relevant for context
+        stock_keywords = ["IHSG", "BURSA", "BEI", "SAHAM", "INVESTOR", "ASING", "EMITEN", "DIVIDEN", "LABA", "RUGI"]
 
+        # Pattern to extract articles
+        pattern = r'media__title[^>]*>\s*<a[^>]*href="([^"]+)"[^>]*>([^<]+)</a>'
+        
         # Date pattern
-        date_pattern = (
-            r'<div[^>]*class="[^"]*media__date[^"]*"[^>]*>.*?<span[^>]*>([^<]+)</span>'
-        )
+        date_pattern = r'<div[^>]*class="[^"]*media__date[^"]*"[^>]*>.*?<span[^>]*>([^<]+)</span>'
         dates = re.findall(date_pattern, html, re.DOTALL | re.IGNORECASE)
 
-        all_matches = []
-        for pattern in patterns:
-            matches = re.findall(pattern, html, re.DOTALL | re.IGNORECASE)
-            all_matches.extend(matches)
+        matches = re.findall(pattern, html, re.DOTALL | re.IGNORECASE)
 
-        # Remove duplicates based on link
-        seen_links = set()
-        unique_matches = []
-        for link, title in all_matches:
-            if link not in seen_links:
-                seen_links.add(link)
-                unique_matches.append((link, title))
+        # Separate into ticker-specific and general market news
+        ticker_news = []
+        market_news = []
 
-        date_idx = 0
-        for link, title in unique_matches:
-            if len(articles) >= limit:
-                break
-
+        for i, (link, title) in enumerate(matches):
             title_clean = title.strip()
             title_clean = re.sub(r"\s+", " ", title_clean)
             title_upper = title_clean.upper()
 
-            # Check if article is relevant to the ticker
-            is_relevant = False
+            article = {
+                "judul": title_clean,
+                "link": link.strip(),
+                "waktu": dates[i].strip() if i < len(dates) else "",
+            }
+
+            # Check if directly about ticker
+            is_ticker_specific = False
             for term in search_terms:
                 if term.upper() in title_upper:
-                    is_relevant = True
+                    is_ticker_specific = True
                     break
 
-            # Also include general stock market news for IHSG
-            if ticker_upper in ["IHSG", "^JKSE"]:
-                stock_keywords = ["IHSG", "BURSA", "BEI", "SAHAM", "INVESTOR", "ASING"]
-                for kw in stock_keywords:
-                    if kw in title_upper:
-                        is_relevant = True
-                        break
+            # Check if general stock news
+            is_stock_news = False
+            for kw in stock_keywords:
+                if kw in title_upper:
+                    is_stock_news = True
+                    break
 
-            if is_relevant:
-                article = {
-                    "judul": title_clean,
-                    "link": link.strip(),
-                    "waktu": dates[date_idx].strip() if date_idx < len(dates) else "",
-                }
-                articles.append(article)
+            if is_ticker_specific:
+                ticker_news.append(article)
+            elif is_stock_news:
+                market_news.append(article)
 
-            date_idx += 1
+        # Prioritize ticker-specific news, then add general market news
+        # Return mix: up to limit articles (prefer ticker news)
+        result = ticker_news[:limit]
+        remaining = limit - len(result)
+        if remaining > 0:
+            result.extend(market_news[:remaining])
 
-        return articles
+        return result
 
 
 class handler(BaseHTTPRequestHandler):
