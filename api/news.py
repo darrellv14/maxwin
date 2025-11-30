@@ -91,9 +91,31 @@ class DetikScraper:
     ]
 
     @staticmethod
+    def _article_has_saham_tag(url, headers, ctx, timeout=5):
+        """
+        Cek ke halaman artikel Detik dan pastikan di bagian Tag ada 'saham'.
+        Implementasi simpel: cek apakah ada link ke /tag/saham di HTML.
+        """
+        try:
+            req = urllib.request.Request(url, headers=headers)
+            with urllib.request.urlopen(req, context=ctx, timeout=timeout) as resp:
+                html = resp.read().decode("utf-8", "ignore").lower()
+
+            # Di footer artikel Detik, setiap tag adalah link ke /tag/<slug>
+            # Contoh: ... <a href="https://www.detik.com/tag/saham">saham</a> ...
+            # Jadi cukup cek substring /tag/saham di HTML.
+            return "/tag/saham" in html
+        except Exception as e:
+            print(f"Tag check error for {url}: {e}")
+            return False
+
+    @staticmethod
     def get_stock_news(ticker, limit=10):
         """
         Fetch news from multiple Detik sources - tag page, finance search, general search.
+        - Layer 1: /tag/{ticker} lalu filter lagi hanya artikel yang juga punya tag 'saham'
+        - Layer 2: finance.detik.com search
+        - Layer 3: general search (detik.com/search)
         """
         try:
             ctx = ssl.create_default_context()
@@ -101,65 +123,101 @@ class DetikScraper:
             ctx.verify_mode = ssl.CERT_NONE
 
             headers = {
-                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-                "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
+                "User-Agent": (
+                    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                    "AppleWebKit/537.36 (KHTML, like Gecko) "
+                    "Chrome/120.0.0.0 Safari/537.36"
+                ),
+                "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,"
+                "image/webp,*/*;q=0.8",
                 "Accept-Language": "id-ID,id;q=0.9,en-US;q=0.8,en;q=0.7",
             }
 
             articles = []
             existing_links = set()
 
-            # 1. FIRST: Try tag page (most reliable for specific tickers like BREN)
+            # =======================
+            # 1. TAG PAGE: /tag/{ticker}
+            # =======================
+            # Misal /tag/bren akan berisi list berita terkait BREN. Kita ambil kandidat,
+            # lalu untuk setiap artikel cek apakah halaman detailnya punya TAG 'saham'.
             tag_url = f"https://www.detik.com/tag/{ticker.lower()}"
             try:
                 req = urllib.request.Request(tag_url, headers=headers)
                 with urllib.request.urlopen(req, context=ctx, timeout=8) as response:
-                    html = response.read().decode("utf-8")
-                tag_articles = DetikScraper._parse_articles(
-                    html, ticker, limit, strict=False
+                    html = response.read().decode("utf-8", "ignore")
+
+                # Ambil kandidat lebih banyak sedikit karena nanti difilter lagi
+                max_candidates = min(limit * 2, 20)
+                tag_candidates = DetikScraper._parse_articles(
+                    html, ticker, max_candidates, strict=False
                 )
-                for art in tag_articles:
-                    if art["link"] not in existing_links:
-                        existing_links.add(art["link"])
+
+                for art in tag_candidates:
+                    if len(articles) >= limit:
+                        break
+
+                    link = art["link"].strip()
+                    if link in existing_links:
+                        continue
+
+                    # Hanya ambil artikel yang juga punya tag 'saham'
+                    if DetikScraper._article_has_saham_tag(link, headers, ctx):
+                        existing_links.add(link)
                         articles.append(art)
+
             except Exception as e:
                 print(f"Tag page error: {e}")
 
-            # 2. SECOND: Search on finance.detik.com
+            # =======================
+            # 2. FINANCE SEARCH
+            # =======================
             if len(articles) < limit:
-                search_url = f"{DetikScraper.FINANCE_URL}?query={urllib.parse.quote(ticker + ' saham')}&siteid=2"
+                search_url = (
+                    f"{DetikScraper.FINANCE_URL}"
+                    f"?query={urllib.parse.quote(ticker + ' saham')}&siteid=2"
+                )
                 try:
                     req = urllib.request.Request(search_url, headers=headers)
-                    with urllib.request.urlopen(
-                        req, context=ctx, timeout=8
-                    ) as response:
-                        html = response.read().decode("utf-8")
+                    with urllib.request.urlopen(req, context=ctx, timeout=8) as response:
+                        html = response.read().decode("utf-8", "ignore")
+
                     finance_articles = DetikScraper._parse_articles(
                         html, ticker, limit - len(articles), strict=True
                     )
                     for art in finance_articles:
-                        if art["link"] not in existing_links:
-                            existing_links.add(art["link"])
+                        link = art["link"].strip()
+                        if link not in existing_links:
+                            existing_links.add(link)
                             articles.append(art)
+                            if len(articles) >= limit:
+                                break
                 except Exception as e:
                     print(f"Finance search error: {e}")
 
-            # 3. THIRD: General search with stricter filter
-            if len(articles) < 5:
-                search_url2 = f"{DetikScraper.SEARCH_URL}?query={urllib.parse.quote(ticker + ' saham bursa')}"
+            # =======================
+            # 3. GENERAL SEARCH
+            # =======================
+            if len(articles) < limit:
+                search_url2 = (
+                    f"{DetikScraper.SEARCH_URL}"
+                    f"?query={urllib.parse.quote(ticker + ' saham bursa')}"
+                )
                 try:
                     req = urllib.request.Request(search_url2, headers=headers)
-                    with urllib.request.urlopen(
-                        req, context=ctx, timeout=8
-                    ) as response:
-                        html = response.read().decode("utf-8")
+                    with urllib.request.urlopen(req, context=ctx, timeout=8) as response:
+                        html = response.read().decode("utf-8", "ignore")
+
                     more_articles = DetikScraper._parse_articles(
                         html, ticker, limit - len(articles), strict=True
                     )
                     for art in more_articles:
-                        if art["link"] not in existing_links:
-                            existing_links.add(art["link"])
+                        link = art["link"].strip()
+                        if link not in existing_links:
+                            existing_links.add(link)
                             articles.append(art)
+                            if len(articles) >= limit:
+                                break
                 except Exception as e:
                     print(f"General search error: {e}")
 
@@ -171,16 +229,16 @@ class DetikScraper:
 
     @staticmethod
     def _parse_articles(html, ticker, limit, strict=True):
-        """Parse articles - filter for stock/finance news"""
+        """Parse articles - filter untuk berita saham/keuangan."""
         articles = []
         ticker_upper = ticker.upper().replace(".JK", "")
 
-        # Company name mappings
+        # Company name mappings - include full names for better matching
         company_names = {
-            "BBCA": ["BCA", "BANK CENTRAL ASIA"],
-            "BBRI": ["BRI", "BANK RAKYAT INDONESIA", "BANK BRI"],
+            "BBCA": ["BCA", "BANK CENTRAL ASIA", "CENTRAL ASIA"],
+            "BBRI": ["BRI", "BANK RAKYAT INDONESIA", "BANK BRI", "RAKYAT INDONESIA"],
             "BMRI": ["MANDIRI", "BANK MANDIRI"],
-            "BBNI": ["BNI", "BANK NEGARA INDONESIA"],
+            "BBNI": ["BNI", "BANK NEGARA INDONESIA", "NEGARA INDONESIA"],
             "TLKM": ["TELKOM", "TELEKOMUNIKASI INDONESIA"],
             "ASII": ["ASTRA", "ASTRA INTERNATIONAL"],
             "UNVR": ["UNILEVER"],
@@ -247,7 +305,7 @@ class DetikScraper:
             # Check if about this specific ticker/company
             is_about_ticker = any(term in title_upper for term in search_terms)
 
-            # If from tag page (strict=False), accept if about ticker
+            # Jika strict=False (tag page), cukup cek tentang tickernya
             if not strict and is_about_ticker:
                 article = {
                     "judul": title_clean,
@@ -267,7 +325,7 @@ class DetikScraper:
 
             # Check if mentions any konglomerat (business news indicator)
             mentions_konglomerat = False
-            for konglo, names in DetikScraper.KONGLOMERAT.items():
+            for _, names in DetikScraper.KONGLOMERAT.items():
                 if any(name.upper() in title_upper for name in names):
                     mentions_konglomerat = True
                     break
@@ -324,19 +382,21 @@ class handler(BaseHTTPRequestHandler):
             # Clean ticker for search
             ticker_clean = ticker.upper().replace(".JK", "")
 
-            # Fetch stock news from Detik (filtered by saham tag)
+            # Fetch stock news from Detik (filtered)
             articles = DetikScraper.get_stock_news(ticker_clean, limit=10)
 
-            # Return raw articles - let ai.js handle sentiment analysis with Gemini
+            # Return raw articles - AI di frontend yang analisis (Gemini, dsb)
             self.send_response(200)
             self.send_header("Content-Type", "application/json")
             self.send_header("Access-Control-Allow-Origin", "*")
-            self.send_header("Cache-Control", "public, max-age=300")  # Cache 5 minutes
+            self.send_header("Cache-Control", "no-cache, no-store, must-revalidate")
+            self.send_header("Pragma", "no-cache")
+            self.send_header("Expires", "0")
             self.end_headers()
 
             response = {
                 "ticker": ticker,
-                "articles": articles,  # Return all articles for AI analysis
+                "articles": articles,
                 "count": len(articles),
                 "timestamp": datetime.now().isoformat(),
             }
