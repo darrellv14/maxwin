@@ -4,6 +4,15 @@ import { setSecurityHeaders, rateLimit, sanitizeInput } from "./security.js";
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "");
 
 // ============ NEWS SCRAPING FROM DETIK ============
+const DETIK_HEADERS = {
+  "User-Agent":
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+  "Accept":
+    "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
+  "Accept-Language": "id-ID,id;q=0.9,en-US;q=0.8,en;q=0.7",
+  "Referer": "https://www.detik.com/",
+};
+
 const COMPANY_NAMES = {
   BBCA: ["BCA", "BANK CENTRAL ASIA"],
   BBRI: ["BRI", "BANK RAKYAT INDONESIA"],
@@ -20,6 +29,30 @@ const COMPANY_NAMES = {
   INCO: ["VALE", "INCO"],
 };
 
+async function fetchWithTimeout(url, timeoutMs = 10000) {
+  const controller =
+    typeof AbortController !== "undefined" ? new AbortController() : null;
+
+  const timeoutId =
+    controller != null
+      ? setTimeout(() => controller.abort(), timeoutMs)
+      : null;
+
+  try {
+    const res = await fetch(url, {
+      headers: DETIK_HEADERS,
+      signal: controller ? controller.signal : undefined,
+    });
+
+    return res;
+  } catch (err) {
+    console.error(`[NEWS] Fetch error for ${url}:`, err.message || err);
+    return null;
+  } finally {
+    if (timeoutId != null) clearTimeout(timeoutId);
+  }
+}
+
 function isRelevantTitle(title, ticker) {
   const titleUpper = title.toUpperCase();
   const tickerClean = ticker.replace(".JK", "").toUpperCase();
@@ -32,107 +65,174 @@ function isRelevantTitle(title, ticker) {
 
 async function fetchArticleContent(url) {
   try {
-    const response = await fetch(url, {
-      headers: {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-      },
-      signal: AbortSignal.timeout(7000),
-    });
-    
-    if (!response.ok) return "";
-    
+    const response = await fetchWithTimeout(url, 7000);
+    if (!response || !response.ok) return "";
+
     const html = await response.text();
-    const contentMatch = html.match(/<div[^>]*class="[^"]*detail__body-text[^"]*"[^>]*>([\s\S]*?)<\/div>/i);
-    
+    const contentMatch = html.match(
+      /<div[^>]*class="[^"]*detail__body-text[^"]*"[^>]*>([\s\S]*?)<\/div>/i
+    );
+
     if (!contentMatch) return "";
-    
+
     let content = contentMatch[1]
-      .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, "")
+      .replace(
+        /<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi,
+        ""
+      )
       .replace(/<style\b[^<]*(?:(?!<\/style>)<[^<]*)*<\/style>/gi, "")
       .replace(/<[^>]+>/g, " ")
       .replace(/\s+/g, " ")
       .trim();
-    
+
     return content.substring(0, 500);
   } catch (error) {
+    console.error("[NEWS] Error parsing article content:", error.message);
     return "";
   }
 }
 
+function extractArticlesFromHtml(html, tickerClean, limit, seen) {
+  const articles = [];
+  const articleBlockPattern = /<article[^>]*>([\s\S]*?)<\/article>/gi;
+
+  let match;
+  while (
+    (match = articleBlockPattern.exec(html)) &&
+    articles.length < limit
+  ) {
+    const articleHtml = match[1];
+
+    // Ambil <a href="...">...</a> pertama di dalam <article>
+    const aMatch = articleHtml.match(
+      /<a[^>]*href="([^"]+)"[^>]*>([\s\S]*?)<\/a>/i
+    );
+    if (!aMatch) continue;
+
+    const link = aMatch[1];
+    if (!link.includes("detik.com")) continue;
+    if (seen.has(link)) continue;
+
+    // Bersihin inner HTML jadi text
+    let rawTitle = aMatch[2] || "";
+    const title = rawTitle
+      .replace(/<[^>]+>/g, " ")
+      .replace(/\s+/g, " ")
+      .trim();
+    if (!title) continue;
+
+    // Filter relevansi berdasarkan ticker/company
+    if (!isRelevantTitle(title, tickerClean)) continue;
+
+    const isFinance = link.includes("finance.detik.com");
+
+    articles.push({
+      judul: title,
+      link,
+      source: isFinance ? "Detik Finance" : "Detik",
+    });
+
+    seen.add(link);
+  }
+
+  return articles;
+}
+
 async function scrapeDetikNews(ticker, limit = 8) {
   const tickerClean = ticker.replace(".JK", "").toUpperCase();
-  const searchUrl = `https://www.detik.com/search/searchnews?query=${encodeURIComponent(tickerClean)}`;
-  
-  console.log(`[NEWS] Scraping: ${searchUrl}`);
-  
-  try {
-    const response = await fetch(searchUrl, {
-      headers: {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-      },
-      signal: AbortSignal.timeout(10000),
-    });
-    
-    if (!response.ok) {
-      console.error(`[NEWS] HTTP ${response.status}`);
-      return [];
-    }
-    
-    const html = await response.text();
-    const articles = [];
-    const seen = new Set();
-    
-    const articleBlockPattern = /<article[^>]*>([\s\S]*?)<\/article>/gi;
-    const linkPattern = /<a[^>]*href="([^"]+)"[^>]*>/i;
-    const titlePattern = /<h3[^>]*class="[^"]*media__title[^"]*"[^>]*>([^<]+)<\/h3>/i;
-    
-    const articleBlocks = [...html.matchAll(articleBlockPattern)];
-    console.log(`[NEWS] Found ${articleBlocks.length} article blocks`);
-    
-    for (const block of articleBlocks) {
-      if (articles.length >= limit) break;
-      
-      const articleHtml = block[1];
-      const linkMatch = articleHtml.match(linkPattern);
-      const titleMatch = articleHtml.match(titlePattern);
-      
-      if (!linkMatch || !titleMatch) continue;
-      
-      const link = linkMatch[1];
-      const title = titleMatch[1].trim();
-      
-      if (seen.has(link)) continue;
-      seen.add(link);
-      
-      const isFinance = link.includes("finance.detik.com");
-      
-      if (!isRelevantTitle(title, tickerClean)) {
-        continue;
-      }
-      
-      articles.push({
-        judul: title,
-        link: link,
-        source: isFinance ? "Detik Finance" : "Detik",
-      });
-    }
-    
-    // Fetch content for first 3 articles
-    if (articles.length > 0) {
-      console.log(`[NEWS] Fetching content for ${Math.min(3, articles.length)} articles`);
-      const contentPromises = articles.slice(0, 3).map(async (article, index) => {
-        const content = await fetchArticleContent(article.link);
-        articles[index].konten = content;
-      });
-      await Promise.all(contentPromises);
-    }
-    
-    console.log(`[NEWS] Scraped ${articles.length} articles`);
-    return articles;
-  } catch (error) {
-    console.error(`[NEWS] Error:`, error.message);
-    return [];
+  const seen = new Set();
+  const articles = [];
+
+  console.log(`[NEWS] Starting scrapeDetikNews for ${tickerClean}`);
+
+  // 1) Coba TAG page dulu: https://www.detik.com/tag/{ticker}
+  const tagUrl = `https://www.detik.com/tag/${tickerClean.toLowerCase()}`;
+  const tagRes = await fetchWithTimeout(tagUrl, 8000);
+  if (tagRes && tagRes.ok) {
+    const tagHtml = await tagRes.text();
+    const fromTag = extractArticlesFromHtml(
+      tagHtml,
+      tickerClean,
+      limit,
+      seen
+    );
+    console.log(
+      `[NEWS] Tag page ${tagUrl} → ${fromTag.length} artikel relevan`
+    );
+    articles.push(...fromTag);
+  } else {
+    console.error(
+      `[NEWS] Tag page error ${tagUrl}:`,
+      tagRes && tagRes.status
+    );
   }
+
+  // 2) Kalau masih kurang, coba finance.detik.com search
+  if (articles.length < limit) {
+    const financeUrl = `https://finance.detik.com/search/searchall?query=${encodeURIComponent(
+      tickerClean + " saham"
+    )}&siteid=2`;
+
+    const financeRes = await fetchWithTimeout(financeUrl, 8000);
+    if (financeRes && financeRes.ok) {
+      const financeHtml = await financeRes.text();
+      const fromFinance = extractArticlesFromHtml(
+        financeHtml,
+        tickerClean,
+        limit - articles.length,
+        seen
+      );
+      console.log(
+        `[NEWS] Finance search ${financeUrl} → ${fromFinance.length} artikel relevan`
+      );
+      articles.push(...fromFinance);
+    } else {
+      console.error(
+        `[NEWS] Finance search error ${financeUrl}:`,
+        financeRes && financeRes.status
+      );
+    }
+  }
+
+  // 3) Kalau masih kosong banget, baru general search
+  if (articles.length < Math.min(limit, 3)) {
+    const searchUrl = `https://www.detik.com/search/searchnews?query=${encodeURIComponent(
+      tickerClean + " saham bursa"
+    )}`;
+
+    const searchRes = await fetchWithTimeout(searchUrl, 8000);
+    if (searchRes && searchRes.ok) {
+      const searchHtml = await searchRes.text();
+      const fromSearch = extractArticlesFromHtml(
+        searchHtml,
+        tickerClean,
+        limit - articles.length,
+        seen
+      );
+      console.log(
+        `[NEWS] General search ${searchUrl} → ${fromSearch.length} artikel relevan`
+      );
+      articles.push(...fromSearch);
+    } else {
+      console.error(
+        `[NEWS] General search error ${searchUrl}:`,
+        searchRes && searchRes.status
+      );
+    }
+  }
+
+  // Fetch content for first 3 articles
+  if (articles.length > 0) {
+    console.log(`[NEWS] Fetching content for ${Math.min(3, articles.length)} articles`);
+    const contentPromises = articles.slice(0, 3).map(async (article, index) => {
+      const content = await fetchArticleContent(article.link);
+      articles[index].konten = content;
+    });
+    await Promise.all(contentPromises);
+  }
+
+  console.log(`[NEWS] Total scraped for ${tickerClean}: ${articles.length}`);
+  return articles.slice(0, limit);
 }
 
 // ============ FETCH NEWS AND ANALYZE SENTIMENT ============
@@ -163,6 +263,11 @@ async function fetchAndAnalyzeNews(ticker) {
     console.error("[NEWS] Error:", error.message);
     return null;
   }
+}
+
+// Stub for fetchNewsSentiment to prevent ReferenceError on /api/ai?action=news
+async function fetchNewsSentiment(ticker) {
+  return fetchAndAnalyzeNews(ticker);
 }
 
 // Analyze news sentiment with Gemini
