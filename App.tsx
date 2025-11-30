@@ -2,6 +2,7 @@ import React, { useEffect } from "react";
 import { BrowserRouter as Router, Routes, Route, useLocation } from "react-router-dom";
 import Dashboard from "./pages/Dashboard";
 import History from "./pages/History";
+import Portfolio from "./pages/Portfolio";
 import AIPicksPage from "./pages/AIPicksPage";
 import NotFound from "./pages/NotFound";
 import Login from "./pages/Login";
@@ -39,6 +40,14 @@ const AppContent: React.FC = () => {
           element={
             <ProtectedRoute>
               <History />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/portfolio"
+          element={
+            <ProtectedRoute>
+              <Portfolio />
             </ProtectedRoute>
           }
         />

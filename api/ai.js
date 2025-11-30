@@ -405,8 +405,13 @@ async function analyzeStock(req, res) {
 
     const strategyPrompt = isIndonesian
       ? `1. **Strategy:** LONG-ONLY (Spot Market). Do NOT suggest Short Selling.
-         - If Bearish: Signal 'SELL' (Exit holdings) or 'WAIT'. Set Entry/TP/SL to 'N/A' or describe support levels to watch.
-         - If Bullish: Signal 'BUY'. Provide Entry, SL, TP.`
+         - If Bullish: Signal 'BUY'. Provide clear Entry zone, SL, and TP levels.
+         - If Bearish/Sideways: Signal 'WAIT' (NOT HOLD). 
+           * For WAIT signal: Provide WATCHLIST LEVELS instead of N/A:
+             - Entry: "Tunggu breakout di atas [resistance]" atau "Entry jika harga turun ke [support]"
+             - Stop Loss: "Di bawah [key support level]"
+             - Take Profit: "Target [resistance level] atau [psychological level]"
+           * Make it actionable - give traders levels to monitor!`
       : `1. **Strategy:** LONG & SHORT (Margin/Futures Market).
          - If Bullish: Signal 'BUY'. Entry < TP.
          - If Bearish: Signal 'SELL' (Short Sell). Entry > TP. Label targets clearly as 'Target (Downside)'.`;
@@ -436,6 +441,7 @@ async function analyzeStock(req, res) {
       2. **Pattern Recognition:** Search for Cup and Handle, Head and Shoulders, Double Bottom/Top, Flags, Triangles. 
          - ONLY report a pattern if you are >80% confident.
          - Fallback: If no clear pattern, focus on Trend and Support/Resistance.
+      3. **NEVER USE 'N/A' for Entry/SL/TP!** Always provide actionable price levels or ranges based on support/resistance.
 
       Task:
       Provide a trading signal based on TECHNICAL ANALYSIS ONLY.
@@ -443,12 +449,13 @@ async function analyzeStock(req, res) {
       
       JSON Schema:
       {
-        "signal": "BUY" | "SELL" | "HOLD",
+        "signal": "BUY" | "SELL" | "WAIT",
         "confidence": number, // 0-100 based on technical indicators only
-        "entryArea": "string range, e.g., '150.00 - 152.50'",
-        "stopLoss": "string value, e.g., '145.00'",
-        "takeProfit1": "string value, e.g., '160.00'",
-        "takeProfit2": "string value, e.g., '175.00'",
+        "confidence": number, // 0-100 based on technical indicators only
+        "entryArea": "string range OR watchlist instruction, e.g., '150.00 - 152.50' OR 'Tunggu breakout di atas 9800'",
+        "stopLoss": "string value OR key level, e.g., '145.00' OR 'Di bawah 9500 (support kunci)'",
+        "takeProfit1": "string value OR target level, e.g., '160.00' OR 'Target 10200 (resistance)'",
+        "takeProfit2": "string value OR extended target, e.g., '175.00' OR 'Target 10500 (psychological level)'",
         "predictionTime": "string value, e.g., 'Next 2-3 Days'",
         "reasoning": "A short, sharp, professional paragraph explaining the TECHNICAL reasoning. Use financial jargon like 'divergence', 'overbought', 'momentum', 'consolidation'. DALAM BAHASA INDONESIA."
       }

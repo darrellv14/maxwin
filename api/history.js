@@ -1,13 +1,14 @@
 import pool from "./db.js";
 import YahooFinance from "yahoo-finance2";
 import { setSecurityHeaders } from "./security.js";
+import { verifyToken } from "./auth.js";
 
 const yahooFinance = new YahooFinance();
 
 // ============ GET HISTORY ============
-async function getHistory(req, res) {
+async function getHistory(req, res, userId) {
   setSecurityHeaders(res);
-  const limit = parseInt(String(req.query?.limit ?? ""), 10) || 5;
+  const limit = parseInt(String(req.query?.limit ?? ""), 10) || 50;
   const offset = parseInt(String(req.query?.offset ?? ""), 10) || 0;
 
   try {
@@ -16,11 +17,12 @@ async function getHistory(req, res) {
         id, ticker, signal, entry_price, tp1, tp2, stop_loss, 
         highest_price, lowest_price, status, date_created
       FROM analysis_history
+      WHERE user_id = $1
       ORDER BY date_created DESC
-      LIMIT $1 OFFSET $2
+      LIMIT $2 OFFSET $3
     `;
 
-    const { rows } = await pool.query(query, [limit, offset]);
+    const { rows } = await pool.query(query, [userId, limit, offset]);
 
     res.setHeader("Cache-Control", "s-maxage=10, stale-while-revalidate");
     return res.status(200).json(rows);
@@ -33,7 +35,7 @@ async function getHistory(req, res) {
 }
 
 // ============ SAVE ANALYSIS ============
-async function saveAnalysis(req, res) {
+async function saveAnalysis(req, res, userId) {
   const { ticker, signal, entry_price, tp1, tp2, stop_loss, reasoning } = req.body || {};
 
   if (!ticker || !signal || typeof entry_price !== "number") {
@@ -45,12 +47,12 @@ async function saveAnalysis(req, res) {
   try {
     const query = `
       INSERT INTO analysis_history 
-      (ticker, signal, entry_price, tp1, tp2, stop_loss, highest_price, lowest_price, status, reasoning, date_created)
-      VALUES ($1, $2, $3, $4, $5, $6, $3, $3, 'ACTIVE', $7, NOW())
+      (user_id, ticker, signal, entry_price, tp1, tp2, stop_loss, highest_price, lowest_price, status, reasoning, date_created)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $4, $4, 'ACTIVE', $8, NOW())
       RETURNING id
     `;
 
-    const values = [ticker, signal, entry_price, tp1, tp2, stop_loss, reasoning];
+    const values = [userId, ticker, signal, entry_price, tp1, tp2, stop_loss, reasoning];
     const { rows } = await pool.query(query, values);
 
     return res.status(201).json({ message: "Saved", id: rows[0].id });
@@ -63,7 +65,7 @@ async function saveAnalysis(req, res) {
 }
 
 // ============ UPDATE STATUS ============
-async function updateStatus(req, res) {
+async function updateStatus(req, res, userId) {
   try {
     const { rows: activeAnalyses } = await pool.query(
       `
@@ -71,8 +73,9 @@ async function updateStatus(req, res) {
         id, ticker, signal, entry_price, tp1, tp2, stop_loss,
         highest_price, lowest_price, status
       FROM analysis_history
-      WHERE status = 'ACTIVE'
-      `
+      WHERE status = 'ACTIVE' AND user_id = $1
+      `,
+      [userId]
     );
 
     let updatedCount = 0;
@@ -139,8 +142,7 @@ async function updateStatus(req, res) {
   } catch (error) {
     console.error("Update-status API Error:", error);
     return res
-      .status(500)
-      .json({ error: error instanceof Error ? error.message : "Internal error" });
+      .status(500).json({ error: error instanceof Error ? error.message : "Internal error" });
   }
 }
 
@@ -155,21 +157,34 @@ export default async function handler(req, res) {
     return res.status(200).end();
   }
 
+  // Verify authentication
+  const authHeader = req.headers.authorization;
+  if (!authHeader || !authHeader.startsWith("Bearer ")) {
+    return res.status(401).json({ success: false, message: "Unauthorized" });
+  }
+
+  const payload = verifyToken(authHeader.substring(7));
+  if (!payload) {
+    return res.status(401).json({ success: false, message: "Token tidak valid" });
+  }
+
+  const userId = payload.userId;
+
   const path = req.url.split("?")[0].replace("/api/history", "");
 
   // Route: GET /api/history - get history list
   if (req.method === "GET" && (path === "" || path === "/")) {
-    return getHistory(req, res);
+    return getHistory(req, res, userId);
   }
 
   // Route: POST /api/history/save - save new analysis
   if (req.method === "POST" && path === "/save") {
-    return saveAnalysis(req, res);
+    return saveAnalysis(req, res, userId);
   }
 
   // Route: POST /api/history/update-status - update all active analyses status
   if (req.method === "POST" && path === "/update-status") {
-    return updateStatus(req, res);
+    return updateStatus(req, res, userId);
   }
 
   return res.status(404).json({ error: "Endpoint not found" });
