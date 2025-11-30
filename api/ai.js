@@ -23,7 +23,7 @@ async function scrapeDetikNews(ticker, limit = 10) {
   
   try {
     const searchUrl = `https://www.detik.com/search/searchall?query=${encodeURIComponent(searchQuery)}`;
-    console.log(`Scraping Detik: ${searchUrl}`);
+    console.log(`[NEWS] Scraping: ${searchUrl}`);
     
     const response = await fetch(searchUrl, {
       headers: {
@@ -33,69 +33,74 @@ async function scrapeDetikNews(ticker, limit = 10) {
       },
     });
     
+    console.log(`[NEWS] Response status: ${response.status}`);
+    
     if (!response.ok) {
-      console.error(`Detik search failed: ${response.status}`);
+      console.error(`[NEWS] Detik search failed: ${response.status}`);
       return [];
     }
     
     const html = await response.text();
+    console.log(`[NEWS] HTML length: ${html.length}`);
     
     // Extract articles from search results
     const articles = [];
     const seenLinks = new Set();
     
-    // Pattern for Detik search results
-    const patterns = [
-      /media__title[^>]*>\s*<a[^>]*href="([^"]+)"[^>]*>([^<]+)<\/a>/gi,
-      /<h3[^>]*>\s*<a[^>]*href="([^"]+)"[^>]*>([^<]+)<\/a>/gi,
-    ];
+    // More robust patterns for Detik search results
+    // Pattern 1: media__title links
+    const pattern1 = /href="(https:\/\/[^"]*detik\.com[^"]+)"[^>]*>\s*([^<]{10,}?)\s*<\/a>/gi;
     
-    for (const pattern of patterns) {
-      let match;
-      while ((match = pattern.exec(html)) !== null && articles.length < limit) {
-        const [, link, title] = match;
-        
-        if (seenLinks.has(link)) continue;
-        
-        const titleClean = title.replace(/\s+/g, ' ').trim();
-        const isFinance = link.toLowerCase().includes("finance.detik.com");
-        
-        // For IHSG: needs stock keywords or be from finance
-        // For stocks: just take from finance.detik.com or has stock keywords
-        if (isIHSG) {
-          const hasKeyword = STOCK_KEYWORDS.some(kw => titleClean.toUpperCase().includes(kw));
-          if (!hasKeyword && !isFinance) continue;
-        } else {
-          // Must be from finance OR have stock keywords
-          const hasKeyword = STOCK_KEYWORDS.some(kw => titleClean.toUpperCase().includes(kw));
-          if (!hasKeyword && !isFinance) continue;
+    let match;
+    let matchCount = 0;
+    
+    while ((match = pattern1.exec(html)) !== null && articles.length < limit) {
+      matchCount++;
+      const [, link, title] = match;
+      
+      // Skip non-article links
+      if (!link.includes('/d-') && !link.includes('/read/')) continue;
+      if (seenLinks.has(link)) continue;
+      
+      const titleClean = title.replace(/\s+/g, ' ').trim();
+      
+      // Skip very short titles (likely not article titles)
+      if (titleClean.length < 20) continue;
+      
+      const isFinance = link.toLowerCase().includes("finance.detik.com");
+      
+      // For IHSG: needs stock keywords or be from finance
+      // For stocks: just take from finance.detik.com or has stock keywords
+      const hasKeyword = STOCK_KEYWORDS.some(kw => titleClean.toUpperCase().includes(kw));
+      
+      if (!hasKeyword && !isFinance) continue;
+      
+      seenLinks.add(link);
+      
+      // Fetch content for top 3 articles
+      let konten = "";
+      if (articles.length < 3) {
+        try {
+          konten = await fetchArticleContent(link);
+        } catch (e) {
+          console.error(`[NEWS] Content fetch error:`, e.message);
         }
-        
-        seenLinks.add(link);
-        
-        // Fetch content for top 3 articles
-        let konten = "";
-        if (articles.length < 3) {
-          try {
-            konten = await fetchArticleContent(link);
-          } catch (e) {
-            console.error(`Content fetch error:`, e.message);
-          }
-        }
-        
-        articles.push({
-          judul: titleClean,
-          link,
-          konten,
-          source: isFinance ? "Detik Finance" : "Detik",
-        });
       }
+      
+      articles.push({
+        judul: titleClean,
+        link,
+        konten,
+        source: isFinance ? "Detik Finance" : "Detik",
+      });
+      
+      console.log(`[NEWS] Found: ${titleClean.slice(0, 50)}...`);
     }
     
-    console.log(`Scraped ${articles.length} articles for ${tickerClean}`);
+    console.log(`[NEWS] Total matches: ${matchCount}, Articles: ${articles.length}`);
     return articles;
   } catch (error) {
-    console.error("Detik scrape error:", error.message || error);
+    console.error("[NEWS] Scrape error:", error.message || error);
     return [];
   }
 }
