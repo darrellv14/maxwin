@@ -4,13 +4,13 @@ import { setSecurityHeaders, rateLimit, sanitizeInput } from "./security.js";
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "");
 
 // ============ FETCH SENTIMENT FROM PYTHON API ============
-// Python handles both news scraping and Gemini analysis (more reliable on Vercel)
+// Use /api/news with sentiment=true parameter (more reliable than separate endpoint)
 async function fetchSentimentFromPythonAPI(ticker, baseUrl) {
   const tickerClean = ticker.replace(".JK", "").toUpperCase();
   
   // Use provided baseUrl or fallback
   const apiBaseUrl = baseUrl || "https://moocuan.darrellvalentino.com";
-  const sentimentUrl = `${apiBaseUrl}/api/news_sentiment?ticker=${encodeURIComponent(tickerClean)}`;
+  const sentimentUrl = `${apiBaseUrl}/api/news?ticker=${encodeURIComponent(tickerClean)}&sentiment=true`;
   
   console.log(`[SENTIMENT] Fetching: ${sentimentUrl}`);
   
