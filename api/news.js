@@ -99,28 +99,36 @@ async function scrapeDetikNews(ticker, limit = 10) {
 
     const html = await response.text();
 
-    // Extract article links and titles using regex
-    const articlePattern =
-      /<article[^>]*>[\s\S]*?<a[^>]*href="([^"]+)"[^>]*>[\s\S]*?<h3[^>]*class="[^"]*media__title[^"]*"[^>]*>([^<]+)<\/h3>[\s\S]*?<\/article>/gi;
-
-    const matches = [...html.matchAll(articlePattern)];
+    // Extract article links and titles - Detik uses h3.media__title inside article tags
     const articles = [];
     const seen = new Set();
 
-    console.log(`[NEWS] Found ${matches.length} potential articles`);
+    // Pattern 1: Match article blocks with link and title
+    const articleBlockPattern = /<article[^>]*>([\s\S]*?)<\/article>/gi;
+    const linkPattern = /<a[^>]*href="([^"]+)"[^>]*>/i;
+    const titlePattern = /<h3[^>]*class="[^"]*media__title[^"]*"[^>]*>([^<]+)<\/h3>/i;
 
-    for (const match of matches) {
+    const articleBlocks = [...html.matchAll(articleBlockPattern)];
+    console.log(`[NEWS] Found ${articleBlocks.length} article blocks`);
+
+    for (const block of articleBlocks) {
       if (articles.length >= limit) break;
 
-      const link = match[1];
-      const title = match[2].trim();
+      const articleHtml = block[1];
+      const linkMatch = articleHtml.match(linkPattern);
+      const titleMatch = articleHtml.match(titlePattern);
+
+      if (!linkMatch || !titleMatch) continue;
+
+      const link = linkMatch[1];
+      const title = titleMatch[1].trim();
 
       if (seen.has(link)) continue;
       seen.add(link);
 
       // Filter by finance domain
       const isFinance = link.includes("finance.detik.com");
-      
+
       // Check relevance
       if (!isRelevant(title, tickerClean)) {
         console.log(`[NEWS] Skipping irrelevant: ${title.substring(0, 50)}`);
