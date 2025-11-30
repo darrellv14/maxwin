@@ -11,7 +11,7 @@ import WatchlistWidget from "../components/WatchlistWidget";
 import { Link, useSearchParams } from "react-router-dom";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
-import { Star, Keyboard, LogOut, Shield } from "lucide-react";
+import { Star, Keyboard, LogOut, Shield, User } from "lucide-react";
 import { useWatchlistStore } from "../stores/watchlistStore";
 import { logout, isAdmin, getUser } from "../services/authService";
 import AIChatAssistant from "@/components/AIChatAssistant";
@@ -21,7 +21,7 @@ import { LOGO_SIZES, getOptimizedLogoUrl } from "../constants/logo";
 const Dashboard: React.FC = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const initialTicker = searchParams.get("ticker")?.toUpperCase() || "BTC-USD";
-  
+
   const [ticker, setTicker] = useState<string>(initialTicker);
   const [searchInput, setSearchInput] = useState<string>(initialTicker);
   const [timeframe, setTimeframe] = useState<TimeFrame>("3M");
@@ -138,11 +138,11 @@ const Dashboard: React.FC = () => {
       <header className="border-b border-gray-800 bg-terminal-dark/50 backdrop-blur sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-3 sm:px-4 py-2 sm:py-3 flex justify-between items-center 2xl:max-w-none">
           <div className="flex items-center gap-2 sm:gap-3">
-            <img 
+            <img
               src={LOGO_SIZES.sm}
               srcSet={`${LOGO_SIZES.sm} 1x, ${LOGO_SIZES.smRetina} 2x`}
-              alt="MooCuan Logo" 
-              className="w-8 h-8 sm:w-10 sm:h-10 object-contain" 
+              alt="MooCuan Logo"
+              className="w-8 h-8 sm:w-10 sm:h-10 object-contain"
               width="40"
               height="40"
             />
@@ -190,7 +190,14 @@ const Dashboard: React.FC = () => {
                 <span className="hidden lg:inline">ADMIN</span>
               </Link>
             )}
-
+            <Link
+              to="/account"
+              className="text-xs font-mono bg-gray-900 px-3 py-1 rounded-full border border-gray-800 hover:bg-gray-800 text-gray-300 transition-colors flex items-center gap-2"
+            >
+              <User className="w-3 h-3" />
+              <span className="hidden lg:inline">ACCOUNT</span>
+              <span className="lg:hidden">ACC</span>
+            </Link>
             <div className="flex items-center gap-2 border-l border-gray-700 pl-4">
               <span className="text-xs text-gray-400 hidden lg:block">{user?.name}</span>
               <button
@@ -205,6 +212,12 @@ const Dashboard: React.FC = () => {
 
           {/* Mobile Nav */}
           <div className="flex md:hidden items-center gap-2">
+            <Link
+              to="/account"
+              className="text-[10px] font-mono bg-gray-900 px-2 py-1 rounded-full border border-gray-800 text-gray-300"
+            >
+              👤
+            </Link>
             <Link
               to="/screener"
               className="text-[10px] font-mono bg-gray-900 px-2 py-1 rounded-full border border-gray-800 text-profit-green"
@@ -279,20 +292,22 @@ const Dashboard: React.FC = () => {
             <div className="bg-terminal-gray border border-gray-800 p-4 rounded-lg">
               <label className="block text-xs font-mono text-gray-400 mb-2">TIMEFRAME</label>
               <div className="grid grid-cols-5 gap-1 sm:gap-2">
-                {(["1D", "5D", "1M", "3M", "6M", "YTD", "1Y", "5Y", "ALL"] as TimeFrame[]).map((tf) => (
-                  <button
-                    key={tf}
-                    onClick={() => setTimeframe(tf)}
-                    aria-label={`Set timeframe to ${tf}`}
-                    className={`py-1 px-1 sm:px-2 text-[10px] sm:text-xs font-mono rounded border transition-colors ${
-                      timeframe === tf
-                        ? "bg-gray-800 border-profit-green text-profit-green"
-                        : "bg-black border-gray-800 text-gray-400 hover:bg-gray-800 hover:text-gray-300"
-                    }`}
-                  >
-                    {tf}
-                  </button>
-                ))}
+                {(["1D", "5D", "1M", "3M", "6M", "YTD", "1Y", "5Y", "ALL"] as TimeFrame[]).map(
+                  (tf) => (
+                    <button
+                      key={tf}
+                      onClick={() => setTimeframe(tf)}
+                      aria-label={`Set timeframe to ${tf}`}
+                      className={`py-1 px-1 sm:px-2 text-[10px] sm:text-xs font-mono rounded border transition-colors ${
+                        timeframe === tf
+                          ? "bg-gray-800 border-profit-green text-profit-green"
+                          : "bg-black border-gray-800 text-gray-400 hover:bg-gray-800 hover:text-gray-300"
+                      }`}
+                    >
+                      {tf}
+                    </button>
+                  )
+                )}
               </div>
             </div>
 
@@ -407,7 +422,9 @@ const Dashboard: React.FC = () => {
           <OraclePanel analysis={analysis} loading={loadingAI} onAnalyze={handleAnalyze} />
 
           <div className="bg-terminal-gray border border-gray-800 rounded-lg p-4 sm:p-6">
-            <h2 className="text-sm sm:text-lg font-bold font-mono text-white mb-3 sm:mb-4">MARKET DEPTH LOG</h2>
+            <h2 className="text-sm sm:text-lg font-bold font-mono text-white mb-3 sm:mb-4">
+              MARKET DEPTH LOG
+            </h2>
             <div className="overflow-x-auto -mx-4 sm:mx-0 px-4 sm:px-0">
               <table className="w-full text-left text-[10px] sm:text-xs font-mono min-w-[300px]">
                 <thead className="border-b border-gray-700 text-gray-500">
@@ -428,7 +445,7 @@ const Dashboard: React.FC = () => {
                         className="border-b border-gray-800/50 hover:bg-gray-800/50 transition-colors"
                       >
                         <td className="py-2 text-gray-500">{d.date}</td>
-                        <td className="py-2 font-bold">{d.close?.toFixed(0) ?? '-'}</td>
+                        <td className="py-2 font-bold">{d.close?.toFixed(0) ?? "-"}</td>
                         <td
                           className={`py-2 ${
                             (d.rsi || 50) > 70
@@ -441,7 +458,7 @@ const Dashboard: React.FC = () => {
                           {d.rsi?.toFixed(1)}
                         </td>
                         <td className="py-2 text-right text-gray-400">
-                          {d.volume?.toLocaleString() ?? '0'}
+                          {d.volume?.toLocaleString() ?? "0"}
                         </td>
                       </tr>
                     ))}

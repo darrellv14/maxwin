@@ -36,8 +36,8 @@ const Register: React.FC = () => {
       return;
     }
 
-    if (password.length < 6) {
-      showToast("Password minimal 6 karakter", "error");
+    if (password.length < 8) {
+      showToast("Password minimal 8 karakter", "error");
       return;
     }
 
@@ -81,7 +81,11 @@ const Register: React.FC = () => {
               className="w-16 h-16 sm:w-24 sm:h-24 mx-auto mb-4 sm:mb-6 relative"
             >
               <div className="absolute inset-0 bg-profit-green/20 rounded-full blur-xl animate-pulse" />
-              <img src={getOptimizedLogoUrl(96)} alt="MooCuan Logo" className="w-full h-full object-contain relative z-10" />
+              <img
+                src={getOptimizedLogoUrl(96)}
+                alt="MooCuan Logo"
+                className="w-full h-full object-contain relative z-10"
+              />
               <CheckCircle className="absolute -bottom-1 -right-1 w-6 h-6 sm:w-8 sm:h-8 text-profit-green bg-terminal-gray rounded-full" />
             </motion.div>
 
@@ -119,7 +123,11 @@ const Register: React.FC = () => {
       <div className="hidden lg:flex lg:w-1/2 bg-terminal-dark border-r border-gray-800 flex-col p-6 xl:p-12">
         <div>
           <div className="flex items-center gap-2 xl:gap-3 mb-4">
-            <img src={getOptimizedLogoUrl(56)} alt="MooCuan Logo" className="w-10 h-10 xl:w-14 xl:h-14 object-contain" />
+            <img
+              src={getOptimizedLogoUrl(56)}
+              alt="MooCuan Logo"
+              className="w-10 h-10 xl:w-14 xl:h-14 object-contain"
+            />
             <h1 className="text-xl xl:text-2xl font-bold tracking-tight text-white font-mono">
               MOO<span className="text-profit-green">CUAN</span>
             </h1>
@@ -199,7 +207,11 @@ const Register: React.FC = () => {
           {/* Mobile Logo */}
           <div className="text-center mb-4 sm:mb-6 lg:hidden">
             <div className="flex flex-col items-center gap-2 mb-3 sm:mb-4">
-              <img src={LOGO_SIZES.md} alt="MooCuan Logo" className="w-16 h-16 sm:w-20 sm:h-20 object-contain" />
+              <img
+                src={LOGO_SIZES.md}
+                alt="MooCuan Logo"
+                className="w-16 h-16 sm:w-20 sm:h-20 object-contain"
+              />
               <span className="text-xl sm:text-2xl font-bold text-white font-mono">
                 MOO<span className="text-profit-green">CUAN</span>
               </span>
@@ -207,8 +219,12 @@ const Register: React.FC = () => {
           </div>
 
           <div className="text-center mb-4 sm:mb-6">
-            <h2 className="text-xl sm:text-2xl font-bold text-white font-mono mb-1 sm:mb-2">Create Account</h2>
-            <p className="text-gray-500 font-mono text-xs sm:text-sm">Buat akun baru untuk mulai trading</p>
+            <h2 className="text-xl sm:text-2xl font-bold text-white font-mono mb-1 sm:mb-2">
+              Create Account
+            </h2>
+            <p className="text-gray-500 font-mono text-xs sm:text-sm">
+              Buat akun baru untuk mulai trading
+            </p>
           </div>
 
           {/* Form Card */}
@@ -229,6 +245,9 @@ const Register: React.FC = () => {
                   placeholder="John Doe"
                   required
                 />
+                <p className="text-gray-600 text-[10px] sm:text-xs mt-1 font-mono">
+                  Minimal 8 karakter
+                </p>
               </div>
 
               {/* Email */}
@@ -269,10 +288,16 @@ const Register: React.FC = () => {
                     onClick={() => setShowPassword(!showPassword)}
                     className="absolute right-3 sm:right-4 top-1/2 -translate-y-1/2 text-gray-500 hover:text-white transition-colors"
                   >
-                    {showPassword ? <EyeOff className="w-4 h-4 sm:w-5 sm:h-5" /> : <Eye className="w-4 h-4 sm:w-5 sm:h-5" />}
+                    {showPassword ? (
+                      <EyeOff className="w-4 h-4 sm:w-5 sm:h-5" />
+                    ) : (
+                      <Eye className="w-4 h-4 sm:w-5 sm:h-5" />
+                    )}
                   </button>
                 </div>
-                <p className="text-gray-600 text-[10px] sm:text-xs mt-1 font-mono">Minimal 6 karakter</p>
+                <p className="text-gray-600 text-[10px] sm:text-xs mt-1 font-mono">
+                  Minimal 6 karakter
+                </p>
               </div>
 
               {/* Confirm Password */}
@@ -296,7 +321,9 @@ const Register: React.FC = () => {
                   required
                 />
                 {confirmPassword && password !== confirmPassword && (
-                  <p className="text-red-400 text-[10px] sm:text-xs mt-1 font-mono">Password tidak cocok</p>
+                  <p className="text-red-400 text-[10px] sm:text-xs mt-1 font-mono">
+                    Password tidak cocok
+                  </p>
                 )}
               </div>
 

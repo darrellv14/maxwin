@@ -12,6 +12,7 @@ import { ToastProvider } from "./components/ToastProvider";
 import CommandPalette from "./components/CommandPalette";
 import AIChatAssistant from "./components/AIChatAssistant";
 import ProtectedRoute from "./components/ProtectedRoute";
+import Account from "./pages/Account";
 import { isAuthenticated } from "./services/authService";
 
 const AppContent: React.FC = () => {
@@ -56,6 +57,15 @@ const AppContent: React.FC = () => {
           element={
             <ProtectedRoute>
               <AIPicksPage />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/account"
+          element={
+            <ProtectedRoute>
+              <Account />
             </ProtectedRoute>
           }
         />

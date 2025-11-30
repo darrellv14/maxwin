@@ -2,17 +2,7 @@ import React, { useEffect, useState, useCallback } from "react";
 import { Command } from "cmdk";
 import { motion, AnimatePresence } from "framer-motion";
 import { useNavigate } from "react-router-dom";
-import {
-  Search,
-  History,
-  Star,
-  BarChart3,
-  Zap,
-  X,
-  LogOut,
-  Shield,
-  Home,
-} from "lucide-react";
+import { Search, History, Star, BarChart3, Zap, X, LogOut, Shield, Home, User } from "lucide-react";
 import { useWatchlistStore } from "../stores";
 import { isAdmin, logout, getToken } from "../services/authService";
 
@@ -24,7 +14,8 @@ const CommandPalette: React.FC<CommandPaletteProps> = ({ onSearch }) => {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
   const navigate = useNavigate();
-  const { watchlist, recentSearches, addRecentSearch, syncWatchlistFromServer } = useWatchlistStore();
+  const { watchlist, recentSearches, addRecentSearch, syncWatchlistFromServer } =
+    useWatchlistStore();
   const isUserAdmin = isAdmin();
   const isLoggedIn = !!getToken();
 
@@ -65,6 +56,9 @@ const CommandPalette: React.FC<CommandPaletteProps> = ({ onSearch }) => {
             break;
           case "admin":
             navigate("/admin");
+            break;
+          case "account":
+            navigate("/account");
             break;
           case "login":
             navigate("/login");
@@ -176,7 +170,11 @@ const CommandPalette: React.FC<CommandPaletteProps> = ({ onSearch }) => {
                       >
                         <Star className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-yellow-500" />
                         <span>{item.ticker}</span>
-                        {item.name && <span className="text-gray-500 text-[10px] sm:text-xs hidden sm:inline">{item.name}</span>}
+                        {item.name && (
+                          <span className="text-gray-500 text-[10px] sm:text-xs hidden sm:inline">
+                            {item.name}
+                          </span>
+                        )}
                       </Command.Item>
                     ))}
                   </Command.Group>
@@ -218,10 +216,20 @@ const CommandPalette: React.FC<CommandPaletteProps> = ({ onSearch }) => {
                       className="flex items-center gap-2 sm:gap-3 px-2 sm:px-3 py-1.5 sm:py-2 rounded-lg cursor-pointer text-xs sm:text-sm font-mono
                         data-[selected=true]:bg-terminal-green/20 data-[selected=true]:text-terminal-green"
                     >
-                      <Shield className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                      <User className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                       <span>Admin Panel</span>
                     </Command.Item>
                   )}
+
+                  <Command.Item
+                    value="navigate:account"
+                    onSelect={handleSelect}
+                    className="flex items-center gap-2 sm:gap-3 px-2 sm:px-3 py-1.5 sm:py-2 rounded-lg cursor-pointer text-xs sm:text-sm font-mono
+                      data-[selected=true]:bg-terminal-green/20 data-[selected=true]:text-terminal-green"
+                  >
+                    <Shield className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                    <span>Account & Security</span>
+                  </Command.Item>
                 </Command.Group>
 
                 {/* Actions */}
