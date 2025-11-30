@@ -6,25 +6,34 @@ const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "");
 // ============ FETCH NEWS FROM DETIK ============
 async function fetchNewsArticles(ticker, baseUrl) {
   try {
+    // Clean ticker
+    const tickerClean = ticker.replace(".JK", "").toUpperCase();
+    
     // Call our internal Detik News API endpoint
-    const newsUrl = `${baseUrl}/api/news?ticker=${encodeURIComponent(ticker)}`;
+    const newsUrl = `${baseUrl}/api/news?ticker=${encodeURIComponent(tickerClean)}`;
+    console.log(`Fetching news from: ${newsUrl}`);
     
     const response = await fetch(newsUrl, {
       method: "GET",
       headers: {
         "Accept": "application/json",
+        "User-Agent": "MooCuan-AI/1.0",
       },
     });
 
+    console.log(`News API response status: ${response.status}`);
+    
     if (!response.ok) {
-      console.error("Detik News API error:", response.status);
+      const errorText = await response.text();
+      console.error("Detik News API error:", response.status, errorText);
       return [];
     }
 
     const data = await response.json();
+    console.log(`News API returned ${data.articles?.length || 0} articles`);
     return data.articles || [];
   } catch (error) {
-    console.error("Detik news fetch error:", error);
+    console.error("Detik news fetch error:", error.message || error);
     return [];
   }
 }
@@ -185,9 +194,14 @@ async function analyzeStock(req, res) {
     }
 
     // Get base URL for internal API calls
-    const protocol = req.headers["x-forwarded-proto"] || "https";
-    const host = req.headers.host || "localhost:3000";
+    // Handle cases where x-forwarded-proto might have multiple values
+    let protocol = req.headers["x-forwarded-proto"] || "https";
+    if (protocol.includes(",")) {
+      protocol = protocol.split(",")[0].trim();
+    }
+    const host = req.headers.host || req.headers["x-forwarded-host"] || "moocuan.darrellvalentino.com";
     const baseUrl = `${protocol}://${host}`;
+    console.log(`Base URL for news API: ${baseUrl}`);
 
     // Fetch news articles from Detik News API (only for Indonesian stocks)
     const isIndonesian = ticker.toUpperCase().endsWith(".JK") || ticker.toUpperCase() === "^JKSE";
