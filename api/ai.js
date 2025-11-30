@@ -299,12 +299,12 @@ async function analyzeNewsWithGemini(articles, ticker, isIHSGFallback = false) {
     });
 
     const prompt = isIHSGFallback
-      ? `Kamu adalah analis sentimen pasar saham Indonesia. Analisis berita IHSG berikut:
+      ? `Kamu adalah analis sentimen pasar saham Indonesia. Analisis berita IHSG berikut dan berikan SATU sentimen AGREGAT untuk kondisi pasar secara keseluruhan:
 
 BERITA IHSG TERKINI:
 ${newsText}
 
-Berikan analisis sentimen pasar dalam format JSON (tanpa markdown):
+Berikan analisis sentimen pasar AGREGAT dalam format JSON (tanpa markdown):
 {
   "type": "BULLISH" | "BEARISH" | "NEUTRAL",
   "headline": "Rangkuman kondisi pasar dalam 1 kalimat",
@@ -315,28 +315,36 @@ Berikan analisis sentimen pasar dalam format JSON (tanpa markdown):
   "keyNews": ["Poin penting 1", "Poin penting 2"],
   "isIHSGFallback": true
 }`
-      : `Kamu adalah analis sentimen berita saham Indonesia. Analisis berita untuk ${ticker}:
+      : `Kamu adalah analis sentimen berita saham Indonesia. Analisis SEMUA berita untuk ${ticker} dan berikan SATU sentimen AGREGAT:
 
 BERITA TERKINI:
 ${newsText}
 
 TUGAS:
-1. Cek apakah berita BENAR-BENAR tentang ${ticker}
-2. Jika relevan: Tentukan sentimen BULLISH, BEARISH, atau NEUTRAL
-3. Jika TIDAK relevan sama sekali: Set isRelevant = false
+1. Baca SEMUA berita di atas
+2. Tentukan apakah mayoritas berita RELEVAN dengan ${ticker}
+3. Gabungkan sentimen dari semua berita yang relevan menjadi SATU sentimen agregat
+4. Jika tidak ada berita relevan: Set isRelevant = false
+
+PENTING: Return HANYA SATU OBJECT JSON, bukan array!
 
 Format JSON (tanpa markdown):
 {
   "type": "BULLISH" | "BEARISH" | "NEUTRAL",
-  "headline": "Rangkuman berita dalam 1 kalimat",
-  "description": "Analisis dampak ke harga saham dengan DATA SPESIFIK dari berita, 2-3 kalimat",
+  "headline": "Rangkuman AGREGAT dari semua berita dalam 1 kalimat",
+  "description": "Analisis dampak KESELURUHAN ke harga saham dengan data spesifik, 2-3 kalimat. Sebutkan jika ada berita konflik (bullish vs bearish).",
   "source": "Detik News",
   "newsDate": "Terbaru",
   "confidence": 0-100,
-  "keyNews": ["Berita penting 1", "Berita penting 2"],
+  "keyNews": ["Berita penting 1", "Berita penting 2", "Berita penting 3"],
   "isRelevant": true | false,
   "isIHSGFallback": false
-}`;
+}
+
+CONTOH OUTPUT:
+Jika ada berita laba naik + berita saham turun: type bisa NEUTRAL dengan description yang jelaskan ada sentimen campur.
+Jika mayoritas berita positif: type BULLISH dengan confidence tinggi.`;
+
 
     const result = await model.generateContent(prompt);
     const response = await result.response;
