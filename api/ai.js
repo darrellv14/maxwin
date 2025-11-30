@@ -3,8 +3,8 @@ import { setSecurityHeaders, rateLimit, sanitizeInput } from "./security.js";
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "");
 
-// ============ DETIK NEWS SENTIMENT ============
-async function fetchNewsSentiment(ticker, baseUrl) {
+// ============ FETCH NEWS FROM DETIK ============
+async function fetchNewsArticles(ticker, baseUrl) {
   try {
     // Call our internal Detik News API endpoint
     const newsUrl = `${baseUrl}/api/news?ticker=${encodeURIComponent(ticker)}`;
@@ -18,14 +18,84 @@ async function fetchNewsSentiment(ticker, baseUrl) {
 
     if (!response.ok) {
       console.error("Detik News API error:", response.status);
-      return null;
+      return [];
     }
 
     const data = await response.json();
-    return data.sentiment || null;
+    return data.articles || [];
   } catch (error) {
     console.error("Detik news fetch error:", error);
-    return null;
+    return [];
+  }
+}
+
+// ============ ANALYZE NEWS WITH GEMINI ============
+async function analyzeNewsWithGemini(articles, ticker) {
+  if (!articles || articles.length === 0) {
+    return {
+      type: "NEUTRAL",
+      headline: "Tidak ada berita terkini",
+      description: "Tidak ditemukan berita relevan untuk saham ini. Analisis berdasarkan teknikal saja.",
+      source: "N/A",
+      confidence: 30,
+    };
+  }
+
+  try {
+    const tickerClean = ticker.replace(".JK", "");
+    const newsText = articles.slice(0, 5).map((a, i) => 
+      `${i + 1}. "${a.judul}" (${a.waktu || 'Baru-baru ini'})`
+    ).join("\n");
+
+    const prompt = `Kamu adalah analis sentimen berita saham Indonesia yang expert. Analisis berita-berita berikut untuk saham ${tickerClean}:
+
+BERITA TERKINI:
+${newsText}
+
+TUGAS:
+1. Baca dan pahami setiap judul berita
+2. Tentukan apakah secara keseluruhan berita ini BULLISH (positif untuk harga saham), BEARISH (negatif), atau NEUTRAL
+3. Berikan analisis yang tajam dan profesional
+
+PENTING:
+- Fokus pada dampak berita terhadap pergerakan harga saham
+- Perhatikan kata kunci: laba, rugi, dividen, akuisisi, ekspansi, PHK, pailit, dll
+- Jika berita campur (ada positif dan negatif), tentukan mana yang lebih dominan
+
+Output dalam format JSON (tanpa markdown code block):
+{
+  "type": "BULLISH" | "BEARISH" | "NEUTRAL",
+  "headline": "Rangkuman satu kalimat yang catchy tentang kondisi berita",
+  "description": "Analisis 2-3 kalimat yang menjelaskan MENGAPA sentimen tersebut dan APA dampaknya ke harga saham. Gunakan bahasa profesional dengan istilah seperti 'katalis positif', 'tekanan jual', 'momentum bullish', dll.",
+  "source": "Detik News",
+  "newsDate": "${articles[0]?.waktu || 'Terbaru'}",
+  "confidence": 0-100,
+  "keyNews": ["Berita paling penting 1", "Berita paling penting 2"]
+}`;
+
+    const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
+    const result = await model.generateContent(prompt);
+    const response = await result.response;
+    const text = response.text();
+
+    if (!text) {
+      throw new Error("Empty response from Gemini");
+    }
+
+    const cleanText = text.replace(/```json\n?|\n?```/g, "").trim();
+    const sentiment = JSON.parse(cleanText);
+
+    return sentiment;
+  } catch (error) {
+    console.error("Gemini news analysis error:", error);
+    // Fallback to first article
+    return {
+      type: "NEUTRAL",
+      headline: articles[0]?.judul || "Berita tersedia",
+      description: `Ditemukan ${articles.length} berita terkait. Silakan review berita untuk analisis lebih lanjut.`,
+      source: "Detik News",
+      confidence: 40,
+    };
   }
 }
 
@@ -50,9 +120,9 @@ async function analyzeStock(req, res) {
     const host = req.headers.host || "localhost:3000";
     const baseUrl = `${protocol}://${host}`;
 
-    // Fetch news sentiment from Detik News API (parallel with Gemini)
+    // Fetch news articles from Detik News API (only for Indonesian stocks)
     const isIndonesian = ticker.toUpperCase().endsWith(".JK") || ticker.toUpperCase() === "^JKSE";
-    const newsSentimentPromise = isIndonesian ? fetchNewsSentiment(ticker, baseUrl) : Promise.resolve(null);
+    const newsArticlesPromise = isIndonesian ? fetchNewsArticles(ticker, baseUrl) : Promise.resolve([]);
 
     const strategyPrompt = isIndonesian
       ? `1. **Strategy:** LONG-ONLY (Spot Market). Do NOT suggest Short Selling.
@@ -117,30 +187,20 @@ async function analyzeStock(req, res) {
     const cleanText = text.replace(/```json\n?|\n?```/g, "").trim();
     const parsedResult = JSON.parse(cleanText);
 
-    // Wait for Detik news sentiment
-    const detikSentiment = await newsSentimentPromise;
+    // Wait for news articles, then analyze with Gemini
+    const newsArticles = await newsArticlesPromise;
+    const newsSentiment = await analyzeNewsWithGemini(newsArticles, ticker);
 
-    // Merge Detik sentiment with Gemini analysis
-    if (detikSentiment) {
-      parsedResult.sentiment = {
-        type: detikSentiment.type || "NEUTRAL",
-        headline: detikSentiment.headline || "Tidak ada berita terkini",
-        description: detikSentiment.description || "Tidak ditemukan berita signifikan",
-        source: detikSentiment.source || "Detik News",
-        newsDate: detikSentiment.newsDate || null,
-        confidence: detikSentiment.confidence || 50,
-      };
-    } else {
-      // Fallback sentiment if Detik is not available or non-Indonesian stock
-      parsedResult.sentiment = {
-        type: "NEUTRAL",
-        headline: isIndonesian ? "Analisis berita tidak tersedia" : "News analysis not available for non-IDX stocks",
-        description: isIndonesian 
-          ? "Fitur pencarian berita sedang tidak aktif. Analisis berdasarkan teknikal saja."
-          : "News sentiment analysis is only available for Indonesian stocks (.JK). Technical analysis only.",
-        source: "N/A",
-      };
-    }
+    // Merge news sentiment with technical analysis
+    parsedResult.sentiment = {
+      type: newsSentiment.type || "NEUTRAL",
+      headline: newsSentiment.headline || "Tidak ada berita terkini",
+      description: newsSentiment.description || "Tidak ditemukan berita signifikan",
+      source: newsSentiment.source || "Detik News",
+      newsDate: newsSentiment.newsDate || null,
+      confidence: newsSentiment.confidence || 50,
+      keyNews: newsSentiment.keyNews || [],
+    };
 
     return res.json({
       success: true,

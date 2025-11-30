@@ -31,20 +31,22 @@ class DetikScraper:
 
             # First try: Search with ticker + saham on tag page
             search_url = f"{DetikScraper.SEARCH_URL}?query={urllib.parse.quote(ticker + ' saham')}"
-            
+
             req = urllib.request.Request(search_url, headers=headers)
             with urllib.request.urlopen(req, context=ctx, timeout=10) as response:
                 html = response.read().decode("utf-8")
 
             articles = DetikScraper._parse_articles(html, ticker, limit)
-            
+
             # If no results, try fetching from tag/saham page
             if len(articles) < 3:
                 req = urllib.request.Request(DetikScraper.TAG_URL, headers=headers)
                 with urllib.request.urlopen(req, context=ctx, timeout=10) as response:
                     html = response.read().decode("utf-8")
-                
-                tag_articles = DetikScraper._parse_articles(html, ticker, limit - len(articles))
+
+                tag_articles = DetikScraper._parse_articles(
+                    html, ticker, limit - len(articles)
+                )
                 articles.extend(tag_articles)
 
             return articles[:limit]
@@ -58,7 +60,7 @@ class DetikScraper:
         """Parse articles from Detik HTML and filter by relevance to ticker"""
         articles = []
         ticker_upper = ticker.upper().replace(".JK", "")
-        
+
         # Common company name mappings for major stocks
         company_names = {
             "BBCA": ["BCA", "Bank Central Asia"],
@@ -84,12 +86,12 @@ class DetikScraper:
             "INTP": ["Indocement"],
             "IHSG": ["IHSG", "Indeks Harga Saham Gabungan", "bursa", "BEI"],
         }
-        
+
         # Get search terms for this ticker
         search_terms = [ticker_upper]
         if ticker_upper in company_names:
             search_terms.extend(company_names[ticker_upper])
-        
+
         # Pattern to extract articles - multiple patterns for robustness
         patterns = [
             # Main pattern for media__title
@@ -99,16 +101,18 @@ class DetikScraper:
             # Pattern for list items
             r'<article[^>]*>.*?<a[^>]*href="([^"]*detik\.com[^"]*)"[^>]*>([^<]+)</a>',
         ]
-        
+
         # Date pattern
-        date_pattern = r'<div[^>]*class="[^"]*media__date[^"]*"[^>]*>.*?<span[^>]*>([^<]+)</span>'
+        date_pattern = (
+            r'<div[^>]*class="[^"]*media__date[^"]*"[^>]*>.*?<span[^>]*>([^<]+)</span>'
+        )
         dates = re.findall(date_pattern, html, re.DOTALL | re.IGNORECASE)
-        
+
         all_matches = []
         for pattern in patterns:
             matches = re.findall(pattern, html, re.DOTALL | re.IGNORECASE)
             all_matches.extend(matches)
-        
+
         # Remove duplicates based on link
         seen_links = set()
         unique_matches = []
@@ -116,23 +120,23 @@ class DetikScraper:
             if link not in seen_links:
                 seen_links.add(link)
                 unique_matches.append((link, title))
-        
+
         date_idx = 0
         for link, title in unique_matches:
             if len(articles) >= limit:
                 break
-                
+
             title_clean = title.strip()
             title_clean = re.sub(r"\s+", " ", title_clean)
             title_upper = title_clean.upper()
-            
+
             # Check if article is relevant to the ticker
             is_relevant = False
             for term in search_terms:
                 if term.upper() in title_upper:
                     is_relevant = True
                     break
-            
+
             # Also include general stock market news for IHSG
             if ticker_upper in ["IHSG", "^JKSE"]:
                 stock_keywords = ["IHSG", "BURSA", "BEI", "SAHAM", "INVESTOR", "ASING"]
@@ -140,7 +144,7 @@ class DetikScraper:
                     if kw in title_upper:
                         is_relevant = True
                         break
-            
+
             if is_relevant:
                 article = {
                     "judul": title_clean,
@@ -148,113 +152,10 @@ class DetikScraper:
                     "waktu": dates[date_idx].strip() if date_idx < len(dates) else "",
                 }
                 articles.append(article)
-            
+
             date_idx += 1
 
         return articles
-
-
-def analyze_news_sentiment(articles, ticker):
-    """Analyze sentiment from news articles using simple heuristics"""
-    if not articles:
-        return {
-            "type": "NEUTRAL",
-            "headline": f"Tidak ada berita terkini untuk {ticker}",
-            "description": "Tidak ditemukan berita relevan dari sumber Detik News. Pertimbangkan faktor teknikal untuk analisis.",
-            "source": "Detik News",
-            "newsDate": "",
-            "confidence": 30,
-        }
-
-    # Keywords for sentiment analysis
-    bullish_words = [
-        "naik",
-        "meningkat",
-        "profit",
-        "laba",
-        "untung",
-        "positif",
-        "tumbuh",
-        "optimis",
-        "rally",
-        "menguat",
-        "bullish",
-        "rekor",
-        "tinggi",
-        "surplus",
-        "dividen",
-        "akuisisi",
-        "ekspansi",
-        "investasi",
-        "kinerja baik",
-        "outperform",
-        "buy",
-        "beli",
-        "target",
-        "prospek cerah",
-    ]
-
-    bearish_words = [
-        "turun",
-        "menurun",
-        "rugi",
-        "kerugian",
-        "negatif",
-        "anjlok",
-        "melemah",
-        "bearish",
-        "rendah",
-        "defisit",
-        "bangkrut",
-        "PHK",
-        "gagal bayar",
-        "pailit",
-        "sell",
-        "jual",
-        "peringatan",
-        "downgrade",
-        "resesi",
-        "koreksi",
-        "tekanan",
-        "merosot",
-    ]
-
-    bullish_score = 0
-    bearish_score = 0
-
-    # Analyze each article
-    all_text = " ".join(
-        [(a.get("judul", "") + " " + a.get("body", "")).lower() for a in articles]
-    )
-
-    for word in bullish_words:
-        if word in all_text:
-            bullish_score += 1
-
-    for word in bearish_words:
-        if word in all_text:
-            bearish_score += 1
-
-    # Determine sentiment
-    if bullish_score > bearish_score + 2:
-        sentiment_type = "BULLISH"
-    elif bearish_score > bullish_score + 2:
-        sentiment_type = "BEARISH"
-    else:
-        sentiment_type = "NEUTRAL"
-
-    # Get the most recent headline
-    main_article = articles[0]
-    confidence = min(70, 30 + len(articles) * 8)  # Base 30, +8 per article, max 70
-
-    return {
-        "type": sentiment_type,
-        "headline": main_article.get("judul", ""),
-        "description": f"Ditemukan {len(articles)} berita terkait. Analisis menunjukkan sentimen {sentiment_type.lower()} berdasarkan kata kunci dalam berita.",
-        "source": "Detik News",
-        "newsDate": main_article.get("waktu", ""),
-        "confidence": confidence,
-    }
 
 
 class handler(BaseHTTPRequestHandler):
@@ -281,10 +182,7 @@ class handler(BaseHTTPRequestHandler):
             # Fetch stock news from Detik (filtered by saham tag)
             articles = DetikScraper.get_stock_news(ticker_clean, limit=10)
 
-            # Analyze sentiment
-            sentiment = analyze_news_sentiment(articles, ticker_clean)
-
-            # Return response
+            # Return raw articles - let ai.js handle sentiment analysis with Gemini
             self.send_response(200)
             self.send_header("Content-Type", "application/json")
             self.send_header("Access-Control-Allow-Origin", "*")
@@ -293,8 +191,8 @@ class handler(BaseHTTPRequestHandler):
 
             response = {
                 "ticker": ticker,
-                "sentiment": sentiment,
-                "articles": articles[:5],  # Return top 5 relevant articles
+                "articles": articles,  # Return all articles for AI analysis
+                "count": len(articles),
                 "timestamp": datetime.now().isoformat(),
             }
 
