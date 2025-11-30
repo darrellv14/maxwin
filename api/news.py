@@ -33,27 +33,67 @@ class DetikScraper:
     # Strict stock/finance keywords - berita HARUS mengandung salah satu ini
     STOCK_KEYWORDS = [
         # Bursa & Index
-        "IHSG", "BEI", "BURSA", "IDX", "JKSE", "LQ45", "IDX30",
+        "IHSG",
+        "BEI",
+        "BURSA",
+        "IDX",
+        "JKSE",
+        "LQ45",
+        "IDX30",
         # Trading terms
-        "SAHAM", "EMITEN", "LISTING", "IPO", "RIGHT ISSUE", "STOCK SPLIT",
-        "BUYBACK", "TENDER OFFER", "DELISTING", "SUSPEND",
+        "SAHAM",
+        "EMITEN",
+        "LISTING",
+        "IPO",
+        "RIGHT ISSUE",
+        "STOCK SPLIT",
+        "BUYBACK",
+        "TENDER OFFER",
+        "DELISTING",
+        "SUSPEND",
         # Corporate actions
-        "DIVIDEN", "LABA", "RUGI", "PENDAPATAN", "REVENUE", "PROFIT",
-        "EARNING", "KINERJA KEUANGAN", "LAPORAN KEUANGAN",
+        "DIVIDEN",
+        "LABA",
+        "RUGI",
+        "PENDAPATAN",
+        "REVENUE",
+        "PROFIT",
+        "EARNING",
+        "KINERJA KEUANGAN",
+        "LAPORAN KEUANGAN",
         # Investor
-        "INVESTOR", "ASING", "DOMESTIK", "NET BUY", "NET SELL", "FOREIGN",
+        "INVESTOR",
+        "ASING",
+        "DOMESTIK",
+        "NET BUY",
+        "NET SELL",
+        "FOREIGN",
         # Market movement
-        "MENGUAT", "MELEMAH", "RALLY", "KOREKSI", "BULLISH", "BEARISH",
-        "NAIK", "TURUN", "ANJLOK", "MEROKET", "REBOUND",
+        "MENGUAT",
+        "MELEMAH",
+        "RALLY",
+        "KOREKSI",
+        "BULLISH",
+        "BEARISH",
+        "NAIK",
+        "TURUN",
+        "ANJLOK",
+        "MEROKET",
+        "REBOUND",
         # Sectors
-        "PERBANKAN", "PERTAMBANGAN", "PROPERTI", "TELEKOMUNIKASI",
-        "CONSUMER", "ENERGI", "INFRASTRUKTUR",
+        "PERBANKAN",
+        "PERTAMBANGAN",
+        "PROPERTI",
+        "TELEKOMUNIKASI",
+        "CONSUMER",
+        "ENERGI",
+        "INFRASTRUKTUR",
     ]
 
     @staticmethod
     def get_stock_news(ticker, limit=10):
         """
-        Fetch news from Detik Finance - more focused on stock news.
+        Fetch news from multiple Detik sources - tag page, finance search, general search.
         """
         try:
             ctx = ssl.create_default_context()
@@ -66,29 +106,62 @@ class DetikScraper:
                 "Accept-Language": "id-ID,id;q=0.9,en-US;q=0.8,en;q=0.7",
             }
 
-            # Search on finance.detik.com for more relevant results
-            search_url = f"{DetikScraper.FINANCE_URL}?query={urllib.parse.quote(ticker + ' saham')}&siteid=2"
+            articles = []
+            existing_links = set()
 
-            req = urllib.request.Request(search_url, headers=headers)
-            with urllib.request.urlopen(req, context=ctx, timeout=10) as response:
-                html = response.read().decode("utf-8")
+            # 1. FIRST: Try tag page (most reliable for specific tickers like BREN)
+            tag_url = f"https://www.detik.com/tag/{ticker.lower()}"
+            try:
+                req = urllib.request.Request(tag_url, headers=headers)
+                with urllib.request.urlopen(req, context=ctx, timeout=8) as response:
+                    html = response.read().decode("utf-8")
+                tag_articles = DetikScraper._parse_articles(
+                    html, ticker, limit, strict=False
+                )
+                for art in tag_articles:
+                    if art["link"] not in existing_links:
+                        existing_links.add(art["link"])
+                        articles.append(art)
+            except Exception as e:
+                print(f"Tag page error: {e}")
 
-            articles = DetikScraper._parse_articles(html, ticker, limit)
+            # 2. SECOND: Search on finance.detik.com
+            if len(articles) < limit:
+                search_url = f"{DetikScraper.FINANCE_URL}?query={urllib.parse.quote(ticker + ' saham')}&siteid=2"
+                try:
+                    req = urllib.request.Request(search_url, headers=headers)
+                    with urllib.request.urlopen(
+                        req, context=ctx, timeout=8
+                    ) as response:
+                        html = response.read().decode("utf-8")
+                    finance_articles = DetikScraper._parse_articles(
+                        html, ticker, limit - len(articles), strict=True
+                    )
+                    for art in finance_articles:
+                        if art["link"] not in existing_links:
+                            existing_links.add(art["link"])
+                            articles.append(art)
+                except Exception as e:
+                    print(f"Finance search error: {e}")
 
-            # If not enough results, also search general with stricter filter
+            # 3. THIRD: General search with stricter filter
             if len(articles) < 5:
                 search_url2 = f"{DetikScraper.SEARCH_URL}?query={urllib.parse.quote(ticker + ' saham bursa')}"
-                req = urllib.request.Request(search_url2, headers=headers)
-                with urllib.request.urlopen(req, context=ctx, timeout=10) as response:
-                    html = response.read().decode("utf-8")
-
-                more_articles = DetikScraper._parse_articles(html, ticker, limit - len(articles))
-                
-                # Add unique articles only
-                existing_links = {a["link"] for a in articles}
-                for art in more_articles:
-                    if art["link"] not in existing_links:
-                        articles.append(art)
+                try:
+                    req = urllib.request.Request(search_url2, headers=headers)
+                    with urllib.request.urlopen(
+                        req, context=ctx, timeout=8
+                    ) as response:
+                        html = response.read().decode("utf-8")
+                    more_articles = DetikScraper._parse_articles(
+                        html, ticker, limit - len(articles), strict=True
+                    )
+                    for art in more_articles:
+                        if art["link"] not in existing_links:
+                            existing_links.add(art["link"])
+                            articles.append(art)
+                except Exception as e:
+                    print(f"General search error: {e}")
 
             return articles[:limit]
 
@@ -97,8 +170,8 @@ class DetikScraper:
             return []
 
     @staticmethod
-    def _parse_articles(html, ticker, limit):
-        """Parse articles - STRICTLY filter for stock/finance news only"""
+    def _parse_articles(html, ticker, limit, strict=True):
+        """Parse articles - filter for stock/finance news"""
         articles = []
         ticker_upper = ticker.upper().replace(".JK", "")
 
@@ -137,30 +210,61 @@ class DetikScraper:
         if ticker_upper in company_names:
             search_terms.extend(company_names[ticker_upper])
 
-        # Pattern to extract articles
-        pattern = r'media__title[^>]*>\s*<a[^>]*href="([^"]+)"[^>]*>([^<]+)</a>'
-        date_pattern = r'<div[^>]*class="[^"]*media__date[^"]*"[^>]*>.*?<span[^>]*>([^<]+)</span>'
-        
-        dates = re.findall(date_pattern, html, re.DOTALL | re.IGNORECASE)
-        matches = re.findall(pattern, html, re.DOTALL | re.IGNORECASE)
+        # Pattern to extract articles - multiple patterns for different page layouts
+        patterns = [
+            r'media__title[^>]*>\s*<a[^>]*href="([^"]+)"[^>]*>([^<]+)</a>',
+            r'<h3[^>]*>\s*<a[^>]*href="([^"]+)"[^>]*>([^<]+)</a>',
+            r'<a[^>]*href="(https?://[^"]*detik\.com/[^"]+)"[^>]*title="([^"]+)"',
+        ]
+        date_pattern = (
+            r'<div[^>]*class="[^"]*media__date[^"]*"[^>]*>.*?<span[^>]*>([^<]+)</span>'
+        )
 
-        for i, (link, title) in enumerate(matches):
+        dates = re.findall(date_pattern, html, re.DOTALL | re.IGNORECASE)
+
+        # Try all patterns
+        matches = []
+        for pattern in patterns:
+            found = re.findall(pattern, html, re.DOTALL | re.IGNORECASE)
+            matches.extend(found)
+
+        # Remove duplicates
+        seen = set()
+        unique_matches = []
+        for link, title in matches:
+            if link not in seen:
+                seen.add(link)
+                unique_matches.append((link, title))
+
+        for i, (link, title) in enumerate(unique_matches):
             if len(articles) >= limit:
                 break
-                
+
             title_clean = title.strip()
             title_clean = re.sub(r"\s+", " ", title_clean)
             title_upper = title_clean.upper()
 
-            # STRICT FILTER: Must be from finance domain OR contain stock keywords
-            is_finance_url = "finance.detik.com" in link.lower()
-            
-            # Check if contains ANY stock keyword
-            has_stock_keyword = any(kw in title_upper for kw in DetikScraper.STOCK_KEYWORDS)
-            
             # Check if about this specific ticker/company
             is_about_ticker = any(term in title_upper for term in search_terms)
-            
+
+            # If from tag page (strict=False), accept if about ticker
+            if not strict and is_about_ticker:
+                article = {
+                    "judul": title_clean,
+                    "link": link.strip(),
+                    "waktu": dates[i].strip() if i < len(dates) else "",
+                }
+                articles.append(article)
+                continue
+
+            # STRICT FILTER: Must be from finance domain OR contain stock keywords
+            is_finance_url = "finance.detik.com" in link.lower()
+
+            # Check if contains ANY stock keyword
+            has_stock_keyword = any(
+                kw in title_upper for kw in DetikScraper.STOCK_KEYWORDS
+            )
+
             # Check if mentions any konglomerat (business news indicator)
             mentions_konglomerat = False
             for konglo, names in DetikScraper.KONGLOMERAT.items():
@@ -173,16 +277,18 @@ class DetikScraper:
             # 2. Contains stock keyword AND about ticker
             # 3. About ticker AND mentions konglomerat
             # 4. Contains multiple stock keywords (general market news)
-            
+
             should_include = False
-            
+
             if is_about_ticker and (is_finance_url or has_stock_keyword):
                 should_include = True
             elif is_about_ticker and mentions_konglomerat:
                 should_include = True
             elif has_stock_keyword and is_finance_url:
                 # General market news from finance section
-                stock_keyword_count = sum(1 for kw in DetikScraper.STOCK_KEYWORDS if kw in title_upper)
+                stock_keyword_count = sum(
+                    1 for kw in DetikScraper.STOCK_KEYWORDS if kw in title_upper
+                )
                 if stock_keyword_count >= 2:
                     should_include = True
 
