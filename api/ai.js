@@ -14,43 +14,52 @@ const STOCK_KEYWORDS = [
 ];
 
 // ============ FETCH NEWS FROM PYTHON API ============
-// Python urllib works better on Vercel than JS fetch for Detik
+// Use hardcoded production URL because Vercel functions can't reliably call each other
 async function fetchNewsFromPythonAPI(ticker, baseUrl) {
   const tickerClean = ticker.replace(".JK", "").toUpperCase();
   
+  // Always use production URL - internal function calls are unreliable on Vercel
+  const productionUrl = "https://moocuan.darrellvalentino.com";
+  const newsUrl = `${productionUrl}/api/news?ticker=${encodeURIComponent(tickerClean)}`;
+  
+  console.log(`[NEWS] Fetching: ${newsUrl}`);
+  
   try {
-    // Use absolute URL to Python news API
-    const newsUrl = `${baseUrl}/api/news?ticker=${encodeURIComponent(tickerClean)}`;
-    console.log(`[NEWS] Fetching from Python API: ${newsUrl}`);
-    
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 8000); // 8 second timeout
+    const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
     
     const response = await fetch(newsUrl, {
       method: "GET",
       headers: {
         "Accept": "application/json",
+        "User-Agent": "MooCuan-AI/1.0",
       },
       signal: controller.signal,
     });
     
     clearTimeout(timeoutId);
     
-    console.log(`[NEWS] Python API status: ${response.status}`);
+    console.log(`[NEWS] Status: ${response.status}`);
     
     if (!response.ok) {
-      console.error(`[NEWS] Python API error: ${response.status}`);
+      const errorText = await response.text();
+      console.error(`[NEWS] Error: ${response.status} - ${errorText}`);
       return [];
     }
     
     const data = await response.json();
-    console.log(`[NEWS] Got ${data.articles?.length || 0} articles from Python API`);
+    console.log(`[NEWS] Got ${data.articles?.length || 0} articles`);
+    
+    if (data.articles && data.articles.length > 0) {
+      console.log(`[NEWS] First article: ${data.articles[0].judul?.slice(0, 50)}...`);
+    }
+    
     return data.articles || [];
   } catch (error) {
     if (error.name === 'AbortError') {
-      console.error('[NEWS] Python API timeout');
+      console.error('[NEWS] Timeout after 10s');
     } else {
-      console.error('[NEWS] Python API error:', error.message);
+      console.error('[NEWS] Fetch error:', error.message);
     }
     return [];
   }
