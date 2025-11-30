@@ -163,6 +163,8 @@ const recordLoginAttempt = (email, success) => {
 
 const initDb = async () => {
   try {
+    console.log("[AUTH] initDb running...");
+
     await pool.query(`
       CREATE TABLE IF NOT EXISTS users (
         id SERIAL PRIMARY KEY,
@@ -175,8 +177,12 @@ const initDb = async () => {
       )
     `);
 
+    console.log("[AUTH] users table ensured");
+
     const adminEmail = "darrell.valentino14@gmail.com";
     const adminExists = await pool.query("SELECT id FROM users WHERE email = $1", [adminEmail]);
+
+    console.log("[AUTH] adminExists rows =", adminExists.rows.length);
 
     if (adminExists.rows.length === 0) {
       await pool.query(
@@ -186,11 +192,22 @@ const initDb = async () => {
       `,
         [adminEmail, hashPassword("bebas123"), "Darrell Valentino", "admin", "approved"]
       );
-      console.log("Admin user created successfully");
+      console.log("[AUTH] Admin user created successfully");
+    } else {
+      console.log("[AUTH] Admin already exists, skip seed");
     }
   } catch (error) {
     console.error("Error initializing auth database:", error);
   }
+};
+
+// 🔹 jangan panggil initDb() langsung di sini
+let dbInitialized = false;
+
+const ensureDbInit = async () => {
+  if (dbInitialized) return;
+  await initDb();
+  dbInitialized = true;
 };
 
 initDb();
@@ -200,6 +217,7 @@ initDb();
 // =======================
 
 export default async function handler(req, res) {
+await ensureDbInit();
   // Security headers
   res.setHeader("X-Content-Type-Options", "nosniff");
   res.setHeader("X-Frame-Options", "DENY");
