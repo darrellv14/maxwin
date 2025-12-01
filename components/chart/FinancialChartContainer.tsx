@@ -9,6 +9,7 @@ import ChartHeader from "./ChartHeader";
 import { IndicatorData } from "../../types";
 import { useWatchlistStore } from "../../stores";
 import { toast } from "sonner";
+import { Sparkles, TrendingUp, TrendingDown, BarChart2, AlertTriangle } from "lucide-react";
 import { 
   detectPatterns, 
   detectPatternsWithAI,
@@ -153,7 +154,7 @@ const FinancialChartContainer: React.FC<FinancialChartContainerProps> = ({
       await new Promise(resolve => setTimeout(resolve, 300));
 
       // Use AI-enhanced detection with Gemini validation
-      toast.loading("🧠 Gemini AI validating patterns...", { id: "ai-draw" });
+      toast.loading("🧠 MooCuan AI validating patterns...", { id: "ai-draw" });
       const { patterns, aiAnalysis: analysis } = await detectPatternsWithAI(data, ticker, true);
       
       setDetectedPatterns(patterns);
@@ -846,98 +847,123 @@ const FinancialChartContainer: React.FC<FinancialChartContainerProps> = ({
           animate={{ opacity: 1, y: 0 }}
           className="pl-0 sm:pl-12 mt-2"
         >
-          <div className="bg-gradient-to-r from-purple-900/30 to-pink-900/30 border border-purple-500/30 rounded-lg p-3 sm:p-4">
+          <div className="bg-terminal-dark border border-gray-800 rounded-lg p-4 sm:p-6 relative overflow-hidden">
+            {/* Background decoration - like OraclePanel */}
+            <div className="absolute top-0 right-0 w-24 sm:w-32 h-24 sm:h-32 bg-purple-900 opacity-10 rounded-full blur-3xl pointer-events-none"></div>
+
             {/* Header with AI Analysis Summary */}
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-3">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-4 sm:mb-6 z-10 relative">
               <div className="flex items-center gap-2">
-                <span className="text-purple-400 text-sm font-bold font-mono">🤖 AI PATTERN ANALYSIS</span>
-                <span className="text-xs text-gray-500">({detectedPatterns.length} pattern{detectedPatterns.length > 1 ? "s" : ""} detected)</span>
-                {aiAnalysis?.primarySignal && (
-                  <span className={`text-xs font-bold px-2 py-0.5 rounded ${
-                    aiAnalysis.primarySignal === "BUY" 
-                      ? "bg-profit-green/20 text-profit-green" 
-                      : aiAnalysis.primarySignal === "SELL"
-                        ? "bg-loss-red/20 text-loss-red"
-                        : "bg-yellow-500/20 text-yellow-400"
-                  }`}>
-                    {aiAnalysis.primarySignal} ({aiAnalysis.primaryConfidence}%)
-                  </span>
-                )}
+                <h2 className="text-base sm:text-lg font-bold font-mono text-white flex items-center">
+                  <Sparkles className="w-4 h-4 sm:w-5 sm:h-5 text-purple-500 mr-1.5 sm:mr-2" />
+                  AI PATTERN ANALYSIS
+                </h2>
+                <span className="text-xs text-gray-500 font-mono">({detectedPatterns.length} detected)</span>
               </div>
-              {aiAnalysis?.bestPattern && (
-                <span className="text-xs text-purple-300 font-mono">
-                  Best: {aiAnalysis.bestPattern}
-                </span>
+              {aiAnalysis?.primarySignal && (
+                <div className="flex items-center gap-2">
+                  <span
+                    className={`text-xl sm:text-2xl font-bold tracking-tighter ${
+                      aiAnalysis.primarySignal === "BUY"
+                        ? "text-profit-green drop-shadow-[0_0_10px_rgba(0,255,157,0.5)]"
+                        : aiAnalysis.primarySignal === "SELL"
+                          ? "text-loss-red drop-shadow-[0_0_10px_rgba(255,0,85,0.5)]"
+                          : "text-yellow-400"
+                    }`}
+                  >
+                    {aiAnalysis.primarySignal}
+                  </span>
+                  <span className="text-sm font-mono text-gray-400">{aiAnalysis.primaryConfidence}%</span>
+                </div>
               )}
             </div>
 
             {/* AI Overall Analysis */}
             {aiAnalysis?.overallAnalysis && (
-              <div className="bg-black/30 rounded p-2 sm:p-3 mb-3 border border-purple-500/20">
-                <div className="text-[10px] text-purple-400 font-mono mb-1">GEMINI AI ANALYSIS:</div>
-                <p className="text-xs text-gray-300 leading-relaxed">
+              <div className="bg-gray-900/50 p-3 sm:p-4 rounded border border-gray-700/50 mb-4 z-10 relative">
+                <div className="text-[10px] sm:text-xs text-gray-500 font-mono uppercase mb-1">MOOCUAN AI ANALYSIS</div>
+                <p className="text-xs sm:text-sm text-gray-300 leading-relaxed">
                   {aiAnalysis.overallAnalysis}
                 </p>
+                {aiAnalysis.bestPattern && (
+                  <div className="mt-2 pt-2 border-t border-gray-700/50 flex justify-between items-center">
+                    <span className="text-[10px] sm:text-xs text-gray-500 font-mono">BEST PATTERN</span>
+                    <span className="text-xs sm:text-sm font-bold text-purple-400">{aiAnalysis.bestPattern}</span>
+                  </div>
+                )}
               </div>
             )}
 
-            {/* Pattern Cards */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 sm:gap-3">
+            {/* Pattern Cards Grid */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 sm:gap-3 z-10 relative">
               {detectedPatterns.map((pattern, idx) => (
                 <div
                   key={idx}
-                  className={`p-2 sm:p-3 rounded border ${
-                    pattern.direction === "bullish"
-                      ? "bg-profit-green/10 border-profit-green/30"
-                      : pattern.direction === "bearish"
-                        ? "bg-loss-red/10 border-loss-red/30"
-                        : "bg-yellow-500/10 border-yellow-500/30"
-                  }`}
+                  className="bg-terminal-gray border border-gray-800 p-3 sm:p-4 rounded-lg shadow-lg"
                 >
-                  <div className="flex items-center justify-between mb-1">
-                    <span className={`text-xs sm:text-sm font-bold ${
-                      pattern.direction === "bullish" ? "text-profit-green" : pattern.direction === "bearish" ? "text-loss-red" : "text-yellow-400"
-                    }`}>
-                      {pattern.aiValidated && "🤖 "}
-                      {pattern.direction === "bullish" ? "📈" : pattern.direction === "bearish" ? "📉" : "➡️"} {pattern.name}
-                    </span>
-                    <span className={`text-[10px] sm:text-xs font-mono ${pattern.aiValidated ? "text-purple-400" : "text-gray-400"}`}>
+                  {/* Pattern Header */}
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center gap-1.5">
+                      {pattern.aiValidated && <Sparkles className="w-3 h-3 text-purple-400" />}
+                      {pattern.direction === "bullish" ? (
+                        <TrendingUp className="w-4 h-4 text-profit-green" />
+                      ) : pattern.direction === "bearish" ? (
+                        <TrendingDown className="w-4 h-4 text-loss-red" />
+                      ) : (
+                        <BarChart2 className="w-4 h-4 text-yellow-400" />
+                      )}
+                      <span className={`text-xs sm:text-sm font-bold ${
+                        pattern.direction === "bullish" ? "text-profit-green" : pattern.direction === "bearish" ? "text-loss-red" : "text-yellow-400"
+                      }`}>
+                        {pattern.name}
+                      </span>
+                    </div>
+                    <span className="text-xs sm:text-sm font-bold text-white font-mono">
                       {pattern.aiConfidence || pattern.confidence}%
                     </span>
                   </div>
                   
                   {/* AI Reasoning */}
                   {pattern.aiReasoning && (
-                    <div className="text-[10px] text-purple-300 font-mono mb-1 italic">
-                      "{pattern.aiReasoning}"
+                    <div className="text-[10px] sm:text-xs text-gray-400 font-mono mb-2 italic border-l-2 border-purple-500/50 pl-2">
+                      {pattern.aiReasoning}
                     </div>
                   )}
                   
-                  {/* Trade Recommendation */}
+                  {/* Trade Recommendation Badge */}
                   {pattern.tradeRecommendation && (
-                    <div className="flex items-center gap-2 mb-1">
-                      <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${
-                        pattern.tradeRecommendation === "BUY" 
-                          ? "bg-profit-green/20 text-profit-green" 
-                          : pattern.tradeRecommendation === "SELL"
-                            ? "bg-loss-red/20 text-loss-red"
-                            : "bg-yellow-500/20 text-yellow-400"
-                      }`}>
+                    <div className="flex items-center gap-2 mb-2">
+                      <span
+                        className={`text-lg sm:text-xl font-bold tracking-tighter ${
+                          pattern.tradeRecommendation === "BUY"
+                            ? "text-profit-green drop-shadow-[0_0_8px_rgba(0,255,157,0.4)]"
+                            : pattern.tradeRecommendation === "SELL"
+                              ? "text-loss-red drop-shadow-[0_0_8px_rgba(255,0,85,0.4)]"
+                              : "text-yellow-400"
+                        }`}
+                      >
                         {pattern.tradeRecommendation}
                       </span>
                       {pattern.riskRewardRatio && (
-                        <span className="text-[10px] text-gray-500">R:R {pattern.riskRewardRatio}</span>
+                        <span className="text-[10px] sm:text-xs text-gray-500 font-mono">R:R {pattern.riskRewardRatio}</span>
                       )}
                     </div>
                   )}
                   
-                  <div className="flex justify-between text-[10px] sm:text-xs">
-                    <span className={pattern.targetDirection === "up" ? "text-profit-green" : "text-loss-red"}>
-                      Target: {pattern.targetPrice.toLocaleString(undefined, { maximumFractionDigits: 0 })}
-                    </span>
-                    <span className="text-loss-red">
-                      SL: {pattern.stopLoss.toLocaleString(undefined, { maximumFractionDigits: 0 })}
-                    </span>
+                  {/* Target & Stop Loss Grid - like OraclePanel trade plan */}
+                  <div className="grid grid-cols-2 gap-1.5 sm:gap-2">
+                    <div className="bg-gray-900/50 p-1.5 sm:p-2 rounded border border-gray-700/50">
+                      <div className="text-[10px] text-gray-500 font-mono">TARGET</div>
+                      <div className={`text-xs sm:text-sm font-bold truncate ${pattern.targetDirection === "up" ? "text-profit-green" : "text-loss-red"}`}>
+                        {pattern.targetPrice.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                      </div>
+                    </div>
+                    <div className="bg-gray-900/50 p-1.5 sm:p-2 rounded border border-gray-700/50">
+                      <div className="text-[10px] text-gray-500 font-mono">STOP LOSS</div>
+                      <div className="text-xs sm:text-sm font-bold text-loss-red truncate">
+                        {pattern.stopLoss.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                      </div>
+                    </div>
                   </div>
                 </div>
               ))}
@@ -945,11 +971,17 @@ const FinancialChartContainer: React.FC<FinancialChartContainerProps> = ({
 
             {/* AI Warnings */}
             {aiAnalysis?.warnings && aiAnalysis.warnings.length > 0 && (
-              <div className="mt-3 p-2 bg-yellow-500/10 border border-yellow-500/30 rounded">
-                <div className="text-[10px] text-yellow-500 font-mono font-bold mb-1">⚠️ WARNINGS:</div>
-                <ul className="text-[10px] text-yellow-400/80 space-y-0.5">
+              <div className="mt-4 bg-gray-900/50 p-3 sm:p-4 rounded border border-yellow-500/30 z-10 relative">
+                <div className="text-[10px] sm:text-xs text-yellow-500 font-mono font-bold mb-2 uppercase flex items-center gap-1">
+                  <AlertTriangle className="w-3 h-3" />
+                  WARNINGS
+                </div>
+                <ul className="text-[10px] sm:text-xs text-gray-400 space-y-1">
                   {aiAnalysis.warnings.map((warning, idx) => (
-                    <li key={idx}>• {warning}</li>
+                    <li key={idx} className="flex items-start gap-1.5">
+                      <span className="text-yellow-500">•</span>
+                      <span>{warning}</span>
+                    </li>
                   ))}
                 </ul>
               </div>
