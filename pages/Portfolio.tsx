@@ -8,14 +8,15 @@ import {
   Plus,
   Trash2,
   Edit2,
-  RefreshCw,
   BarChart3,
   AlertCircle,
   Wallet,
+  RefreshCw,
 } from "lucide-react";
 import { usePortfolioStore, PortfolioPosition } from "../stores";
 import { toast } from "sonner";
 import Navbar from "../components/Navbar";
+import ConfirmModal from "../components/ConfirmModal";
 
 interface PortfolioStats {
   totalValue: number;
@@ -23,7 +24,9 @@ interface PortfolioStats {
   totalPnL: number;
   totalPnLPercent: number;
   topGainer: PortfolioPosition | null;
+  topGainerPercent: number;
   topLoser: PortfolioPosition | null;
+  topLoserPercent: number;
 }
 
 const Portfolio: React.FC = () => {
@@ -32,7 +35,7 @@ const Portfolio: React.FC = () => {
     isLoading,
     error,
     fetchPositions,
-    addTransaction,
+    updatePosition,
     removePosition,
     getTotalValue,
     getTotalCost,
@@ -42,6 +45,10 @@ const Portfolio: React.FC = () => {
 
   const [showAddModal, setShowAddModal] = useState(false);
   const [editingPosition, setEditingPosition] = useState<PortfolioPosition | null>(null);
+  const [deleteConfirm, setDeleteConfirm] = useState<{ isOpen: boolean; ticker: string }>({
+    isOpen: false,
+    ticker: "",
+  });
   const [formData, setFormData] = useState({
     ticker: "",
     shares: "",
@@ -49,25 +56,34 @@ const Portfolio: React.FC = () => {
     name: "",
   });
 
+  // Auto-fetch positions on mount and every 60 seconds
   useEffect(() => {
     fetchPositions();
+
+    const interval = setInterval(() => {
+      fetchPositions();
+    }, 60000); // 60 seconds
+
+    return () => clearInterval(interval);
   }, [fetchPositions]);
 
   const stats = useMemo<PortfolioStats>(() => {
     let topGainer: PortfolioPosition | null = null;
     let topLoser: PortfolioPosition | null = null;
-    let maxGain = -Infinity;
-    let maxLoss = Infinity;
+    let topGainerPercent = 0;
+    let topLoserPercent = 0;
 
     positions.forEach((pos) => {
       const pnlPercent = (((pos.currentPrice || pos.avgPrice) - pos.avgPrice) / pos.avgPrice) * 100;
 
-      if (pnlPercent > maxGain) {
-        maxGain = pnlPercent;
+      // Only set as top gainer if actually in profit (pnlPercent > 0)
+      if (pnlPercent > 0 && pnlPercent > topGainerPercent) {
+        topGainerPercent = pnlPercent;
         topGainer = pos;
       }
-      if (pnlPercent < maxLoss) {
-        maxLoss = pnlPercent;
+      // Only set as top loser if actually in loss (pnlPercent < 0)
+      if (pnlPercent < 0 && pnlPercent < topLoserPercent) {
+        topLoserPercent = pnlPercent;
         topLoser = pos;
       }
     });
@@ -78,7 +94,9 @@ const Portfolio: React.FC = () => {
       totalPnL: getTotalPnL(),
       totalPnLPercent: getTotalPnLPercent(),
       topGainer,
+      topGainerPercent,
       topLoser,
+      topLoserPercent,
     };
   }, [positions, getTotalValue, getTotalCost, getTotalPnL, getTotalPnLPercent]);
 
@@ -89,6 +107,7 @@ const Portfolio: React.FC = () => {
     }
 
     try {
+      const { addTransaction } = usePortfolioStore.getState();
       await addTransaction({
         ticker: formData.ticker.toUpperCase(),
         type: "buy",
@@ -107,24 +126,11 @@ const Portfolio: React.FC = () => {
   const handleUpdatePosition = async () => {
     if (!editingPosition) return;
 
-    const currentShares = editingPosition.shares;
-    const newShares = parseFloat(formData.shares);
-    const diff = newShares - currentShares;
-
-    if (diff === 0) {
-      toast.info("No changes to make");
-      setEditingPosition(null);
-      setFormData({ ticker: "", shares: "", avgPrice: "", name: "" });
-      return;
-    }
-
     try {
-      await addTransaction({
-        ticker: editingPosition.ticker,
-        type: diff > 0 ? "buy" : "sell",
-        shares: Math.abs(diff),
-        price: parseFloat(formData.avgPrice),
-        notes: formData.name,
+      await updatePosition(editingPosition.ticker, {
+        shares: parseFloat(formData.shares),
+        avgPrice: parseFloat(formData.avgPrice),
+        name: formData.name || undefined,
       });
       toast.success(`Updated ${editingPosition.ticker}`);
       setEditingPosition(null);
@@ -134,12 +140,13 @@ const Portfolio: React.FC = () => {
     }
   };
 
-  const handleDeletePosition = async (ticker: string) => {
-    if (!confirm(`Remove ${ticker} from portfolio?`)) return;
+  const handleDeletePosition = async () => {
+    if (!deleteConfirm.ticker) return;
 
     try {
-      await removePosition(ticker);
-      toast.success(`Removed ${ticker} from portfolio`);
+      await removePosition(deleteConfirm.ticker);
+      toast.success(`Removed ${deleteConfirm.ticker} from portfolio`);
+      setDeleteConfirm({ isOpen: false, ticker: "" });
     } catch {
       toast.error("Failed to remove position");
     }
@@ -179,27 +186,16 @@ const Portfolio: React.FC = () => {
               Monitor posisi saham dan crypto yang tersimpan di MooCuan
             </p>
           </div>
-          <div className="flex gap-2">
-            <motion.button
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
-              onClick={() => fetchPositions()}
-              className="flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-1.5 sm:py-2 bg-gray-900 border border-gray-700 text-gray-300 text-xs sm:text-sm rounded-lg font-mono hover:bg-gray-800 transition-colors"
-            >
-              <RefreshCw className={`w-3 h-3 sm:w-4 sm:h-4 ${isLoading ? "animate-spin" : ""}`} />
-              <span className="hidden xs:inline">REFRESH</span>
-            </motion.button>
-            <motion.button
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
-              onClick={() => setShowAddModal(true)}
-              className="flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-1.5 sm:py-2 bg-profit-green text-black text-xs sm:text-sm rounded-lg font-mono font-bold hover:bg-profit-green/90 transition-colors"
-            >
-              <Plus className="w-3 h-3 sm:w-4 sm:h-4" />
-              <span className="hidden xs:inline">ADD POSITION</span>
-              <span className="xs:hidden">ADD</span>
-            </motion.button>
-          </div>
+          <motion.button
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
+            onClick={() => setShowAddModal(true)}
+            className="flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-1.5 sm:py-2 bg-profit-green text-black text-xs sm:text-sm rounded-lg font-mono font-bold hover:bg-profit-green/90 transition-colors"
+          >
+            <Plus className="w-3 h-3 sm:w-4 sm:h-4" />
+            <span className="hidden xs:inline">ADD POSITION</span>
+            <span className="xs:hidden">ADD</span>
+          </motion.button>
         </div>
 
         <div className="grid grid-cols-2 md:grid-cols-4 gap-2 sm:gap-4 mb-4 sm:mb-6">
@@ -235,7 +231,7 @@ const Portfolio: React.FC = () => {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-[10px] sm:text-xs text-gray-500 font-mono uppercase">
-                  Unrealized P&amp;L
+                  Unrealized P&L
                 </p>
                 <p
                   className={`text-lg sm:text-2xl font-bold font-mono ${
@@ -264,6 +260,7 @@ const Portfolio: React.FC = () => {
             </div>
           </motion.div>
 
+          {/* Top Gainer - Only show if there is an actual profit */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -281,18 +278,11 @@ const Portfolio: React.FC = () => {
                       {stats.topGainer.ticker.replace(".JK", "")}
                     </p>
                     <p className="text-[10px] sm:text-xs text-profit-green mt-1">
-                      +
-                      {(
-                        (((stats.topGainer.currentPrice || stats.topGainer.avgPrice) -
-                          stats.topGainer.avgPrice) /
-                          stats.topGainer.avgPrice) *
-                        100
-                      ).toFixed(2)}
-                      %
+                      +{stats.topGainerPercent.toFixed(2)}%
                     </p>
                   </>
                 ) : (
-                  <p className="text-[10px] sm:text-xs text-gray-500 mt-1">No positions</p>
+                  <p className="text-[10px] sm:text-xs text-gray-500 mt-2">Belum ada profit</p>
                 )}
               </div>
               <div className="w-8 h-8 sm:w-10 sm:h-10 bg-profit-green/10 rounded-lg flex items-center justify-center border border-profit-green/30">
@@ -301,6 +291,7 @@ const Portfolio: React.FC = () => {
             </div>
           </motion.div>
 
+          {/* Top Loser - Only show if there is an actual loss */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -318,17 +309,11 @@ const Portfolio: React.FC = () => {
                       {stats.topLoser.ticker.replace(".JK", "")}
                     </p>
                     <p className="text-[10px] sm:text-xs text-loss-red mt-1">
-                      {(
-                        (((stats.topLoser.currentPrice || stats.topLoser.avgPrice) -
-                          stats.topLoser.avgPrice) /
-                          stats.topLoser.avgPrice) *
-                        100
-                      ).toFixed(2)}
-                      %
+                      {stats.topLoserPercent.toFixed(2)}%
                     </p>
                   </>
                 ) : (
-                  <p className="text-[10px] sm:text-xs text-gray-500 mt-1">No positions</p>
+                  <p className="text-[10px] sm:text-xs text-gray-500 mt-2">Belum ada rugi</p>
                 )}
               </div>
               <div className="w-8 h-8 sm:w-10 sm:h-10 bg-loss-red/10 rounded-lg flex items-center justify-center border border-loss-red/30">
@@ -350,9 +335,12 @@ const Portfolio: React.FC = () => {
               POSITIONS
               <span className="text-[10px] sm:text-xs text-gray-500">({positions.length})</span>
             </h3>
+            {isLoading && (
+              <RefreshCw className="w-4 h-4 text-gray-500 animate-spin" />
+            )}
           </div>
 
-          {isLoading ? (
+          {isLoading && positions.length === 0 ? (
             <div className="py-10 sm:py-12 text-center text-gray-400">
               <RefreshCw className="w-6 h-6 sm:w-8 sm:h-8 animate-spin mx-auto mb-3" />
               <p className="font-mono text-xs sm:text-sm">Loading positions...</p>
@@ -386,8 +374,8 @@ const Portfolio: React.FC = () => {
                     <th className="px-3 sm:px-4 py-2.5 text-right">Avg Price</th>
                     <th className="px-3 sm:px-4 py-2.5 text-right">Current</th>
                     <th className="px-3 sm:px-4 py-2.5 text-right">Value</th>
-                    <th className="px-3 sm:px-4 py-2.5 text-right">P&amp;L</th>
-                    <th className="px-3 sm:px-4 py-2.5 text-right">P&amp;L %</th>
+                    <th className="px-3 sm:px-4 py-2.5 text-right">P&L</th>
+                    <th className="px-3 sm:px-4 py-2.5 text-right">P&L %</th>
                     <th className="px-3 sm:px-4 py-2.5 text-right">Actions</th>
                   </tr>
                 </thead>
@@ -455,7 +443,7 @@ const Portfolio: React.FC = () => {
                                 <Edit2 className="w-3 h-3 sm:w-4 sm:h-4 text-blue-400" />
                               </button>
                               <button
-                                onClick={() => handleDeletePosition(pos.ticker)}
+                                onClick={() => setDeleteConfirm({ isOpen: true, ticker: pos.ticker })}
                                 className="p-1.5 sm:p-2 rounded-lg hover:bg-gray-800 border border-transparent hover:border-gray-700 transition-colors"
                                 aria-label="Delete position"
                               >
@@ -496,6 +484,7 @@ const Portfolio: React.FC = () => {
         </motion.div>
       </main>
 
+      {/* Add/Edit Modal */}
       <AnimatePresence>
         {(showAddModal || editingPosition) && (
           <motion.div
@@ -599,6 +588,18 @@ const Portfolio: React.FC = () => {
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* Delete Confirmation Modal */}
+      <ConfirmModal
+        isOpen={deleteConfirm.isOpen}
+        onClose={() => setDeleteConfirm({ isOpen: false, ticker: "" })}
+        onConfirm={handleDeletePosition}
+        title="Hapus Posisi"
+        message={`Apakah Anda yakin ingin menghapus ${deleteConfirm.ticker.replace(".JK", "")} dari portfolio?`}
+        confirmText="Hapus"
+        cancelText="Batal"
+        variant="danger"
+      />
     </div>
   );
 };

@@ -1,8 +1,9 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Briefcase, Plus, X, DollarSign, PieChart, ChevronDown, ChevronUp } from "lucide-react";
 import { usePortfolioStore, PortfolioPosition } from "../stores";
 import { toast } from "sonner";
+import ConfirmModal from "./ConfirmModal";
 
 interface AddPositionModalProps {
   isOpen: boolean;
@@ -121,12 +122,28 @@ const PortfolioWidget: React.FC = () => {
     positions,
     addTransaction,
     removePosition,
+    fetchPositions,
     getTotalValue,
     getTotalPnL,
     getTotalPnLPercent,
   } = usePortfolioStore();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isExpanded, setIsExpanded] = useState(true);
+  const [deleteConfirm, setDeleteConfirm] = useState<{ isOpen: boolean; ticker: string }>({
+    isOpen: false,
+    ticker: "",
+  });
+
+  // Auto-fetch positions on mount and every 60 seconds
+  useEffect(() => {
+    fetchPositions();
+
+    const interval = setInterval(() => {
+      fetchPositions();
+    }, 60000); // 60 seconds
+
+    return () => clearInterval(interval);
+  }, [fetchPositions]);
 
   const handleAddPosition = async (
     position: Omit<PortfolioPosition, "id" | "addedAt" | "updatedAt">
@@ -292,10 +309,7 @@ const PortfolioWidget: React.FC = () => {
                           </div>
                         </div>
                         <button
-                          onClick={() => {
-                            removePosition(pos.ticker);
-                            toast.success("Position removed");
-                          }}
+                          onClick={() => setDeleteConfirm({ isOpen: true, ticker: pos.ticker })}
                           className="p-1 opacity-0 group-hover:opacity-100 hover:bg-red-500/20 rounded transition-all"
                           aria-label={`Remove ${pos.ticker} from portfolio`}
                         >
@@ -315,6 +329,25 @@ const PortfolioWidget: React.FC = () => {
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
         onAdd={handleAddPosition}
+      />
+
+      <ConfirmModal
+        isOpen={deleteConfirm.isOpen}
+        onClose={() => setDeleteConfirm({ isOpen: false, ticker: "" })}
+        onConfirm={async () => {
+          try {
+            await removePosition(deleteConfirm.ticker);
+            toast.success("Position removed");
+            setDeleteConfirm({ isOpen: false, ticker: "" });
+          } catch {
+            toast.error("Failed to remove position");
+          }
+        }}
+        title="Hapus Posisi"
+        message={`Apakah Anda yakin ingin menghapus ${deleteConfirm.ticker.replace(".JK", "")} dari portfolio?`}
+        confirmText="Hapus"
+        cancelText="Batal"
+        variant="danger"
       />
     </motion.div>
   );

@@ -39,6 +39,7 @@ interface PortfolioStore {
     price: number;
     notes?: string;
   }) => Promise<void>;
+  updatePosition: (ticker: string, data: { shares?: number; avgPrice?: number; name?: string }) => Promise<void>;
   removePosition: (ticker: string) => Promise<void>;
   getTotalValue: () => number;
   getTotalCost: () => number;
@@ -133,6 +134,37 @@ export const usePortfolioStore = create<PortfolioStore>()((set, get) => ({
       if (!response.ok) {
         const data = await response.json();
         throw new Error(data.message || "Failed to add transaction");
+      }
+
+      await get().fetchPositions();
+      set({ isLoading: false });
+    } catch (error) {
+      set({ error: (error as Error).message, isLoading: false });
+      throw error;
+    }
+  },
+
+  updatePosition: async (ticker, data) => {
+    set({ isLoading: true, error: null });
+    try {
+      const token = getToken();
+      if (!token) {
+        set({ error: "Not authenticated", isLoading: false });
+        throw new Error("Not authenticated");
+      }
+
+      const response = await fetch(`${API_URL}/api/portfolio/position/${ticker}`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(data),
+      });
+
+      if (!response.ok) {
+        const result = await response.json();
+        throw new Error(result.message || "Failed to update position");
       }
 
       await get().fetchPositions();

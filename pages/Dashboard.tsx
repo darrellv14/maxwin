@@ -73,7 +73,7 @@ const Dashboard: React.FC = () => {
   const handleAnalyze = async () => {
     const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
     if (!apiKey) {
-      alert("Please check API Key configuration.");
+      toast.error("Please check API Key configuration.");
       return;
     }
 

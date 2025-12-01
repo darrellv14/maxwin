@@ -316,6 +316,60 @@ export default async function handler(req, res) {
       }
     }
 
+    // PUT /position/:ticker - Update position (edit avgPrice and shares directly)
+    if (path.startsWith("/position/") && req.method === "PUT") {
+      const ticker = path.split("/")[2]?.toUpperCase();
+      const { shares, avgPrice, name } = req.body;
+
+      if (!ticker) {
+        return res.status(400).json({ success: false, message: "Ticker harus diisi" });
+      }
+
+      if (shares === undefined && avgPrice === undefined && name === undefined) {
+        return res.status(400).json({ success: false, message: "Tidak ada data untuk diupdate" });
+      }
+
+      // Check if position exists
+      const existingPosition = await pool.query(
+        "SELECT id FROM portfolio_positions WHERE user_id = $1 AND ticker = $2",
+        [userId, ticker]
+      );
+
+      if (existingPosition.rows.length === 0) {
+        return res.status(404).json({ success: false, message: "Posisi tidak ditemukan" });
+      }
+
+      // Build dynamic update query
+      const updates = [];
+      const values = [];
+      let paramIndex = 1;
+
+      if (shares !== undefined) {
+        updates.push(`shares = $${paramIndex++}`);
+        values.push(shares);
+      }
+      if (avgPrice !== undefined) {
+        updates.push(`avg_price = $${paramIndex++}`);
+        values.push(avgPrice);
+      }
+      if (name !== undefined) {
+        updates.push(`name = $${paramIndex++}`);
+        values.push(name);
+      }
+      updates.push(`updated_at = CURRENT_TIMESTAMP`);
+
+      values.push(userId, ticker);
+
+      await pool.query(
+        `UPDATE portfolio_positions 
+         SET ${updates.join(", ")} 
+         WHERE user_id = $${paramIndex++} AND ticker = $${paramIndex}`,
+        values
+      );
+
+      return res.json({ success: true, message: "Posisi berhasil diupdate" });
+    }
+
     // DELETE /position/:ticker - Remove entire position
     if (path.startsWith("/position/") && req.method === "DELETE") {
       const ticker = path.split("/")[2]?.toUpperCase();
