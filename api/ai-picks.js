@@ -4,6 +4,18 @@ import { GoogleGenerativeAI } from "@google/generative-ai";
 import TI from "technicalindicators";
 import { setSecurityHeaders, rateLimit } from "./security.js";
 
+// Ensure user_id is nullable for AI picks
+const ensureNullableUserId = async () => {
+  try {
+    await pool.query(`
+      ALTER TABLE analysis_history ALTER COLUMN user_id DROP NOT NULL;
+    `);
+  } catch (e) {
+    // Ignore - already nullable or doesn't exist
+  }
+};
+ensureNullableUserId().catch(() => {});
+
 // =======================
 //  Helper: TECHNICALS
 // =======================
