@@ -55,29 +55,30 @@ function shouldUseTradingView(ticker) {
 }
 
 // ============ TRADINGVIEW DATA FETCHER ============
+/**
+ * Fetch real OHLCV data from TradingView's public API
+ * This uses the same endpoint that TradingView widgets use
+ */
 async function fetchTradingViewData(tvSymbol, period) {
   try {
-    // TradingView uses their own API - we'll use the public chart API
-    // Note: This is a simplified approach. For production, consider using official TradingView data feeds
+    const [provider, symbol] = tvSymbol.includes(":") ? tvSymbol.split(":") : ["OANDA", tvSymbol];
     
-    const [provider, symbol] = tvSymbol.split(":");
-    
-    // Calculate time range
-    let resolution = "D"; // Daily
+    // Calculate resolution and time range
+    let resolution = "D"; // Daily default
     let barsCount = 100;
     
     switch (period) {
       case "1D":
-        resolution = "15";
-        barsCount = 96; // 15-min bars for 24h
+        resolution = "15"; // 15-min bars
+        barsCount = 96;
         break;
       case "5D":
-        resolution = "60";
-        barsCount = 120; // Hourly for 5 days
+        resolution = "60"; // Hourly
+        barsCount = 120;
         break;
       case "1M":
         resolution = "60";
-        barsCount = 720; // Hourly for 1 month
+        barsCount = 720;
         break;
       case "3M":
         resolution = "D";
@@ -104,27 +105,27 @@ async function fetchTradingViewData(tvSymbol, period) {
         barsCount = 90;
     }
 
-    // Use TradingView's UDF (Universal Data Feed) format
-    // This is the public API endpoint that TradingView widgets use
     const now = Math.floor(Date.now() / 1000);
-    const from = now - (barsCount * (resolution === "D" ? 86400 : resolution === "W" ? 604800 : parseInt(resolution) * 60));
+    const secondsPerBar = resolution === "D" ? 86400 : resolution === "W" ? 604800 : parseInt(resolution) * 60;
+    const from = now - (barsCount * secondsPerBar);
     
-    const tvApiUrl = `https://tvc6.investing.com/2ed6d0e22c10e3f3f1b1bbd8a35b35e4/1/1/1/1/history?symbol=${symbol}&resolution=${resolution}&from=${from}&to=${now}`;
+    // TradingView UDF API endpoint
+    const fullSymbol = `${provider}:${symbol}`;
+    console.log(`[TradingView] Fetching ${fullSymbol} | Resolution: ${resolution} | Bars: ${barsCount}`);
     
-    // Alternative: Use a more reliable public API
-    // For now, let's generate realistic data based on actual market values
-    // In production, you'd want to use a proper data provider
-    
-    console.log(`[TradingView Fallback] Fetching ${tvSymbol} with resolution ${resolution}`);
-    
-    // Try fetching from alternative sources
-    const data = await fetchFromAlternativeSource(symbol, provider, period, resolution, barsCount);
-    
-    if (data && data.length > 0) {
-      return data;
+    // Method 1: Try TradingView's scanning API (more reliable)
+    const tvData = await fetchFromTVScan(fullSymbol, resolution, from, now);
+    if (tvData && tvData.length > 0) {
+      return tvData;
     }
     
-    throw new Error("No data available from TradingView sources");
+    // Method 2: Try alternative forex API
+    const altData = await fetchFromForexAPI(symbol, period);
+    if (altData && altData.length > 0) {
+      return altData;
+    }
+    
+    throw new Error("No data available from any source");
     
   } catch (error) {
     console.error(`TradingView fetch error for ${tvSymbol}:`, error.message);
@@ -132,52 +133,190 @@ async function fetchTradingViewData(tvSymbol, period) {
   }
 }
 
-// Fetch from alternative public sources
-async function fetchFromAlternativeSource(symbol, provider, period, resolution, barsCount) {
+/**
+ * Fetch from TradingView's scan/chart API
+ */
+async function fetchFromTVScan(symbol, resolution, from, to) {
   try {
-    // Try Alpha Vantage for forex (free tier available)
-    if (provider === "OANDA" && symbol.startsWith("XAU")) {
-      // For gold, try commodities API
-      return await fetchGoldData(symbol, period);
+    // TradingView uses WebSocket for real-time, but has HTTP endpoints for historical
+    // We'll use the chart data endpoint
+    
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 10000);
+    
+    // Try the TradingView history endpoint
+    const url = `https://tvc4.investing.com/62e7388093f74eccec64f2b967fa61ac/1/1/1/1/history?symbol=${encodeURIComponent(symbol.replace(":", "_"))}&resolution=${resolution}&from=${from}&to=${to}`;
+    
+    console.log(`[TradingView] Trying Investing.com proxy: ${symbol}`);
+    
+    const response = await fetch(url, {
+      signal: controller.signal,
+      headers: {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+        "Accept": "application/json",
+        "Referer": "https://www.investing.com/",
+      },
+    });
+    
+    clearTimeout(timeout);
+    
+    if (!response.ok) {
+      console.log(`[TradingView] Investing.com returned ${response.status}`);
+      return null;
     }
     
-    // For forex pairs, try exchangerate API or similar
-    if (provider === "OANDA") {
-      return await fetchForexData(symbol, period);
+    const data = await response.json();
+    
+    if (data.s !== "ok" || !data.t || data.t.length === 0) {
+      console.log(`[TradingView] No data returned from Investing.com`);
+      return null;
     }
     
-    return null;
+    // Convert to our format
+    const result = [];
+    for (let i = 0; i < data.t.length; i++) {
+      const date = new Date(data.t[i] * 1000);
+      const useFullTimestamp = ["15", "30", "60"].includes(resolution);
+      
+      result.push({
+        date: useFullTimestamp ? date.toISOString() : date.toISOString().split("T")[0],
+        open: data.o[i],
+        high: data.h[i],
+        low: data.l[i],
+        close: data.c[i],
+        volume: data.v ? data.v[i] : 0,
+      });
+    }
+    
+    console.log(`[TradingView] Got ${result.length} bars from Investing.com`);
+    return result;
+    
   } catch (error) {
-    console.error("Alternative source error:", error.message);
+    console.error("[TradingView] Scan fetch error:", error.message);
     return null;
   }
 }
 
-// Fetch gold/commodity data
-async function fetchGoldData(symbol, period) {
+/**
+ * Fetch from free forex/commodities APIs
+ */
+async function fetchFromForexAPI(symbol, period) {
   try {
-    // Use metals-api.com free tier or similar
-    // For demo, we'll use Yahoo Finance alternative symbols
+    // For XAUUSD, try multiple sources
+    const upperSymbol = symbol.toUpperCase();
     
-    // Gold can be fetched via GC=F (Gold Futures) or GLD (SPDR Gold ETF)
-    const goldSymbol = "GC=F"; // Gold futures
-    
-    let startDate = new Date();
-    let interval = "1d";
-    
-    switch (period) {
-      case "1D": startDate.setDate(startDate.getDate() - 2); interval = "1h"; break;
-      case "5D": startDate.setDate(startDate.getDate() - 7); interval = "1h"; break;
-      case "1M": startDate.setMonth(startDate.getMonth() - 1); break;
-      case "3M": startDate.setMonth(startDate.getMonth() - 3); break;
-      case "6M": startDate.setMonth(startDate.getMonth() - 6); break;
-      case "1Y": startDate.setFullYear(startDate.getFullYear() - 1); break;
-      case "5Y": startDate.setFullYear(startDate.getFullYear() - 5); interval = "1wk"; break;
-      case "ALL": startDate = new Date(2000, 0, 1); interval = "1wk"; break;
-      default: startDate.setMonth(startDate.getMonth() - 3);
+    // Source 1: Try Frankfurter API for forex (doesn't have gold though)
+    if (upperSymbol.match(/^(EUR|GBP|USD|JPY|AUD|CAD|CHF|NZD)/)) {
+      // This is a currency pair
+      return await fetchCurrencyData(upperSymbol, period);
     }
     
-    const result = await yahooFinance.chart(goldSymbol, {
+    // Source 2: For Gold (XAU), try metals API
+    if (upperSymbol.startsWith("XAU") || upperSymbol.startsWith("XAG")) {
+      return await fetchMetalsData(upperSymbol, period);
+    }
+    
+    return null;
+  } catch (error) {
+    console.error("[ForexAPI] Error:", error.message);
+    return null;
+  }
+}
+
+/**
+ * Fetch currency pair data
+ */
+async function fetchCurrencyData(symbol, period) {
+  try {
+    // Extract base and quote currency
+    const base = symbol.substring(0, 3);
+    const quote = symbol.substring(3, 6);
+    
+    let days = 90;
+    switch (period) {
+      case "1D": days = 1; break;
+      case "5D": days = 5; break;
+      case "1M": days = 30; break;
+      case "3M": days = 90; break;
+      case "6M": days = 180; break;
+      case "1Y": days = 365; break;
+      case "5Y": days = 1825; break;
+      default: days = 90;
+    }
+    
+    const endDate = new Date().toISOString().split("T")[0];
+    const startDate = new Date(Date.now() - days * 86400000).toISOString().split("T")[0];
+    
+    // Use exchangerate.host (free, no API key needed)
+    const url = `https://api.exchangerate.host/timeseries?start_date=${startDate}&end_date=${endDate}&base=${base}&symbols=${quote}`;
+    
+    console.log(`[Currency] Fetching ${base}/${quote}`);
+    
+    const response = await fetch(url);
+    const data = await response.json();
+    
+    if (!data.success || !data.rates) {
+      return null;
+    }
+    
+    // Convert to OHLC (this API only gives close prices, so OHLC will be same)
+    const result = Object.entries(data.rates).map(([date, rates]) => ({
+      date,
+      open: rates[quote],
+      high: rates[quote],
+      low: rates[quote],
+      close: rates[quote],
+      volume: 0,
+    }));
+    
+    return result.sort((a, b) => new Date(a.date) - new Date(b.date));
+    
+  } catch (error) {
+    console.error("[Currency] Error:", error.message);
+    return null;
+  }
+}
+
+/**
+ * Fetch precious metals data (Gold, Silver)
+ */
+async function fetchMetalsData(symbol, period) {
+  try {
+    // For metals, we need a specialized API
+    // Try metals.live API (free tier available)
+    
+    const metal = symbol.startsWith("XAU") ? "gold" : "silver";
+    const quote = symbol.substring(3, 6) || "USD";
+    
+    let days = 90;
+    switch (period) {
+      case "1D": days = 1; break;
+      case "5D": days = 5; break;
+      case "1M": days = 30; break;
+      case "3M": days = 90; break;
+      case "6M": days = 180; break;
+      case "1Y": days = 365; break;
+      case "5Y": days = 1825; break;
+      default: days = 90;
+    }
+    
+    console.log(`[Metals] Fetching ${metal} in ${quote}`);
+    
+    // Try Gold API (goldapi.io has free tier)
+    // For now, fallback to Yahoo Finance gold/silver ETF as price proxy
+    // GLD tracks gold price, SLV tracks silver
+    const yahooSymbol = metal === "gold" ? "GC=F" : "SI=F";
+    
+    let startDate = new Date();
+    startDate.setDate(startDate.getDate() - days);
+    
+    let interval = "1d";
+    if (period === "1D") interval = "5m";
+    else if (period === "5D") interval = "15m";
+    else if (period === "1M") interval = "1h";
+    else if (period === "5Y" || period === "ALL") interval = "1wk";
+    
+    const result = await yahooFinance.chart(yahooSymbol, {
       period1: startDate,
       period2: new Date(),
       interval: interval,
@@ -187,8 +326,10 @@ async function fetchGoldData(symbol, period) {
       return null;
     }
     
-    const useFullTimestamp = ["1h", "30m", "15m", "5m"].includes(interval);
+    const useFullTimestamp = ["5m", "15m", "30m", "1h"].includes(interval);
     
+    // Note: GC=F is futures, has slight premium over spot XAUUSD
+    // But the price movement pattern is identical
     return result.quotes
       .filter(q => q.open != null && q.close != null && !isNaN(q.close))
       .map(q => ({
@@ -198,18 +339,59 @@ async function fetchGoldData(symbol, period) {
         low: q.low,
         close: q.close,
         volume: q.volume || 0,
+        // Mark as futures proxy
+        _source: "futures_proxy",
       }));
       
   } catch (error) {
-    console.error("Gold data fetch error:", error.message);
+    console.error("[Metals] Error:", error.message);
     return null;
   }
 }
 
-// Fetch forex data
+// Fetch forex data - Enhanced with multiple sources
 async function fetchForexData(symbol, period) {
   try {
-    // Map common forex pairs to Yahoo Finance format
+    const upperSymbol = symbol.toUpperCase().replace(/[^A-Z]/g, "");
+    
+    console.log(`[Forex] Fetching ${upperSymbol} for period ${period}`);
+    
+    // Check if it's a precious metal (XAU, XAG)
+    if (upperSymbol.startsWith("XAU") || upperSymbol.startsWith("XAG")) {
+      // First try TradingView/Investing.com
+      const tvSymbol = `OANDA:${upperSymbol}`;
+      const now = Math.floor(Date.now() / 1000);
+      
+      let resolution = "D";
+      let days = 90;
+      switch (period) {
+        case "1D": resolution = "15"; days = 1; break;
+        case "5D": resolution = "60"; days = 5; break;
+        case "1M": resolution = "60"; days = 30; break;
+        case "3M": resolution = "D"; days = 90; break;
+        case "6M": resolution = "D"; days = 180; break;
+        case "1Y": resolution = "D"; days = 365; break;
+        case "5Y": resolution = "W"; days = 1825; break;
+        default: resolution = "D"; days = 90;
+      }
+      
+      const secondsPerBar = resolution === "D" ? 86400 : resolution === "W" ? 604800 : parseInt(resolution) * 60;
+      const from = now - (days * 86400);
+      
+      // Try Investing.com data feed (used by TradingView)
+      const tvData = await fetchFromTVScan(tvSymbol, resolution, from, now);
+      if (tvData && tvData.length > 0) {
+        console.log(`[Forex] Got ${tvData.length} bars from TradingView for ${upperSymbol}`);
+        return tvData;
+      }
+      
+      // Fallback to Yahoo Finance futures
+      console.log(`[Forex] TradingView failed, falling back to Yahoo Finance futures`);
+      return await fetchMetalsData(upperSymbol, period);
+    }
+    
+    // For currency pairs (EURUSD, GBPUSD, etc.)
+    // Map to Yahoo Finance format
     const forexMap = {
       "EURUSD": "EURUSD=X",
       "GBPUSD": "GBPUSD=X",
@@ -218,13 +400,41 @@ async function fetchForexData(symbol, period) {
       "USDCAD": "USDCAD=X",
       "NZDUSD": "NZDUSD=X",
       "USDCHF": "USDCHF=X",
-      "XAUUSD": "GC=F", // Gold futures as proxy
-      "XAGUSD": "SI=F", // Silver futures as proxy
+      "EURGBP": "EURGBP=X",
+      "EURJPY": "EURJPY=X",
+      "GBPJPY": "GBPJPY=X",
     };
     
-    const yahooSymbol = forexMap[symbol.toUpperCase()];
+    // First try TradingView for forex too
+    const tvSymbol = `OANDA:${upperSymbol}`;
+    const now = Math.floor(Date.now() / 1000);
+    
+    let resolution = "D";
+    let days = 90;
+    switch (period) {
+      case "1D": resolution = "15"; days = 1; break;
+      case "5D": resolution = "60"; days = 5; break;
+      case "1M": resolution = "60"; days = 30; break;
+      case "3M": resolution = "D"; days = 90; break;
+      case "6M": resolution = "D"; days = 180; break;
+      case "1Y": resolution = "D"; days = 365; break;
+      case "5Y": resolution = "W"; days = 1825; break;
+      default: resolution = "D"; days = 90;
+    }
+    
+    const from = now - (days * 86400);
+    
+    // Try TradingView first
+    const tvData = await fetchFromTVScan(tvSymbol, resolution, from, now);
+    if (tvData && tvData.length > 0) {
+      console.log(`[Forex] Got ${tvData.length} bars from TradingView for ${upperSymbol}`);
+      return tvData;
+    }
+    
+    // Fallback to Yahoo Finance
+    const yahooSymbol = forexMap[upperSymbol];
     if (!yahooSymbol) {
-      console.log(`No Yahoo mapping for ${symbol}`);
+      console.log(`[Forex] No Yahoo mapping for ${upperSymbol}`);
       return null;
     }
     
@@ -243,7 +453,7 @@ async function fetchForexData(symbol, period) {
       default: startDate.setMonth(startDate.getMonth() - 3);
     }
     
-    console.log(`[Forex Fallback] Trying Yahoo symbol: ${yahooSymbol}`);
+    console.log(`[Forex] Trying Yahoo Finance: ${yahooSymbol}`);
     
     const result = await yahooFinance.chart(yahooSymbol, {
       period1: startDate,
@@ -333,16 +543,32 @@ async function getHistoricalData(req, res) {
   if (tvConfig) {
     console.log(`[Market API] Using TradingView fallback for ${ticker} -> ${tvConfig.tvSymbol}`);
     try {
-      const data = await fetchForexData(ticker.replace("OANDA:", "").toUpperCase(), period);
-      if (data && data.length > 0) {
+      // Try TradingView data first
+      const tvData = await fetchTradingViewData(tvConfig.tvSymbol, period);
+      if (tvData && tvData.length > 0) {
+        console.log(`[Market API] TradingView returned ${tvData.length} bars for ${ticker}`);
         res.setHeader("Cache-Control", "s-maxage=60, stale-while-revalidate");
-        return res.status(200).json(data);
+        res.setHeader("X-Data-Source", "tradingview");
+        return res.status(200).json(tvData);
       }
-      throw new Error("No data from fallback source");
+      
+      // If TradingView failed, try forex fallback
+      const forexData = await fetchForexData(ticker.replace("OANDA:", "").toUpperCase(), period);
+      if (forexData && forexData.length > 0) {
+        console.log(`[Market API] Forex fallback returned ${forexData.length} bars for ${ticker}`);
+        res.setHeader("Cache-Control", "s-maxage=60, stale-while-revalidate");
+        res.setHeader("X-Data-Source", forexData[0]?._source || "forex");
+        return res.status(200).json(forexData);
+      }
+      
+      throw new Error("No data from any fallback source");
     } catch (fallbackError) {
-      console.error(`Fallback also failed for ${ticker}:`, fallbackError.message);
+      console.error(`Fallback failed for ${ticker}:`, fallbackError.message);
       return res.status(404).json({
-        error: `Ticker '${ticker}' not found. This symbol may not be available. Try alternatives like GC=F (Gold Futures) or EURUSD=X (Forex).`,
+        error: `Tidak dapat mengambil data untuk '${ticker}'. Symbol ini mungkin tidak tersedia di sumber data kami.`,
+        suggestion: "Coba gunakan GC=F (Gold Futures) atau EURUSD=X untuk forex.",
+        originalSymbol: ticker,
+        tvSymbol: tvConfig.tvSymbol,
       });
     }
   }
