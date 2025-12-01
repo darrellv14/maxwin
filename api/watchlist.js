@@ -2,10 +2,15 @@ import pool from "./db.js";
 import { verifyToken } from "./auth.js";
 import { setSecurityHeaders, sanitizeInput } from "./security.js";
 
-// Initialize watchlist table
+// Lazy initialization flag
+let dbInitialized = false;
+
+// Initialize watchlist table (runs only once per cold start)
 const initDb = async () => {
+  if (dbInitialized) return;
+  
   try {
-    // First ensure users table exists (in case auth.js hasn't run yet)
+    // Create tables and indexes in a single batch
     await pool.query(`
       CREATE TABLE IF NOT EXISTS users (
         id SERIAL PRIMARY KEY,
@@ -15,10 +20,8 @@ const initDb = async () => {
         role VARCHAR(50) DEFAULT 'user',
         status VARCHAR(50) DEFAULT 'pending',
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-      )
-    `);
-    
-    await pool.query(`
+      );
+      
       CREATE TABLE IF NOT EXISTS watchlist (
         id SERIAL PRIMARY KEY,
         user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -26,29 +29,21 @@ const initDb = async () => {
         name VARCHAR(255),
         added_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         UNIQUE(user_id, ticker)
-      )
+      );
+      
+      CREATE INDEX IF NOT EXISTS idx_watchlist_user ON watchlist(user_id);
     `);
     
-    // Add name column if it doesn't exist (for existing tables)
-    await pool.query(`
-      ALTER TABLE watchlist 
-      ADD COLUMN IF NOT EXISTS name VARCHAR(255)
-    `);
-    
-    // Add added_at column if it doesn't exist (for existing tables)
-    await pool.query(`
-      ALTER TABLE watchlist 
-      ADD COLUMN IF NOT EXISTS added_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-    `);
-    
+    dbInitialized = true;
     console.log("Watchlist table initialized");
   } catch (error) {
-    console.error("Error initializing watchlist table:", error);
+    if (error.code === '42P07' || error.code === '23505') {
+      dbInitialized = true;
+    } else {
+      console.error("Error initializing watchlist table:", error);
+    }
   }
 };
-
-// Don't block module loading - init asynchronously
-initDb().catch(console.error);
 
 export default async function handler(req, res) {
   // Security headers
@@ -61,6 +56,9 @@ export default async function handler(req, res) {
   if (req.method === "OPTIONS") {
     return res.status(200).end();
   }
+
+  // Lazy init tables
+  await initDb();
 
   // Verify authentication
   const authHeader = req.headers.authorization;

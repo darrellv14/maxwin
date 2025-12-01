@@ -307,9 +307,10 @@ const History: React.FC = () => {
           />
           <StatsCard
             title="Performance"
-            value=""
+            value={stats.wins > stats.losses ? "WINNING" : stats.losses > stats.wins ? "LOSING" : "EVEN"}
+            subtitle={`${stats.wins - stats.losses > 0 ? '+' : ''}${stats.wins - stats.losses} net`}
             icon={<Award className="w-4 h-4 sm:w-5 sm:h-5 text-yellow-400" />}
-            color="text-white"
+            color={stats.wins >= stats.losses ? "text-yellow-400" : "text-red-400"}
           />
         </div>
 

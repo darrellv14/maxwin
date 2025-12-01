@@ -30,7 +30,7 @@ interface PortfolioStore {
   transactions: Transaction[];
   isLoading: boolean;
   error: string | null;
-  fetchPositions: () => Promise<void>;
+  fetchPositions: (options?: { skipPrices?: boolean }) => Promise<void>;
   fetchTransactions: () => Promise<void>;
   addTransaction: (data: {
     ticker: string;
@@ -53,7 +53,7 @@ export const usePortfolioStore = create<PortfolioStore>()((set, get) => ({
   isLoading: false,
   error: null,
 
-  fetchPositions: async () => {
+  fetchPositions: async (options = {}) => {
     set({ isLoading: true, error: null });
     try {
       const token = getToken();
@@ -62,7 +62,11 @@ export const usePortfolioStore = create<PortfolioStore>()((set, get) => ({
         return;
       }
 
-      const response = await fetch(`${API_URL}/api/portfolio/positions`, {
+      const url = options.skipPrices 
+        ? `${API_URL}/api/portfolio/positions?skipPrices=true`
+        : `${API_URL}/api/portfolio/positions`;
+
+      const response = await fetch(url, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
@@ -71,13 +75,22 @@ export const usePortfolioStore = create<PortfolioStore>()((set, get) => ({
       if (!response.ok) throw new Error("Failed to fetch positions");
 
       const data = await response.json();
+      const oldPositions = get().positions;
+      
       set({
-        positions: data.positions.map((p: any) => ({
-          ...p,
-          currentPrice: p.currentPrice || undefined, // Use real price from API
-          addedAt: new Date(p.addedAt),
-          updatedAt: p.updatedAt ? new Date(p.updatedAt) : undefined,
-        })),
+        positions: data.positions.map((p: any) => {
+          // If skipPrices, preserve existing currentPrice from state
+          const existingPos = options.skipPrices 
+            ? oldPositions.find(op => op.ticker === p.ticker)
+            : null;
+          
+          return {
+            ...p,
+            currentPrice: p.currentPrice || existingPos?.currentPrice || undefined,
+            addedAt: new Date(p.addedAt),
+            updatedAt: p.updatedAt ? new Date(p.updatedAt) : undefined,
+          };
+        }),
         isLoading: false,
       });
     } catch (error) {
@@ -136,7 +149,8 @@ export const usePortfolioStore = create<PortfolioStore>()((set, get) => ({
         throw new Error(data.message || "Failed to add transaction");
       }
 
-      await get().fetchPositions();
+      // Skip price fetching for faster CRUD, prices already cached
+      await get().fetchPositions({ skipPrices: true });
       set({ isLoading: false });
     } catch (error) {
       set({ error: (error as Error).message, isLoading: false });
@@ -167,7 +181,8 @@ export const usePortfolioStore = create<PortfolioStore>()((set, get) => ({
         throw new Error(result.message || "Failed to update position");
       }
 
-      await get().fetchPositions();
+      // Skip price fetching for faster CRUD
+      await get().fetchPositions({ skipPrices: true });
       set({ isLoading: false });
     } catch (error) {
       set({ error: (error as Error).message, isLoading: false });
@@ -193,7 +208,8 @@ export const usePortfolioStore = create<PortfolioStore>()((set, get) => ({
 
       if (!response.ok) throw new Error("Failed to remove position");
 
-      await get().fetchPositions();
+      // Skip price fetching for faster CRUD
+      await get().fetchPositions({ skipPrices: true });
       set({ isLoading: false });
     } catch (error) {
       set({ error: (error as Error).message, isLoading: false });

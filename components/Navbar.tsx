@@ -1,6 +1,6 @@
 import React from "react";
 import { Link, useLocation } from "react-router-dom";
-import { Keyboard, LogOut, Shield, User, Wallet } from "lucide-react";
+import { Keyboard, LogOut, Shield, User, Wallet, BarChart3, Sparkles } from "lucide-react";
 import { logout, isAdmin, getUser } from "../services/authService";
 import { LOGO_SIZES } from "../constants/logo";
 
@@ -106,40 +106,40 @@ const Navbar: React.FC = () => {
             to="/account"
             className={`text-[10px] font-mono px-2 py-1 rounded-full border ${
               isActive("/account") ? "bg-gray-800 border-profit-green" : "bg-gray-900 border-gray-800"
-            } text-gray-300`}
+            } text-gray-300 flex items-center justify-center`}
           >
-            👤
+            <User className="w-3 h-3" />
           </Link>
           <Link
             to="/screener"
             className={`text-[10px] font-mono px-2 py-1 rounded-full border ${
               isActive("/screener") ? "bg-gray-800 border-profit-green" : "bg-gray-900 border-gray-800"
-            } text-profit-green`}
+            } text-profit-green flex items-center justify-center`}
           >
-            AI
+            <Sparkles className="w-3 h-3" />
           </Link>
           <Link
             to="/history"
             className={`text-[10px] font-mono px-2 py-1 rounded-full border ${
               isActive("/history") ? "bg-gray-800 border-profit-green" : "bg-gray-900 border-gray-800"
-            } text-gray-300`}
+            } text-gray-300 flex items-center justify-center`}
           >
-            📊
+            <BarChart3 className="w-3 h-3" />
           </Link>
           <Link
             to="/portfolio"
             className={`text-[10px] font-mono px-2 py-1 rounded-full border ${
               isActive("/portfolio") ? "bg-gray-800 border-profit-green" : "bg-gray-900 border-gray-800"
-            } text-blue-400`}
+            } text-blue-400 flex items-center justify-center`}
           >
-            💼
+            <Wallet className="w-3 h-3" />
           </Link>
           {isAdmin() && (
             <Link
               to="/admin"
               className={`text-[10px] font-mono px-2 py-1 rounded-full border ${
                 isActive("/admin") ? "bg-purple-800 border-purple-500" : "bg-purple-900/50 border-purple-700"
-              } text-purple-300`}
+              } text-purple-300 flex items-center justify-center`}
             >
               <Shield className="w-3 h-3" />
             </Link>

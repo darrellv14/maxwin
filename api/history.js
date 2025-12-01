@@ -5,10 +5,15 @@ import { verifyToken } from "./auth.js";
 
 const yahooFinance = new YahooFinance();
 
-// Initialize analysis_history table
+// Lazy initialization flag
+let dbInitialized = false;
+
+// Initialize analysis_history table (runs only once per cold start)
 const initDb = async () => {
+  if (dbInitialized) return;
+  
   try {
-    // Create analysis_history table with user_id (nullable for AI screener picks)
+    // Create table and indexes in a single batch
     await pool.query(`
       CREATE TABLE IF NOT EXISTS analysis_history (
         id SERIAL PRIMARY KEY,
@@ -24,41 +29,24 @@ const initDb = async () => {
         status VARCHAR(20) DEFAULT 'ACTIVE',
         reasoning TEXT,
         date_created TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-      )
-    `);
-
-    // Add user_id column if it doesn't exist (for migration)
-    await pool.query(`
-      DO $$ 
-      BEGIN 
-        IF NOT EXISTS (
-          SELECT 1 FROM information_schema.columns 
-          WHERE table_name = 'analysis_history' AND column_name = 'user_id'
-        ) THEN
-          ALTER TABLE analysis_history ADD COLUMN user_id INTEGER REFERENCES users(id) ON DELETE CASCADE;
-        END IF;
-      END $$;
-    `);
-
-    // Make user_id nullable (for AI screener picks that don't belong to any user)
-    await pool.query(`
-      ALTER TABLE analysis_history ALTER COLUMN user_id DROP NOT NULL;
-    `).catch(() => {
-      // Ignore error if already nullable
-    });
-
-    // Create index on user_id for faster queries
-    await pool.query(`
+      );
+      
       CREATE INDEX IF NOT EXISTS idx_analysis_history_user_id ON analysis_history(user_id);
+      CREATE INDEX IF NOT EXISTS idx_analysis_history_status ON analysis_history(status) WHERE status = 'ACTIVE';
+      CREATE INDEX IF NOT EXISTS idx_analysis_history_date ON analysis_history(date_created DESC);
     `);
 
+    dbInitialized = true;
     console.log("Analysis history table initialized");
   } catch (error) {
-    console.error("Error initializing analysis_history table:", error);
+    // Tables likely already exist
+    if (error.code === '42P07' || error.code === '23505') {
+      dbInitialized = true;
+    } else {
+      console.error("Error initializing analysis_history table:", error);
+    }
   }
 };
-
-initDb().catch(console.error);
 
 // ============ GET HISTORY ============
 async function getHistory(req, res, userId) {
@@ -211,6 +199,9 @@ export default async function handler(req, res) {
   if (req.method === "OPTIONS") {
     return res.status(200).end();
   }
+
+  // Lazy init tables
+  await initDb();
 
   // Verify authentication
   const authHeader = req.headers.authorization;

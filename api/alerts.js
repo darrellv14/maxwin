@@ -2,10 +2,15 @@ import pool from "./db.js";
 import { verifyToken } from "./auth.js";
 import { setSecurityHeaders, sanitizeInput } from "./security.js";
 
-// Initialize alerts table
+// Lazy initialization flag
+let dbInitialized = false;
+
+// Initialize alerts table (runs only once per cold start)
 const initDb = async () => {
+  if (dbInitialized) return;
+  
   try {
-    // Ensure users table exists first
+    // Create tables and indexes in a single batch
     await pool.query(`
       CREATE TABLE IF NOT EXISTS users (
         id SERIAL PRIMARY KEY,
@@ -15,10 +20,8 @@ const initDb = async () => {
         role VARCHAR(50) DEFAULT 'user',
         status VARCHAR(50) DEFAULT 'pending',
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-      )
-    `);
-    
-    await pool.query(`
+      );
+      
       CREATE TABLE IF NOT EXISTS price_alerts (
         id SERIAL PRIMARY KEY,
         user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -30,14 +33,22 @@ const initDb = async () => {
         triggered_price DECIMAL(15, 2),
         active BOOLEAN DEFAULT TRUE,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-      )
+      );
+      
+      CREATE INDEX IF NOT EXISTS idx_alerts_user ON price_alerts(user_id);
+      CREATE INDEX IF NOT EXISTS idx_alerts_active ON price_alerts(active, triggered) WHERE active = TRUE AND triggered = FALSE;
     `);
+    
+    dbInitialized = true;
+    console.log("Alerts table initialized");
   } catch (error) {
-    console.error("Error initializing alerts table:", error);
+    if (error.code === '42P07' || error.code === '23505') {
+      dbInitialized = true;
+    } else {
+      console.error("Error initializing alerts table:", error);
+    }
   }
 };
-
-initDb().catch(console.error);
 
 // ============ CHECK ALERTS (cron) ============
 async function checkAlerts(req, res) {
@@ -128,6 +139,9 @@ export default async function handler(req, res) {
   if (req.method === "OPTIONS") {
     return res.status(200).end();
   }
+
+  // Lazy init tables
+  await initDb();
 
   const path = req.url.split("?")[0].replace("/api/alerts", "");
 

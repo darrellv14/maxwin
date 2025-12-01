@@ -5,34 +5,59 @@ import YahooFinance from "yahoo-finance2";
 
 const yahooFinance = new YahooFinance();
 
-// Helper function to fetch current prices for multiple tickers
+// Simple in-memory cache for prices (5 minute TTL)
+const priceCache = new Map();
+const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+
+// Helper function to fetch current prices for multiple tickers with caching
 async function fetchCurrentPrices(tickers) {
   const prices = {};
+  const tickersToFetch = [];
+  const now = Date.now();
   
-  // Fetch prices in parallel with error handling for each ticker
-  await Promise.all(
-    tickers.map(async (ticker) => {
+  // Check cache first
+  for (const ticker of tickers) {
+    const cached = priceCache.get(ticker);
+    if (cached && (now - cached.timestamp) < CACHE_TTL) {
+      prices[ticker] = cached.price;
+    } else {
+      tickersToFetch.push(ticker);
+    }
+  }
+  
+  // Fetch only uncached prices in parallel with timeout
+  if (tickersToFetch.length > 0) {
+    const fetchPromises = tickersToFetch.map(async (ticker) => {
       try {
-        const quote = await yahooFinance.quote(ticker);
+        const quote = await Promise.race([
+          yahooFinance.quote(ticker),
+          new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 3000))
+        ]);
         const price = quote.regularMarketPrice ?? quote.postMarketPrice ?? quote.preMarketPrice;
         if (typeof price === "number") {
           prices[ticker] = price;
+          priceCache.set(ticker, { price, timestamp: now });
         }
       } catch (error) {
         console.warn(`Failed to fetch price for ${ticker}:`, error.message);
-        // Price will be undefined, frontend will fall back to avgPrice
       }
-    })
-  );
+    });
+    
+    await Promise.all(fetchPromises);
+  }
   
   return prices;
 }
 
-// Initialize portfolio tables
-// Initialize portfolio tables
+// Lazy initialization flag
+let dbInitialized = false;
+
+// Initialize portfolio tables (runs only once per cold start)
 const initDb = async () => {
+  if (dbInitialized) return;
+  
   try {
-    // Ensure users table exists first
+    // Run all table creations in a single transaction for speed
     await pool.query(`
       CREATE TABLE IF NOT EXISTS users (
         id SERIAL PRIMARY KEY,
@@ -42,11 +67,8 @@ const initDb = async () => {
         role VARCHAR(50) DEFAULT 'user',
         status VARCHAR(50) DEFAULT 'pending',
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-      )
-    `);
-
-    // Positions table
-    await pool.query(`
+      );
+      
       CREATE TABLE IF NOT EXISTS portfolio_positions (
         id SERIAL PRIMARY KEY,
         user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -57,11 +79,8 @@ const initDb = async () => {
         added_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         UNIQUE(user_id, ticker)
-      )
-    `);
-
-    // Transactions table (new schema)
-    await pool.query(`
+      );
+      
       CREATE TABLE IF NOT EXISTS portfolio_transactions (
         id SERIAL PRIMARY KEY,
         user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -72,25 +91,24 @@ const initDb = async () => {
         total_value DECIMAL(15, 2) NOT NULL,
         notes TEXT,
         transaction_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-      )
+      );
+      
+      CREATE INDEX IF NOT EXISTS idx_positions_user ON portfolio_positions(user_id);
+      CREATE INDEX IF NOT EXISTS idx_transactions_user ON portfolio_transactions(user_id);
+      CREATE INDEX IF NOT EXISTS idx_transactions_date ON portfolio_transactions(user_id, transaction_date DESC);
     `);
 
-    await pool.query(`
-      ALTER TABLE portfolio_transactions
-      ADD COLUMN IF NOT EXISTS shares       DECIMAL(15, 4) NOT NULL DEFAULT 0,
-      ADD COLUMN IF NOT EXISTS price        DECIMAL(15, 2) NOT NULL DEFAULT 0,
-      ADD COLUMN IF NOT EXISTS total_value  DECIMAL(15, 2) NOT NULL DEFAULT 0,
-      ADD COLUMN IF NOT EXISTS notes        TEXT,
-      ADD COLUMN IF NOT EXISTS transaction_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-    `);
-
+    dbInitialized = true;
     console.log("Portfolio tables initialized");
   } catch (error) {
-    console.error("Error initializing portfolio tables:", error);
+    // Tables likely already exist, mark as initialized anyway
+    if (error.code === '42P07' || error.code === '23505') {
+      dbInitialized = true;
+    } else {
+      console.error("Error initializing portfolio tables:", error);
+    }
   }
 };
-
-initDb().catch(console.error);
 
 export default async function handler(req, res) {
   setSecurityHeaders(res);
@@ -101,6 +119,9 @@ export default async function handler(req, res) {
   if (req.method === "OPTIONS") {
     return res.status(200).end();
   }
+
+  // Lazy init tables (only on first request after cold start)
+  await initDb();
 
   // Verify authentication
   const authHeader = req.headers.authorization;
@@ -119,6 +140,8 @@ export default async function handler(req, res) {
   try {
     // GET /positions - Get all positions with current prices
     if ((path === "" || path === "/positions") && req.method === "GET") {
+      const skipPrices = req.query?.skipPrices === 'true';
+      
       const result = await pool.query(
         `SELECT id, ticker, name, shares, avg_price, added_at, updated_at 
          FROM portfolio_positions 
@@ -127,9 +150,12 @@ export default async function handler(req, res) {
         [userId]
       );
 
-      // Fetch current prices from Yahoo Finance
-      const tickers = result.rows.map((p) => p.ticker);
-      const currentPrices = tickers.length > 0 ? await fetchCurrentPrices(tickers) : {};
+      // Only fetch prices if not skipped (for faster CRUD operations)
+      let currentPrices = {};
+      if (!skipPrices && result.rows.length > 0) {
+        const tickers = result.rows.map((p) => p.ticker);
+        currentPrices = await fetchCurrentPrices(tickers);
+      }
 
       return res.json({
         success: true,
