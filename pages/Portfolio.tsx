@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useMemo } from "react";
-import { Link } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   TrendingUp,
@@ -12,16 +11,11 @@ import {
   RefreshCw,
   BarChart3,
   AlertCircle,
-  Keyboard,
-  Shield,
-  User,
-  LogOut,
   Wallet,
 } from "lucide-react";
 import { usePortfolioStore, PortfolioPosition } from "../stores";
 import { toast } from "sonner";
-import { getUser, logout, isAdmin } from "../services/authService";
-import { LOGO_SIZES } from "../constants/logo";
+import Navbar from "../components/Navbar";
 
 interface PortfolioStats {
   totalValue: number;
@@ -54,8 +48,6 @@ const Portfolio: React.FC = () => {
     avgPrice: "",
     name: "",
   });
-
-  const user = getUser();
 
   useEffect(() => {
     fetchPositions();
@@ -174,120 +166,7 @@ const Portfolio: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-terminal-black text-gray-200 font-sans selection:bg-green-900 selection:text-white pb-6 md:pb-10">
-      <header className="border-b border-gray-800 bg-terminal-dark/50 backdrop-blur sticky top-0 z-50">
-        <div className="max-w-7xl mx-auto px-3 sm:px-4 py-2 sm:py-3 flex justify-between items-center 2xl:max-w-none">
-          <div className="flex items-center gap-2 sm:gap-3">
-            <Link to="/" className="flex items-center gap-2 sm:gap-3">
-              <img
-                src={LOGO_SIZES.sm}
-                srcSet={`${LOGO_SIZES.sm} 1x, ${LOGO_SIZES.smRetina} 2x`}
-                alt="MooCuan Logo"
-                className="w-8 h-8 sm:w-10 sm:h-10 object-contain"
-              />
-              <h1 className="text-base sm:text-xl font-bold tracking-tight text-white font-mono hidden xs:block">
-                MOO<span className="text-profit-green">CUAN</span>
-              </h1>
-            </Link>
-            <div className="h-4 sm:h-6 w-px bg-gray-700 mx-2" />
-            <div className="flex items-center gap-1.5">
-              <Wallet className="w-4 h-4 sm:w-5 sm:h-5 text-profit-green" />
-              <span className="text-[10px] sm:text-xs font-mono text-gray-400">PORTFOLIO</span>
-            </div>
-          </div>
-
-          <div className="hidden md:flex items-center gap-3 lg:gap-4">
-            <button
-              onClick={() => {
-                const event = new KeyboardEvent("keydown", { key: "k", metaKey: true });
-                document.dispatchEvent(event);
-              }}
-              className="hidden lg:flex items-center gap-2 text-xs font-mono text-gray-400 hover:text-gray-200 bg-gray-900 px-3 py-1.5 rounded border border-gray-800"
-              aria-label="Open command palette (Cmd+K)"
-            >
-              <Keyboard className="w-3 h-3" />
-              <span>Cmd+K</span>
-            </button>
-
-            <Link
-              to="/screener"
-              className="text-xs font-mono bg-gray-900 px-3 py-1 rounded-full border border-gray-800 hover:bg-gray-800 text-profit-green transition-colors flex items-center gap-2"
-            >
-              <span className="w-2 h-2 bg-profit-green rounded-full animate-pulse" />
-              <span className="hidden lg:inline">AI SCREENER</span>
-              <span className="lg:hidden">AI</span>
-            </Link>
-            <Link
-              to="/history"
-              className="text-xs font-mono bg-gray-900 px-3 py-1 rounded-full border border-gray-800 hover:bg-gray-800 text-gray-300 transition-colors"
-            >
-              <span className="hidden lg:inline">VIEW HISTORY</span>
-              <span className="lg:hidden">HISTORY</span>
-            </Link>
-            {isAdmin() && (
-              <Link
-                to="/admin"
-                className="text-xs font-mono bg-purple-900/50 px-3 py-1 rounded-full border border-purple-700 hover:bg-purple-800 text-purple-300 transition-colors flex items-center gap-2"
-              >
-                <Shield className="w-3 h-3" />
-                <span className="hidden lg:inline">ADMIN</span>
-              </Link>
-            )}
-            <Link
-              to="/account"
-              className="text-xs font-mono bg-gray-900 px-3 py-1 rounded-full border border-gray-800 hover:bg-gray-800 text-gray-300 transition-colors flex items-center gap-2"
-            >
-              <User className="w-3 h-3" />
-              <span className="hidden lg:inline">ACCOUNT</span>
-              <span className="lg:hidden">ACC</span>
-            </Link>
-            <div className="flex items-center gap-2 border-l border-gray-700 pl-4">
-              <span className="text-xs text-gray-400 hidden lg:block">{user?.name}</span>
-              <button
-                onClick={logout}
-                className="p-1.5 text-gray-400 hover:text-red-400 transition-colors"
-                title="Logout"
-              >
-                <LogOut className="w-4 h-4" />
-              </button>
-            </div>
-          </div>
-
-          <div className="flex md:hidden items-center gap-2">
-            <Link
-              to="/account"
-              className="text-[10px] font-mono bg-gray-900 px-2 py-1 rounded-full border border-gray-800 text-gray-300"
-            >
-              👤
-            </Link>
-            <Link
-              to="/screener"
-              className="text-[10px] font-mono bg-gray-900 px-2 py-1 rounded-full border border-gray-800 text-profit-green"
-            >
-              AI
-            </Link>
-            <Link
-              to="/history"
-              className="text-[10px] font-mono bg-gray-900 px-2 py-1 rounded-full border border-gray-800 text-gray-300"
-            >
-              📊
-            </Link>
-            {isAdmin() && (
-              <Link
-                to="/admin"
-                className="text-[10px] font-mono bg-purple-900/50 px-2 py-1 rounded-full border border-purple-700 text-purple-300"
-              >
-                <Shield className="w-3 h-3" />
-              </Link>
-            )}
-            <button
-              onClick={logout}
-              className="p-1 text-gray-400 hover:text-red-400 transition-colors"
-            >
-              <LogOut className="w-4 h-4" />
-            </button>
-          </div>
-        </div>
-      </header>
+      <Navbar />
 
       <main className="max-w-7xl mx-auto px-3 sm:px-4 mt-4 sm:mt-6 2xl:max-w-none">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4 mb-4 sm:mb-6">

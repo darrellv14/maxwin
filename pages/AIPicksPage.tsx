@@ -1,9 +1,10 @@
 import React, { useEffect, useState } from "react";
 import { getAIPicks, AnalysisRecord } from "../services/analysisService";
-import { Link, useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { Loader2, Bot, TrendingUp, Grid, List, Filter, SortAsc, RefreshCw } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import ScreenerCard from "../components/ScreenerCard";
+import Navbar from "../components/Navbar";
 
 type ViewMode = "grid" | "table";
 type SortOption = "date" | "confidence" | "ticker";
@@ -59,8 +60,9 @@ const AIPicksPage: React.FC = () => {
   }, [picks, sortBy, filterSignal]);
 
   return (
-    <div className="min-h-screen bg-terminal-black text-gray-300 p-4 sm:p-6 lg:p-8 font-sans selection:bg-profit-green selection:text-black">
-      <div className="max-w-7xl mx-auto 2xl:max-w-none">
+    <div className="min-h-screen bg-terminal-black text-gray-300 font-sans selection:bg-profit-green selection:text-black">
+      <Navbar />
+      <div className="max-w-7xl mx-auto p-4 sm:p-6 lg:p-8 2xl:max-w-none">
         {/* Header */}
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6 sm:mb-8 border-b border-gray-800 pb-4 sm:pb-6">
           <div>
@@ -79,13 +81,6 @@ const AIPicksPage: React.FC = () => {
               <span className="sm:hidden">AI-powered stock screening.</span>
             </p>
           </div>
-          <Link
-            to="/"
-            className="bg-gray-800 hover:bg-gray-700 text-white px-3 sm:px-4 py-1.5 sm:py-2 rounded border border-gray-700 font-mono text-xs sm:text-sm transition-colors whitespace-nowrap"
-          >
-            <span className="hidden sm:inline">← BACK TO TERMINAL</span>
-            <span className="sm:hidden">← BACK</span>
-          </Link>
         </div>
 
         {/* Controls Bar */}

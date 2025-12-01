@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { useNavigate, Link } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import {
   Users,
@@ -10,9 +10,7 @@ import {
   XCircle,
   Loader2,
   Shield,
-  Home,
   RefreshCw,
-  LogOut,
   Activity,
   TrendingUp,
   AlertTriangle,
@@ -24,12 +22,10 @@ import {
   getAllUsers,
   approveUser,
   rejectUser,
-  logout,
   User,
-  getUser,
 } from "../services/authService";
 import { useToast } from "../components/ToastProvider";
-import { LOGO_SIZES } from "../constants/logo";
+import Navbar from "../components/Navbar";
 
 const AdminDashboard: React.FC = () => {
   const navigate = useNavigate();
@@ -139,52 +135,10 @@ const AdminDashboard: React.FC = () => {
   };
 
   const pendingCount = users.filter((u) => u.status === "pending").length;
-  const currentUser = getUser();
 
   return (
     <div className="min-h-screen bg-terminal-black text-gray-200 font-sans selection:bg-green-900 selection:text-white pb-6 sm:pb-10">
-      {/* Header */}
-      <header className="border-b border-gray-800 bg-terminal-dark/50 backdrop-blur sticky top-0 z-50">
-        <div className="max-w-7xl mx-auto px-3 sm:px-4 py-2 sm:py-3 flex justify-between items-center">
-          <div className="flex items-center gap-2 sm:gap-4">
-            <Link to="/" className="flex items-center gap-2 sm:gap-3">
-              <img src={LOGO_SIZES.sm} alt="MooCuan Logo" className="w-8 h-8 sm:w-10 sm:h-10 object-contain" />
-              <h1 className="text-base sm:text-xl font-bold tracking-tight text-white font-mono hidden xs:block">
-                MOO<span className="text-profit-green">CUAN</span>
-              </h1>
-            </Link>
-            <div className="h-4 sm:h-6 w-px bg-gray-700"></div>
-            <div className="flex items-center gap-1.5 sm:gap-2">
-              <Shield className="w-4 h-4 sm:w-5 sm:h-5 text-purple-400" />
-              <span className="text-purple-400 font-mono font-bold text-[10px] sm:text-sm">ADMIN</span>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-2 sm:gap-4">
-            <Link
-              to="/"
-              className="text-[10px] sm:text-xs font-mono bg-gray-900 px-2 sm:px-3 py-1 sm:py-1.5 rounded border border-gray-800 hover:bg-gray-800 text-gray-300 transition-colors flex items-center gap-1 sm:gap-2"
-            >
-              <Home className="w-3 h-3" />
-              <span className="hidden sm:inline">DASHBOARD</span>
-            </Link>
-
-            <div className="flex items-center gap-1.5 sm:gap-2 border-l border-gray-700 pl-2 sm:pl-4">
-              <div className="w-6 h-6 sm:w-8 sm:h-8 bg-purple-500/20 rounded-full flex items-center justify-center border border-purple-500/30">
-                <Shield className="w-3 h-3 sm:w-4 sm:h-4 text-purple-400" />
-              </div>
-              <span className="text-[10px] sm:text-xs text-gray-400 font-mono hidden md:block">{currentUser?.name}</span>
-              <button
-                onClick={logout}
-                className="p-1 sm:p-1.5 text-gray-400 hover:text-red-400 transition-colors"
-                title="Logout"
-              >
-                <LogOut className="w-3 h-3 sm:w-4 sm:h-4" />
-              </button>
-            </div>
-          </div>
-        </div>
-      </header>
+      <Navbar />
 
       <main className="max-w-7xl mx-auto px-3 sm:px-4 mt-4 sm:mt-6">
         {/* Stats Cards */}

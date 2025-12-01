@@ -6,6 +6,7 @@ import {
   AnalysisRecord,
 } from "../services/analysisService";
 import { Link } from "react-router-dom";
+import Navbar from "../components/Navbar";
 import {
   ChevronDown,
   Loader2,
@@ -257,8 +258,9 @@ const History: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-terminal-black text-gray-200 font-sans p-3 sm:p-4 md:p-6">
-      <div className="max-w-7xl mx-auto">
+    <div className="min-h-screen bg-terminal-black text-gray-200 font-sans">
+      <Navbar />
+      <div className="max-w-7xl mx-auto p-3 sm:p-4 md:p-6">
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4 mb-4 sm:mb-6">
           <div>
@@ -284,12 +286,6 @@ const History: React.FC = () => {
               <Download className="w-3 h-3 sm:w-4 sm:h-4" />
               <span className="hidden sm:inline">EXPORT CSV</span>
             </button>
-            <Link
-              to="/"
-              className="bg-terminal-green hover:bg-terminal-green/80 text-black px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg font-mono text-xs sm:text-sm font-bold transition-colors"
-            >
-              ← <span className="hidden xs:inline">BACK</span>
-            </Link>
           </div>
         </div>
 

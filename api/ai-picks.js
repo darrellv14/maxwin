@@ -66,6 +66,7 @@ const calculateAdvancedIndicators = (stockData) => {
   const lastRSI = tiIndex(rsi);
   const lastMACD = tiIndex(macd);
   const lastBB = tiIndex(bb);
+  const lastSMA20 = tiIndex(sma20);
   const lastSMA50 = tiIndex(sma50);
   const lastEMA200 = tiIndex(ema200);
   const lastATR = tiIndex(atr);
@@ -75,11 +76,21 @@ const calculateAdvancedIndicators = (stockData) => {
   let techScore = 50;
   const currentClose = closes[lastIndex];
 
+  // SMA20 crossover - short term momentum
+  if (currentClose > lastSMA20) techScore += 5;
+  // SMA20 above SMA50 - bullish alignment
+  if (lastSMA20 > lastSMA50) techScore += 5;
+  // Price above SMA50 - medium term trend
   if (currentClose > lastSMA50) techScore += 10;
+  // Price above EMA200 - long term trend
   if (lastEMA200 && currentClose > lastEMA200) techScore += 10;
+  // MACD histogram positive - momentum
   if (lastMACD.histogram > 0) techScore += 5;
+  // RSI in bullish zone but not overbought
   if (lastRSI > 50 && lastRSI < 70) techScore += 5;
+  // OBV increasing - volume confirmation
   if (lastOBV > prevOBV) techScore += 5;
+  // Price breakout above Bollinger upper band
   if (currentClose > lastBB.upper) techScore += 10;
 
   const technicalConfidence = Math.min(100, Math.max(0, techScore));
@@ -89,6 +100,7 @@ const calculateAdvancedIndicators = (stockData) => {
     indicators: {
       rsi: lastRSI,
       macdHist: lastMACD.histogram,
+      sma20: lastSMA20,
       sma50: lastSMA50,
       ema200: lastEMA200,
       bbUpper: lastBB.upper,
@@ -109,13 +121,58 @@ const calculateAdvancedIndicators = (stockData) => {
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "");
 
+// IDX Universe - Comprehensive list of Indonesian stocks
 const IDX_UNIVERSE = [
-  "BBCA.JK", "BBRI.JK", "BMRI.JK", "BBNI.JK", "BNGA.JK", "ARTO.JK", "BBHI.JK", "BBYB.JK", "BANK.JK",
-  "BREN.JK", "BRPT.JK", "TPIA.JK", "CUAN.JK", "PTRO.JK", "BRMS.JK", "BUMI.JK", "AMMN.JK", "DEWA.JK",
-  "ENRG.JK", "PSAB.JK", "PANI.JK", "BSDE.JK", "SMRA.JK", "CTRA.JK", "ASRI.JK", "ADRO.JK", "PTBA.JK",
-  "ITMG.JK", "HRUM.JK", "ICBP.JK", "MYOR.JK", "AMRT.JK", "CPIN.JK", "JPFA.JK", "DAAZ.JK", "MLPT.JK",
-  "AWAN.JK", "PYFA.JK", "GOTO.JK", "TLKM.JK", "ISAT.JK", "EXCL.JK", "MEDC.JK", "PGAS.JK", "ANTM.JK",
-  "MDKA.JK", "INKP.JK", "TKIM.JK",
+  // === BANKING ===
+  "BBCA.JK", "BBRI.JK", "BMRI.JK", "BBNI.JK", "BNGA.JK", "ARTO.JK", "BBHI.JK", "BBYB.JK", "BANK.JK", "BABP.JK",
+  
+  // === GRUP PRAJOGO PANGESTU (Barito Pacific) ===
+  "BRPT.JK", "TPIA.JK", "BREN.JK", "CUAN.JK", "PTRO.JK", "CDIA.JK", "SSIA.JK",
+  
+  // === GRUP HAPSORO SUKMONOHADI ===
+  "RAJA.JK", "RATU.JK", "MINA.JK", "SINI.JK", "BUVA.JK", "UANG.JK",
+  
+  // === GRUP SALIM ===
+  "INDF.JK", "ICBP.JK", "AMMN.JK", "DNET.JK", "IMAS.JK", "SIMP.JK", "BUMI.JK", "EMTK.JK",
+  
+  // === GRUP DJARUM (Hartono Bersaudara) ===
+  "TOWR.JK", "BELI.JK", "RANC.JK",
+  
+  // === GRUP SINAR MAS (Keluarga Widjaja) ===
+  "BSDE.JK", "DSSA.JK", "INKP.JK", "TKIM.JK", "SMAR.JK", "GEMS.JK", "FREN.JK",
+  
+  // === LOW TUCK KWONG ===
+  "BYAN.JK", "MYOH.JK",
+  
+  // === GARIBALDI "BOY" THOHIR ===
+  "ADRO.JK", "ADMR.JK", "MDKA.JK", "MBMA.JK",
+  
+  // === HERMANTO TANOKO (Tancorp Group) ===
+  "AVIA.JK", "CLEO.JK", "DEPO.JK", "RISE.JK",
+  
+  // === EDWIN SOERYADJAYA (Saratoga) ===
+  "SRTG.JK", "ASII.JK",
+  
+  // === HARY TANOESOEDIBJO (MNC Group) ===
+  "MNCN.JK", "BHIT.JK", "KPIG.JK",
+  
+  // === HOT PICKS 2025 ===
+  "ARCI.JK", "EMAS.JK", "WIFI.JK", "PACK.JK", "BRMS.JK",
+  
+  // === PROPERTY ===
+  "BKSL.JK", "SMRA.JK", "CTRA.JK", "ASRI.JK", "PANI.JK", "PWON.JK", "LPKR.JK",
+  
+  // === MINING & ENERGY ===
+  "PTBA.JK", "ITMG.JK", "HRUM.JK", "MEDC.JK", "PGAS.JK", "ANTM.JK", "INCO.JK", "TINS.JK", "ENRG.JK", "DEWA.JK", "PSAB.JK",
+  
+  // === CONSUMER & RETAIL ===
+  "MYOR.JK", "AMRT.JK", "CPIN.JK", "JPFA.JK", "UNVR.JK", "KLBF.JK", "HMSP.JK", "GGRM.JK",
+  
+  // === TELCO & TECH ===
+  "TLKM.JK", "ISAT.JK", "EXCL.JK", "GOTO.JK",
+  
+  // === OTHERS / TRENDING ===
+  "DAAZ.JK", "MLPT.JK", "MLPL.JK", "AWAN.JK", "PYFA.JK", "ESSA.JK", "BUKA.JK", "DCII.JK", "AKRA.JK", "SMGR.JK",
 ];
 
 // ============ GET AI PICKS ============
