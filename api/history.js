@@ -40,6 +40,13 @@ const initDb = async () => {
       END $$;
     `);
 
+    // Make user_id nullable (for AI screener picks that don't belong to any user)
+    await pool.query(`
+      ALTER TABLE analysis_history ALTER COLUMN user_id DROP NOT NULL;
+    `).catch(() => {
+      // Ignore error if already nullable
+    });
+
     // Create index on user_id for faster queries
     await pool.query(`
       CREATE INDEX IF NOT EXISTS idx_analysis_history_user_id ON analysis_history(user_id);
