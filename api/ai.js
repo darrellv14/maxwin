@@ -607,7 +607,8 @@ async function analyzePatterns(req, res) {
       trendDirection,
       volatility,
       keyLevels,
-      ohlcSummary
+      ohlcSummary,
+      volumeAnalysis
     } = req.body;
 
     if (!patterns || patterns.length === 0) {
@@ -646,6 +647,16 @@ async function analyzePatterns(req, res) {
       pivotPoint: keyLevels?.pivot?.pivot || currentPrice,
     };
 
+    // Build volume analysis context
+    const volumeContext = volumeAnalysis ? {
+      trend: volumeAnalysis.volumeTrend || "unknown",
+      breakoutPotential: volumeAnalysis.breakoutPotential || "unknown",
+      phase: volumeAnalysis.accumulationDistribution || "neutral",
+      priceConfirmation: volumeAnalysis.volumePriceConfirmation || false,
+      recentSpikes: volumeAnalysis.volumeSpikes || [],
+      summary: volumeAnalysis.analysis || "No volume data",
+    } : null;
+
     // Build timeframe-specific guidelines
     let timeframeGuidelines = "";
     if (timeframeInterval === "1h" || timeframeInterval === "4h") {
@@ -656,7 +667,7 @@ async function analyzePatterns(req, res) {
       timeframeGuidelines = "- Pattern position trading: fokus pada major trend\\n- Target price 15-50% range\\n- Stop loss 5-10%\\n- Pattern perlu konfirmasi volume";
     }
 
-    const prompt = `Kamu adalah AI Technical Analyst EXPERT yang sangat ahli dalam menganalisis chart pattern dan technical analysis.
+    const prompt = `Kamu adalah AI Technical Analyst EXPERT yang sangat ahli dalam menganalisis chart pattern, volume analysis, dan technical analysis.
 
 ## MARKET CONTEXT
 - TICKER: ${ticker || "UNKNOWN"}
@@ -672,6 +683,16 @@ async function analyzePatterns(req, res) {
 - Resistance Levels: ${JSON.stringify(technicalContext.resistanceLevels.map(r => r.toLocaleString()))}
 - Pivot Point: ${technicalContext.pivotPoint.toLocaleString()}
 
+## 📊 VOLUME ANALYSIS (CRITICAL FOR BREAKOUT VALIDATION)
+${volumeContext ? `
+- Volume Trend: ${volumeContext.trend.toUpperCase()} 
+- Breakout Potential: ${volumeContext.breakoutPotential.toUpperCase()}
+- Market Phase: ${volumeContext.phase.toUpperCase()} (Accumulation = bullish smart money, Distribution = bearish smart money)
+- Price-Volume Confirmation: ${volumeContext.priceConfirmation ? "✅ CONFIRMED" : "⚠️ DIVERGENCE DETECTED"}
+- Analysis: ${volumeContext.summary}
+${volumeContext.recentSpikes.length > 0 ? `- Recent Volume Spikes: ${JSON.stringify(volumeContext.recentSpikes.map(s => ({ date: s.date, significance: s.significance, priceChange: s.priceChange?.toFixed(2) + "%" })))}` : "- No significant volume spikes recently"}
+` : "- Volume data not available"}
+
 ## PERIOD SUMMARY (${totalDataPoints} candles)
 - High: ${ohlcSummary?.periodHigh?.toLocaleString() || "N/A"}
 - Low: ${ohlcSummary?.periodLow?.toLocaleString() || "N/A"}
@@ -686,12 +707,27 @@ ${JSON.stringify(patternSummary, null, 2)}
 Berdasarkan timeframe ${timeframe || "Daily"}:
 ${timeframeGuidelines}
 
+## 🎯 VOLUME-BASED BREAKOUT RULES (WAJIB DIIKUTI!)
+1. **HIGH BREAKOUT POTENTIAL + ACCUMULATION**: Pattern validity +15-20%, breakout likely to succeed
+2. **HIGH BREAKOUT POTENTIAL + DISTRIBUTION**: ⚠️ Fake breakout risk! Reduce confidence -10%
+3. **LOW BREAKOUT POTENTIAL**: Pattern may fail, reduce confidence -15-20%
+4. **VOLUME SPIKE dengan price naik**: Bullish confirmation, increase confidence
+5. **VOLUME SPIKE dengan price turun**: Bearish confirmation atau capitulation
+6. **VOLUME DECREASING saat pattern forming**: Coiling pattern, breakout imminent but need volume confirmation
+7. **VOLUME-PRICE DIVERGENCE**: 🚨 FALSE BREAKOUT WARNING - price naik tapi volume turun = bearish divergence
+
 ## TUGAS ANALISIS
-1. VALIDASI PATTERN: Apakah pattern yang terdeteksi valid berdasarkan timeframe, current trend, volatility level, dan support/resistance alignment
-2. CONFIDENCE ADJUSTMENT: Berikan confidence score yang lebih akurat (0-100) dengan mempertimbangkan pattern clarity, volume confirmation, trend alignment, key level confluence
-3. PATTERN RANKING: Identifikasi pattern mana yang paling reliable untuk timeframe ini
-4. TRADE RECOMMENDATION: Entry zone, target, dan stop loss yang REALISTIS untuk timeframe ${timeframe || "Daily"}
-5. RISK ASSESSMENT: Identifikasi false signal indicators dan risk factors
+1. VALIDASI PATTERN: Apakah pattern yang terdeteksi valid berdasarkan timeframe, current trend, volatility level, support/resistance alignment, DAN VOLUME CONFIRMATION
+2. VOLUME BREAKOUT CHECK: Analisis apakah volume mendukung breakout atau mengindikasikan false breakout
+3. CONFIDENCE ADJUSTMENT: Berikan confidence score yang lebih akurat (0-100) dengan mempertimbangkan:
+   - Pattern clarity
+   - VOLUME CONFIRMATION (ini sangat penting!)
+   - Trend alignment  
+   - Key level confluence
+   - Accumulation/Distribution phase
+4. PATTERN RANKING: Identifikasi pattern mana yang paling reliable berdasarkan volume support
+5. TRADE RECOMMENDATION: Entry zone, target, dan stop loss yang REALISTIS untuk timeframe ${timeframe || "Daily"}
+6. RISK ASSESSMENT: Identifikasi false signal indicators, VOLUME WARNINGS, dan risk factors
 
 PENTING: Jawab dalam format JSON yang VALID:
 {
@@ -700,24 +736,27 @@ PENTING: Jawab dalam format JSON yang VALID:
       "name": "Pattern Name",
       "isValid": true,
       "adjustedConfidence": 75,
-      "reasoning": "Alasan validasi yang detail",
+      "reasoning": "Alasan validasi yang detail TERMASUK analisis volume",
+      "volumeConfirmation": "CONFIRMED" | "WEAK" | "DIVERGENCE",
       "tradeRecommendation": "BUY",
       "entryZone": "range harga entry yang spesifik",
       "targetPrice": 1234,
       "stopLoss": 1200,
       "riskRewardRatio": "1:2.5",
+      "breakoutLikelihood": "HIGH" | "MEDIUM" | "LOW",
       "timeframeNote": "Catatan khusus untuk timeframe"
     }
   ],
-  "overallAnalysis": "Analisis komprehensif mempertimbangkan timeframe, trend, volatility, dan confluence level",
+  "overallAnalysis": "Analisis komprehensif mempertimbangkan timeframe, trend, volatility, volume, dan confluence level",
+  "volumeVerdict": "Volume analysis summary - apakah volume mendukung trading decision",
   "primarySignal": "BUY",
   "primaryConfidence": 80,
-  "warnings": ["Peringatan spesifik berdasarkan kondisi market"],
+  "warnings": ["Peringatan spesifik berdasarkan kondisi market DAN volume"],
   "bestPattern": "Nama pattern terbaik dengan alasan",
   "timeframeSuitability": "HIGH"
 }
 
-Berikan analisis yang OBJEKTIF, AKURAT, dan SPECIFIC untuk timeframe ${timeframe || "Daily"}.`;
+Berikan analisis yang OBJEKTIF, AKURAT, dan SPECIFIC dengan FOKUS PADA VOLUME CONFIRMATION untuk timeframe ${timeframe || "Daily"}.`;
 
     const model = genAI.getGenerativeModel({ 
       model: "gemini-2.0-flash",

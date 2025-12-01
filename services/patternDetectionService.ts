@@ -47,6 +47,9 @@ export interface DetectedPattern {
   aiReasoning?: string;
   tradeRecommendation?: string;
   riskRewardRatio?: string;
+  // Volume-related fields
+  volumeConfirmation?: "CONFIRMED" | "WEAK" | "DIVERGENCE";
+  breakoutLikelihood?: "HIGH" | "MEDIUM" | "LOW";
 }
 
 export interface AIPatternAnalysis {
@@ -55,17 +58,22 @@ export interface AIPatternAnalysis {
     isValid: boolean;
     adjustedConfidence: number;
     reasoning: string;
+    volumeConfirmation?: "CONFIRMED" | "WEAK" | "DIVERGENCE";
     tradeRecommendation: string;
     entryZone?: string;
     targetPrice: number;
     stopLoss: number;
     riskRewardRatio?: string;
+    breakoutLikelihood?: "HIGH" | "MEDIUM" | "LOW";
+    timeframeNote?: string;
   }[];
   overallAnalysis: string;
+  volumeVerdict?: string;
   primarySignal: "BUY" | "SELL" | "HOLD";
   primaryConfidence: number;
   warnings: string[];
   bestPattern: string;
+  timeframeSuitability?: "HIGH" | "MEDIUM" | "LOW";
 }
 
 export interface DrawInstruction {
@@ -949,6 +957,145 @@ function inferTimeframe(data: IndicatorData[]): { interval: string; description:
 }
 
 /**
+ * Analyze volume for breakout confirmation and pattern validation
+ */
+function analyzeVolume(data: IndicatorData[]): {
+  avgVolume: number;
+  recentAvgVolume: number;
+  volumeTrend: "increasing" | "decreasing" | "stable";
+  volumeSpikes: { date: string; volume: number; priceChange: number; significance: string }[];
+  breakoutPotential: "high" | "medium" | "low";
+  accumulationDistribution: "accumulation" | "distribution" | "neutral";
+  volumePriceConfirmation: boolean;
+  volumeAnalysis: string;
+} {
+  if (data.length < 20) {
+    return {
+      avgVolume: 0,
+      recentAvgVolume: 0,
+      volumeTrend: "stable",
+      volumeSpikes: [],
+      breakoutPotential: "low",
+      accumulationDistribution: "neutral",
+      volumePriceConfirmation: false,
+      volumeAnalysis: "Insufficient data for volume analysis",
+    };
+  }
+
+  const volumes = data.map(d => d.volume);
+  const recentData = data.slice(-20);
+  const olderData = data.slice(-60, -20);
+
+  // Calculate average volumes
+  const avgVolume = volumes.reduce((a, b) => a + b, 0) / volumes.length;
+  const recentAvgVolume = recentData.reduce((a, b) => a + b.volume, 0) / recentData.length;
+  const olderAvgVolume = olderData.length > 0 
+    ? olderData.reduce((a, b) => a + b.volume, 0) / olderData.length 
+    : avgVolume;
+
+  // Volume trend
+  let volumeTrend: "increasing" | "decreasing" | "stable" = "stable";
+  const volumeChangePercent = ((recentAvgVolume - olderAvgVolume) / olderAvgVolume) * 100;
+  if (volumeChangePercent > 15) {
+    volumeTrend = "increasing";
+  } else if (volumeChangePercent < -15) {
+    volumeTrend = "decreasing";
+  }
+
+  // Find volume spikes (>1.5x average volume)
+  const volumeSpikes: { date: string; volume: number; priceChange: number; significance: string }[] = [];
+  for (let i = 1; i < data.length; i++) {
+    if (data[i].volume > avgVolume * 1.5) {
+      const priceChange = ((data[i].close - data[i - 1].close) / data[i - 1].close) * 100;
+      const volumeRatio = data[i].volume / avgVolume;
+      let significance = "moderate";
+      if (volumeRatio > 3) significance = "extreme";
+      else if (volumeRatio > 2) significance = "high";
+      
+      volumeSpikes.push({
+        date: data[i].date,
+        volume: data[i].volume,
+        priceChange,
+        significance,
+      });
+    }
+  }
+
+  // Accumulation/Distribution Analysis
+  // Using simplified Money Flow concept
+  let accumulationScore = 0;
+  for (let i = 0; i < recentData.length; i++) {
+    const d = recentData[i];
+    const moneyFlowMultiplier = d.high !== d.low 
+      ? ((d.close - d.low) - (d.high - d.close)) / (d.high - d.low)
+      : 0;
+    const moneyFlowVolume = moneyFlowMultiplier * d.volume;
+    accumulationScore += moneyFlowVolume;
+  }
+
+  let accumulationDistribution: "accumulation" | "distribution" | "neutral" = "neutral";
+  const avgMoneyFlow = accumulationScore / recentData.length;
+  if (avgMoneyFlow > avgVolume * 0.1) {
+    accumulationDistribution = "accumulation";
+  } else if (avgMoneyFlow < -avgVolume * 0.1) {
+    accumulationDistribution = "distribution";
+  }
+
+  // Volume-Price Confirmation
+  // Check if volume confirms price movement
+  const priceUp = recentData[recentData.length - 1].close > recentData[0].close;
+  const volumePriceConfirmation = (priceUp && volumeTrend === "increasing") || 
+                                   (!priceUp && volumeTrend === "decreasing");
+
+  // Breakout Potential based on volume buildup
+  let breakoutPotential: "high" | "medium" | "low" = "low";
+  const lastFiveVolume = data.slice(-5).reduce((a, b) => a + b.volume, 0) / 5;
+  const volumeBuildupRatio = lastFiveVolume / avgVolume;
+  
+  if (volumeBuildupRatio > 1.3 && volumeTrend === "increasing") {
+    breakoutPotential = "high";
+  } else if (volumeBuildupRatio > 1.1) {
+    breakoutPotential = "medium";
+  }
+
+  // Recent volume spikes in last 5 candles
+  const recentSpikes = volumeSpikes.filter(s => {
+    const spikeDate = new Date(s.date);
+    const lastDate = new Date(data[data.length - 1].date);
+    const diffDays = (lastDate.getTime() - spikeDate.getTime()) / (1000 * 60 * 60 * 24);
+    return diffDays <= 5;
+  });
+
+  if (recentSpikes.length > 0 && recentSpikes.some(s => s.significance === "extreme" || s.significance === "high")) {
+    breakoutPotential = "high";
+  }
+
+  // Build analysis summary
+  let volumeAnalysis = `Volume ${volumeTrend} (${volumeChangePercent > 0 ? "+" : ""}${volumeChangePercent.toFixed(1)}%). `;
+  volumeAnalysis += `${accumulationDistribution.charAt(0).toUpperCase() + accumulationDistribution.slice(1)} phase detected. `;
+  volumeAnalysis += `Breakout potential: ${breakoutPotential}. `;
+  
+  if (volumeSpikes.length > 0) {
+    volumeAnalysis += `${volumeSpikes.length} volume spike(s) detected. `;
+  }
+  
+  if (!volumePriceConfirmation) {
+    volumeAnalysis += "⚠️ Volume-price divergence detected. ";
+  }
+
+  return {
+    avgVolume,
+    recentAvgVolume,
+    volumeTrend,
+    volumeSpikes: volumeSpikes.slice(-10), // Last 10 spikes
+    breakoutPotential,
+    accumulationDistribution,
+    volumePriceConfirmation,
+    volumeAnalysis,
+  };
+}
+
+/**
  * Calculate key technical levels for pattern analysis
  */
 function calculateKeyLevels(data: IndicatorData[]): {
@@ -1046,6 +1193,9 @@ export async function validatePatternsWithAI(
     // Calculate key technical levels
     const keyLevels = calculateKeyLevels(priceData);
     
+    // Analyze volume for breakout confirmation
+    const volumeAnalysis = analyzeVolume(priceData);
+    
     // Get optimal amount of data based on timeframe
     const optimalData = priceData.slice(-timeframe.optimalPeriods);
     
@@ -1073,6 +1223,16 @@ export async function validatePatternsWithAI(
           pivot: keyLevels.pivotPoints,
         },
         ohlcSummary,
+        volumeAnalysis: {
+          avgVolume: volumeAnalysis.avgVolume,
+          recentAvgVolume: volumeAnalysis.recentAvgVolume,
+          volumeTrend: volumeAnalysis.volumeTrend,
+          breakoutPotential: volumeAnalysis.breakoutPotential,
+          accumulationDistribution: volumeAnalysis.accumulationDistribution,
+          volumePriceConfirmation: volumeAnalysis.volumePriceConfirmation,
+          volumeSpikes: volumeAnalysis.volumeSpikes.slice(-5), // Last 5 spikes
+          analysis: volumeAnalysis.volumeAnalysis,
+        },
         patterns: patterns.map(p => ({
           name: p.name,
           type: p.type,
@@ -1153,6 +1313,8 @@ export async function detectPatternsWithAI(
           pattern.aiReasoning = aiValidation.reasoning;
           pattern.tradeRecommendation = aiValidation.tradeRecommendation;
           pattern.riskRewardRatio = aiValidation.riskRewardRatio;
+          pattern.volumeConfirmation = aiValidation.volumeConfirmation;
+          pattern.breakoutLikelihood = aiValidation.breakoutLikelihood;
           
           // Update target and stop loss if AI provides better values
           if (aiValidation.targetPrice) {
@@ -1162,9 +1324,18 @@ export async function detectPatternsWithAI(
             pattern.stopLoss = aiValidation.stopLoss;
           }
           
-          // Update description with AI reasoning
+          // Update description with AI reasoning and volume info
+          let volumeInfo = "";
+          if (aiValidation.volumeConfirmation) {
+            const volumeEmoji = aiValidation.volumeConfirmation === "CONFIRMED" ? "✅" : 
+                               aiValidation.volumeConfirmation === "WEAK" ? "⚠️" : "🚨";
+            volumeInfo = ` | Volume: ${volumeEmoji} ${aiValidation.volumeConfirmation}`;
+          }
+          if (aiValidation.breakoutLikelihood) {
+            volumeInfo += ` | Breakout: ${aiValidation.breakoutLikelihood}`;
+          }
           if (aiValidation.reasoning) {
-            pattern.description = `${pattern.description} | AI: ${aiValidation.reasoning}`;
+            pattern.description = `${pattern.description} | AI: ${aiValidation.reasoning}${volumeInfo}`;
           }
         }
       });

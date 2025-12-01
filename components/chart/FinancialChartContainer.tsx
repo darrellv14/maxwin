@@ -9,7 +9,7 @@ import ChartHeader from "./ChartHeader";
 import { IndicatorData, TimeFrame } from "../../types";
 import { useWatchlistStore } from "../../stores";
 import { toast } from "sonner";
-import { Sparkles, TrendingUp, TrendingDown, BarChart2, AlertTriangle, Clock } from "lucide-react";
+import { Sparkles, TrendingUp, TrendingDown, BarChart2, AlertTriangle, Clock, Volume2, Zap } from "lucide-react";
 import { 
   detectPatterns, 
   detectPatternsWithAI,
@@ -955,6 +955,19 @@ const FinancialChartContainer: React.FC<FinancialChartContainerProps> = ({
               </div>
             )}
 
+            {/* Volume Verdict Panel */}
+            {aiAnalysis?.volumeVerdict && (
+              <div className="bg-gray-900/50 p-3 sm:p-4 rounded border border-blue-500/30 mb-4 z-10 relative">
+                <div className="text-[10px] sm:text-xs text-blue-400 font-mono font-bold mb-2 uppercase flex items-center gap-1">
+                  <Volume2 className="w-3 h-3" />
+                  VOLUME ANALYSIS
+                </div>
+                <p className="text-xs sm:text-sm text-gray-300 leading-relaxed">
+                  {aiAnalysis.volumeVerdict}
+                </p>
+              </div>
+            )}
+
             {/* Pattern Cards Grid */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 sm:gap-3 z-10 relative">
               {detectedPatterns.map((pattern, idx) => (
@@ -1007,6 +1020,34 @@ const FinancialChartContainer: React.FC<FinancialChartContainerProps> = ({
                       </span>
                       {pattern.riskRewardRatio && (
                         <span className="text-[10px] sm:text-xs text-gray-500 font-mono">R:R {pattern.riskRewardRatio}</span>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Volume Confirmation Badge */}
+                  {pattern.volumeConfirmation && (
+                    <div className="flex items-center gap-2 mb-2">
+                      <div className={`flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-mono ${
+                        pattern.volumeConfirmation === "CONFIRMED" 
+                          ? "bg-profit-green/20 text-profit-green border border-profit-green/30" 
+                          : pattern.volumeConfirmation === "WEAK"
+                            ? "bg-yellow-500/20 text-yellow-400 border border-yellow-500/30"
+                            : "bg-loss-red/20 text-loss-red border border-loss-red/30"
+                      }`}>
+                        <Volume2 className="w-3 h-3" />
+                        <span>VOL: {pattern.volumeConfirmation}</span>
+                      </div>
+                      {pattern.breakoutLikelihood && (
+                        <div className={`flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-mono ${
+                          pattern.breakoutLikelihood === "HIGH" 
+                            ? "bg-profit-green/20 text-profit-green border border-profit-green/30" 
+                            : pattern.breakoutLikelihood === "MEDIUM"
+                              ? "bg-yellow-500/20 text-yellow-400 border border-yellow-500/30"
+                              : "bg-gray-500/20 text-gray-400 border border-gray-500/30"
+                        }`}>
+                          <Zap className="w-3 h-3" />
+                          <span>BRK: {pattern.breakoutLikelihood}</span>
+                        </div>
                       )}
                     </div>
                   )}
