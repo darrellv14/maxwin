@@ -302,72 +302,76 @@ const Dashboard: React.FC = () => {
 
                 {/* Main Financial Chart */}
                 <FinancialChart data={data} ticker={ticker} />
+
+                {/* Oracle Panel + Market Depth - Below Chart, Same Width */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {/* Oracle Panel */}
+                  <div className="h-[320px]">
+                    <OraclePanel analysis={analysis} loading={loadingAI} onAnalyze={handleAnalyze} />
+                  </div>
+
+                  {/* Market Depth Log */}
+                  <div className="bg-terminal-gray border border-gray-800 rounded-lg p-4 h-[320px] flex flex-col">
+                    <h2 className="text-sm font-bold font-mono text-white mb-3">
+                      MARKET DEPTH LOG
+                    </h2>
+                    <div className="flex-1 overflow-y-auto">
+                      <table className="w-full text-left text-[10px] sm:text-xs font-mono">
+                        <thead className="border-b border-gray-700 text-gray-500 sticky top-0 bg-terminal-gray">
+                          <tr>
+                            <th className="pb-2">DATE</th>
+                            <th className="pb-2">CLOSE</th>
+                            <th className="pb-2">RSI</th>
+                            <th className="pb-2 text-right">VOLUME</th>
+                          </tr>
+                        </thead>
+                        <tbody className="text-gray-300">
+                          {[...data]
+                            .reverse()
+                            .slice(0, 10)
+                            .map((d, i) => (
+                              <tr
+                                key={i}
+                                className="border-b border-gray-800/50 hover:bg-gray-800/50 transition-colors"
+                              >
+                                <td className="py-1.5 text-gray-500">{d.date}</td>
+                                <td className="py-1.5 font-bold">{d.close?.toFixed(0) ?? "-"}</td>
+                                <td
+                                  className={`py-1.5 ${
+                                    (d.rsi || 50) > 70
+                                      ? "text-red-400"
+                                      : (d.rsi || 50) < 30
+                                        ? "text-green-400"
+                                        : ""
+                                  }`}
+                                >
+                                  {d.rsi?.toFixed(1)}
+                                </td>
+                                <td className="py-1.5 text-right text-gray-400">
+                                  {d.volume?.toLocaleString() ?? "0"}
+                                </td>
+                              </tr>
+                            ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </div>
               </>
             )}
           </div>
         </div>
 
-        {/* Bottom Row: Confidence Chart + Oracle + Market Depth - sejajar */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-          {/* Confidence Chart */}
-          <div className="bg-terminal-dark rounded-lg border border-gray-800 p-4 flex flex-col h-[320px]">
-            <h2 className="text-xs font-mono text-gray-400 mb-2 uppercase tracking-wider">
-              AI Confidence / Win Rate History
-            </h2>
-            <div className="flex-1 min-h-0">
-              <ConfidenceChart data={data} />
-            </div>
-          </div>
-
-          {/* Oracle Panel */}
-          <div className="h-[320px]">
-            <OraclePanel analysis={analysis} loading={loadingAI} onAnalyze={handleAnalyze} />
-          </div>
-
-          {/* Market Depth Log */}
-          <div className="bg-terminal-gray border border-gray-800 rounded-lg p-4 h-[320px] flex flex-col">
-            <h2 className="text-sm font-bold font-mono text-white mb-3">
-              MARKET DEPTH LOG
-            </h2>
-            <div className="flex-1 overflow-y-auto">
-              <table className="w-full text-left text-[10px] sm:text-xs font-mono">
-                <thead className="border-b border-gray-700 text-gray-500 sticky top-0 bg-terminal-gray">
-                  <tr>
-                    <th className="pb-2">DATE</th>
-                    <th className="pb-2">CLOSE</th>
-                    <th className="pb-2">RSI</th>
-                    <th className="pb-2 text-right">VOLUME</th>
-                  </tr>
-                </thead>
-                <tbody className="text-gray-300">
-                  {[...data]
-                    .reverse()
-                    .slice(0, 10)
-                    .map((d, i) => (
-                      <tr
-                        key={i}
-                        className="border-b border-gray-800/50 hover:bg-gray-800/50 transition-colors"
-                      >
-                        <td className="py-1.5 text-gray-500">{d.date}</td>
-                        <td className="py-1.5 font-bold">{d.close?.toFixed(0) ?? "-"}</td>
-                        <td
-                          className={`py-1.5 ${
-                            (d.rsi || 50) > 70
-                              ? "text-red-400"
-                              : (d.rsi || 50) < 30
-                                ? "text-green-400"
-                                : ""
-                          }`}
-                        >
-                          {d.rsi?.toFixed(1)}
-                        </td>
-                        <td className="py-1.5 text-right text-gray-400">
-                          {d.volume?.toLocaleString() ?? "0"}
-                        </td>
-                      </tr>
-                    ))}
-                </tbody>
-              </table>
+        {/* AI Confidence Chart - Same Width as Sidebar/Watchlist */}
+        <div className="grid grid-cols-1 md:grid-cols-12 gap-4 mb-6">
+          <div className="col-span-12 md:col-span-3">
+            <div className="bg-terminal-dark rounded-lg border border-gray-800 p-4 flex flex-col h-[280px]">
+              <h2 className="text-xs font-mono text-gray-400 mb-2 uppercase tracking-wider">
+                AI Confidence / Win Rate History
+              </h2>
+              <div className="flex-1 min-h-0">
+                <ConfidenceChart data={data} />
+              </div>
             </div>
           </div>
         </div>
