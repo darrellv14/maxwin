@@ -317,7 +317,7 @@ const Dashboard: React.FC = () => {
                 <AIChatAssistant />
 
                 {/* Financial Chart */}
-                <FinancialChart data={data} ticker={ticker} />
+                <FinancialChart data={data} ticker={ticker} timeframe={timeframe} />
 
                 {/* Bottom Section: Oracle AI + Market Depth (Side by Side, Equal Height) */}
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">

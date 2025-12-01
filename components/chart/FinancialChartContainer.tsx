@@ -6,10 +6,10 @@ import ChartTypeToggle from "./ChartTypeToggle";
 import ChartControls from "./ChartControls";
 import ChartLegend from "./ChartLegend";
 import ChartHeader from "./ChartHeader";
-import { IndicatorData } from "../../types";
+import { IndicatorData, TimeFrame } from "../../types";
 import { useWatchlistStore } from "../../stores";
 import { toast } from "sonner";
-import { Sparkles, TrendingUp, TrendingDown, BarChart2, AlertTriangle } from "lucide-react";
+import { Sparkles, TrendingUp, TrendingDown, BarChart2, AlertTriangle, Clock } from "lucide-react";
 import { 
   detectPatterns, 
   detectPatternsWithAI,
@@ -22,6 +22,7 @@ import {
 interface FinancialChartContainerProps {
   data: IndicatorData[];
   ticker?: string;
+  timeframe?: TimeFrame;
 }
 
 // Canvas Drawing Layer for annotations
@@ -34,9 +35,28 @@ interface DrawingObject {
   aiInstructions?: DrawInstruction[];
 }
 
+// Timeframe recommendations for pattern detection
+const TIMEFRAME_INFO: Record<TimeFrame, { 
+  label: string; 
+  patternQuality: "excellent" | "good" | "fair" | "poor";
+  description: string;
+  minDataPoints: number;
+}> = {
+  "1D": { label: "1 Day", patternQuality: "poor", description: "Too short for reliable patterns", minDataPoints: 30 },
+  "5D": { label: "5 Days", patternQuality: "fair", description: "Short-term scalping patterns only", minDataPoints: 30 },
+  "1M": { label: "1 Month", patternQuality: "good", description: "Good for swing trading patterns", minDataPoints: 20 },
+  "3M": { label: "3 Months", patternQuality: "excellent", description: "Optimal for most chart patterns", minDataPoints: 60 },
+  "6M": { label: "6 Months", patternQuality: "excellent", description: "Excellent for major patterns", minDataPoints: 120 },
+  "YTD": { label: "Year to Date", patternQuality: "good", description: "Good pattern visibility", minDataPoints: 50 },
+  "1Y": { label: "1 Year", patternQuality: "excellent", description: "Perfect for major trend patterns", minDataPoints: 250 },
+  "5Y": { label: "5 Years", patternQuality: "good", description: "Long-term position patterns", minDataPoints: 500 },
+  "ALL": { label: "All Time", patternQuality: "fair", description: "May include outdated patterns", minDataPoints: 100 },
+};
+
 const FinancialChartContainer: React.FC<FinancialChartContainerProps> = ({
   data,
   ticker = "STOCK",
+  timeframe = "3M",
 }) => {
   const [chartType, setChartType] = useState<"candlestick" | "line">("candlestick");
   const [activeTool, setActiveTool] = useState<DrawingTool>("cursor");
@@ -128,6 +148,9 @@ const FinancialChartContainer: React.FC<FinancialChartContainerProps> = ({
   const priceChange = prevData ? currentPrice - prevData.close : 0;
   const priceChangePercent = prevData ? (priceChange / prevData.close) * 100 : 0;
 
+  // Get current timeframe info
+  const currentTimeframeInfo = TIMEFRAME_INFO[timeframe];
+
   // Calculate price range for AI drawing
   const priceRange = React.useMemo(() => {
     if (data.length === 0) return { min: 0, max: 100 };
@@ -140,13 +163,20 @@ const FinancialChartContainer: React.FC<FinancialChartContainerProps> = ({
 
   // AI Auto-Draw handler
   const handleAIAutoDraw = useCallback(async () => {
-    if (data.length < 20) {
-      toast.error("Not enough data for pattern detection");
+    const tfInfo = TIMEFRAME_INFO[timeframe];
+    
+    if (data.length < tfInfo.minDataPoints) {
+      toast.error(`Need at least ${tfInfo.minDataPoints} data points for ${tfInfo.label} timeframe. Currently have ${data.length}.`);
       return;
     }
 
+    // Warn if timeframe is not optimal
+    if (tfInfo.patternQuality === "poor" || tfInfo.patternQuality === "fair") {
+      toast.warning(`⚠️ ${tfInfo.label} timeframe: ${tfInfo.description}. Consider using 3M-1Y for better patterns.`, { duration: 4000 });
+    }
+
     setIsAIDrawing(true);
-    toast.loading("🤖 AI scanning for chart patterns...", { id: "ai-draw" });
+    toast.loading(`🤖 AI scanning ${tfInfo.label} chart for patterns...`, { id: "ai-draw" });
 
     try {
       // Step 1: Detect patterns algorithmically
@@ -208,7 +238,7 @@ const FinancialChartContainer: React.FC<FinancialChartContainerProps> = ({
     } finally {
       setIsAIDrawing(false);
     }
-  }, [data, ticker, canvasSize, priceRange]);
+  }, [data, ticker, canvasSize, priceRange, timeframe]);
 
   // Handle crosshair move
   const handleCrosshairMove = useCallback((price: number | null, time: string | null) => {
@@ -382,16 +412,18 @@ const FinancialChartContainer: React.FC<FinancialChartContainerProps> = ({
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
     // Draw AI pattern instructions first (so user drawings appear on top)
+    // Draw AI pattern instructions - professional clean style
     aiDrawInstructions.forEach((instruction) => {
       ctx.strokeStyle = instruction.color;
       ctx.fillStyle = instruction.color;
-      ctx.lineWidth = 2;
+      ctx.lineWidth = 1.5;
       ctx.setLineDash([]);
 
       switch (instruction.type) {
         case "line":
           if (instruction.points.length >= 2) {
             ctx.beginPath();
+            ctx.lineWidth = 1.5;
             ctx.moveTo(instruction.points[0].x, instruction.points[0].y);
             for (let i = 1; i < instruction.points.length; i++) {
               ctx.lineTo(instruction.points[i].x, instruction.points[i].y);
@@ -403,7 +435,8 @@ const FinancialChartContainer: React.FC<FinancialChartContainerProps> = ({
         case "dashed-line":
           if (instruction.points.length >= 2) {
             ctx.beginPath();
-            ctx.setLineDash([8, 4]);
+            ctx.lineWidth = 1;
+            ctx.setLineDash([6, 3]);
             ctx.moveTo(instruction.points[0].x, instruction.points[0].y);
             for (let i = 1; i < instruction.points.length; i++) {
               ctx.lineTo(instruction.points[i].x, instruction.points[i].y);
@@ -411,13 +444,13 @@ const FinancialChartContainer: React.FC<FinancialChartContainerProps> = ({
             ctx.stroke();
             ctx.setLineDash([]);
             
-            // Draw label if exists
+            // Draw label if exists - clean style
             if (instruction.label) {
               const midPoint = instruction.points[Math.floor(instruction.points.length / 2)];
-              ctx.font = "bold 11px monospace";
-              ctx.fillStyle = "rgba(0, 0, 0, 0.8)";
+              ctx.font = "10px monospace";
+              ctx.fillStyle = "rgba(0, 0, 0, 0.7)";
               const metrics = ctx.measureText(instruction.label);
-              ctx.fillRect(midPoint.x - 2, midPoint.y - 12, metrics.width + 4, 14);
+              ctx.fillRect(midPoint.x - 2, midPoint.y - 10, metrics.width + 4, 12);
               ctx.fillStyle = instruction.color;
               ctx.fillText(instruction.label, midPoint.x, midPoint.y - 1);
             }
@@ -429,46 +462,46 @@ const FinancialChartContainer: React.FC<FinancialChartContainerProps> = ({
             const [start, end] = instruction.points;
             const isUp = end.y < start.y;
             
-            // Draw vertical line
+            // Draw vertical line - clean professional style
             ctx.beginPath();
             ctx.setLineDash([4, 4]);
             ctx.strokeStyle = instruction.color;
-            ctx.lineWidth = 2;
+            ctx.lineWidth = 1.5;
             ctx.moveTo(start.x, start.y);
             ctx.lineTo(end.x, end.y);
             ctx.stroke();
             ctx.setLineDash([]);
             
-            // Draw arrow head
+            // Draw small arrow head
             ctx.beginPath();
             ctx.fillStyle = instruction.color;
             if (isUp) {
               ctx.moveTo(end.x, end.y);
-              ctx.lineTo(end.x - 8, end.y + 12);
-              ctx.lineTo(end.x + 8, end.y + 12);
+              ctx.lineTo(end.x - 5, end.y + 8);
+              ctx.lineTo(end.x + 5, end.y + 8);
             } else {
               ctx.moveTo(end.x, end.y);
-              ctx.lineTo(end.x - 8, end.y - 12);
-              ctx.lineTo(end.x + 8, end.y - 12);
+              ctx.lineTo(end.x - 5, end.y - 8);
+              ctx.lineTo(end.x + 5, end.y - 8);
             }
             ctx.closePath();
             ctx.fill();
             
-            // Draw target label with glow effect
+            // Draw target label - clean professional style without glow
             if (instruction.label) {
-              ctx.font = "bold 12px monospace";
+              ctx.font = "11px monospace";
               const metrics = ctx.measureText(instruction.label);
               const labelX = end.x - metrics.width / 2;
-              const labelY = isUp ? end.y - 18 : end.y + 28;
+              const labelY = isUp ? end.y - 14 : end.y + 22;
               
-              // Glow background
-              ctx.shadowColor = instruction.color;
-              ctx.shadowBlur = 10;
-              ctx.fillStyle = "rgba(0, 0, 0, 0.9)";
-              ctx.fillRect(labelX - 6, labelY - 12, metrics.width + 12, 18);
-              ctx.shadowBlur = 0;
+              // Simple background
+              ctx.fillStyle = "rgba(0, 0, 0, 0.75)";
+              ctx.fillRect(labelX - 4, labelY - 10, metrics.width + 8, 14);
+              ctx.strokeStyle = instruction.color;
+              ctx.lineWidth = 1;
+              ctx.strokeRect(labelX - 4, labelY - 10, metrics.width + 8, 14);
               
-              // Text
+              // Text without glow
               ctx.fillStyle = instruction.color;
               ctx.fillText(instruction.label, labelX, labelY);
             }
@@ -477,8 +510,9 @@ const FinancialChartContainer: React.FC<FinancialChartContainerProps> = ({
 
         case "zone":
           if (instruction.points.length >= 3 && instruction.fill) {
+            // Fill zone with subtle transparency
             ctx.beginPath();
-            ctx.globalAlpha = 0.15;
+            ctx.globalAlpha = 0.08;
             ctx.moveTo(instruction.points[0].x, instruction.points[0].y);
             for (let i = 1; i < instruction.points.length; i++) {
               ctx.lineTo(instruction.points[i].x, instruction.points[i].y);
@@ -487,9 +521,10 @@ const FinancialChartContainer: React.FC<FinancialChartContainerProps> = ({
             ctx.fill();
             ctx.globalAlpha = 1;
             
-            // Draw border
+            // Draw clean border
             ctx.beginPath();
-            ctx.globalAlpha = 0.6;
+            ctx.globalAlpha = 0.4;
+            ctx.lineWidth = 1;
             ctx.moveTo(instruction.points[0].x, instruction.points[0].y);
             for (let i = 1; i < instruction.points.length; i++) {
               ctx.lineTo(instruction.points[i].x, instruction.points[i].y);
@@ -503,22 +538,19 @@ const FinancialChartContainer: React.FC<FinancialChartContainerProps> = ({
         case "text":
           if (instruction.points.length >= 1 && instruction.label) {
             const [p] = instruction.points;
-            ctx.font = "bold 12px monospace";
+            ctx.font = "11px monospace";
             const metrics = ctx.measureText(instruction.label);
             
-            // Background with gradient-like effect
-            ctx.fillStyle = "rgba(0, 0, 0, 0.85)";
-            ctx.fillRect(p.x - 4, p.y - 14, metrics.width + 8, 18);
+            // Clean professional background
+            ctx.fillStyle = "rgba(0, 0, 0, 0.75)";
+            ctx.fillRect(p.x - 3, p.y - 11, metrics.width + 6, 14);
             ctx.strokeStyle = instruction.color;
             ctx.lineWidth = 1;
-            ctx.strokeRect(p.x - 4, p.y - 14, metrics.width + 8, 18);
+            ctx.strokeRect(p.x - 3, p.y - 11, metrics.width + 6, 14);
             
-            // Text with glow
-            ctx.shadowColor = instruction.color;
-            ctx.shadowBlur = 6;
+            // Text without glow
             ctx.fillStyle = instruction.color;
             ctx.fillText(instruction.label, p.x, p.y);
-            ctx.shadowBlur = 0;
           }
           break;
 
@@ -527,8 +559,8 @@ const FinancialChartContainer: React.FC<FinancialChartContainerProps> = ({
             const [p] = instruction.points;
             ctx.beginPath();
             ctx.moveTo(p.x, p.y);
-            ctx.lineTo(p.x - 10, p.y + 15);
-            ctx.lineTo(p.x + 10, p.y + 15);
+            ctx.lineTo(p.x - 6, p.y + 10);
+            ctx.lineTo(p.x + 6, p.y + 10);
             ctx.closePath();
             ctx.fill();
           }
@@ -845,7 +877,7 @@ const FinancialChartContainer: React.FC<FinancialChartContainerProps> = ({
         <motion.div
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
-          className="pl-0 sm:pl-12 mt-2"
+          className="pl-0 mt-2"
         >
           <div className="bg-terminal-dark border border-gray-800 rounded-lg p-4 sm:p-6 relative overflow-hidden">
             {/* Background decoration - like OraclePanel */}
@@ -853,12 +885,26 @@ const FinancialChartContainer: React.FC<FinancialChartContainerProps> = ({
 
             {/* Header with AI Analysis Summary */}
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-4 sm:mb-6 z-10 relative">
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-wrap">
                 <h2 className="text-base sm:text-lg font-bold font-mono text-white flex items-center">
                   <Sparkles className="w-4 h-4 sm:w-5 sm:h-5 text-purple-500 mr-1.5 sm:mr-2" />
                   AI PATTERN ANALYSIS
                 </h2>
                 <span className="text-xs text-gray-500 font-mono">({detectedPatterns.length} detected)</span>
+                {/* Timeframe Badge */}
+                <span className={`text-[10px] font-mono px-2 py-0.5 rounded flex items-center gap-1 ${
+                  currentTimeframeInfo.patternQuality === "excellent" 
+                    ? "bg-profit-green/20 text-profit-green border border-profit-green/30"
+                    : currentTimeframeInfo.patternQuality === "good"
+                      ? "bg-blue-500/20 text-blue-400 border border-blue-500/30"
+                      : currentTimeframeInfo.patternQuality === "fair"
+                        ? "bg-yellow-500/20 text-yellow-400 border border-yellow-500/30"
+                        : "bg-loss-red/20 text-loss-red border border-loss-red/30"
+                }`}>
+                  <Clock className="w-3 h-3" />
+                  {currentTimeframeInfo.label}
+                  {currentTimeframeInfo.patternQuality === "excellent" && " ★"}
+                </span>
               </div>
               {aiAnalysis?.primarySignal && (
                 <div className="flex items-center gap-2">
@@ -877,6 +923,21 @@ const FinancialChartContainer: React.FC<FinancialChartContainerProps> = ({
                 </div>
               )}
             </div>
+
+            {/* Timeframe Quality Info */}
+            {(currentTimeframeInfo.patternQuality === "poor" || currentTimeframeInfo.patternQuality === "fair") && (
+              <div className="bg-yellow-500/10 border border-yellow-500/30 rounded p-2 sm:p-3 mb-4 z-10 relative">
+                <div className="flex items-start gap-2">
+                  <AlertTriangle className="w-4 h-4 text-yellow-500 flex-shrink-0 mt-0.5" />
+                  <div>
+                    <div className="text-xs text-yellow-500 font-mono font-bold">TIMEFRAME NOTICE</div>
+                    <p className="text-[10px] sm:text-xs text-yellow-400/80 mt-1">
+                      {currentTimeframeInfo.description}. For more reliable patterns, use <span className="font-bold">3M, 6M, or 1Y</span> timeframe.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
 
             {/* AI Overall Analysis */}
             {aiAnalysis?.overallAnalysis && (

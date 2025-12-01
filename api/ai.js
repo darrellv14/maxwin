@@ -598,7 +598,17 @@ ${context ? `Topik: ${context}` : ""}`;
 // ============ AI PATTERN ANALYSIS ============
 async function analyzePatterns(req, res) {
   try {
-    const { ticker, patterns, priceData } = req.body;
+    const { 
+      ticker, 
+      patterns, 
+      priceData,
+      timeframe,
+      timeframeInterval,
+      trendDirection,
+      volatility,
+      keyLevels,
+      ohlcSummary
+    } = req.body;
 
     if (!patterns || patterns.length === 0) {
       return res.status(400).json({ error: "Patterns data is required" });
@@ -611,6 +621,12 @@ async function analyzePatterns(req, res) {
       ? ((currentPrice - recentPrices[0].close) / recentPrices[0].close * 100).toFixed(2)
       : 0;
 
+    // Calculate additional metrics
+    const totalDataPoints = priceData?.length || 0;
+    const periodRange = ohlcSummary 
+      ? ((ohlcSummary.periodHigh - ohlcSummary.periodLow) / ohlcSummary.periodLow * 100).toFixed(2)
+      : 0;
+
     const patternSummary = patterns.map(p => ({
       name: p.name,
       type: p.type,
@@ -618,47 +634,90 @@ async function analyzePatterns(req, res) {
       confidence: p.confidence,
       targetPrice: p.targetPrice,
       stopLoss: p.stopLoss,
+      keyPoints: p.points || [],
     }));
 
-    const prompt = `Kamu adalah AI Technical Analyst expert yang menganalisis chart pattern.
+    // Build comprehensive technical context
+    const technicalContext = {
+      currentTrend: trendDirection || "unknown",
+      volatilityLevel: volatility ? `${volatility}%` : "unknown",
+      supportLevels: keyLevels?.support || [],
+      resistanceLevels: keyLevels?.resistance || [],
+      pivotPoint: keyLevels?.pivot?.pivot || currentPrice,
+    };
 
-TICKER: ${ticker || "UNKNOWN"}
-CURRENT PRICE: ${currentPrice.toLocaleString()}
-PRICE CHANGE (20 period): ${priceChange}%
+    // Build timeframe-specific guidelines
+    let timeframeGuidelines = "";
+    if (timeframeInterval === "1h" || timeframeInterval === "4h") {
+      timeframeGuidelines = "- Pattern intraday: fokus pada breakout cepat dan scalping opportunity\\n- Target price biasanya 1-3% range\\n- Stop loss ketat 0.5-1%";
+    } else if (timeframeInterval === "1d") {
+      timeframeGuidelines = "- Pattern swing trading: fokus pada trend continuation/reversal\\n- Target price 5-15% range\\n- Stop loss 2-5%\\n- Pattern perlu 20-60 candle untuk valid";
+    } else {
+      timeframeGuidelines = "- Pattern position trading: fokus pada major trend\\n- Target price 15-50% range\\n- Stop loss 5-10%\\n- Pattern perlu konfirmasi volume";
+    }
 
-DETECTED PATTERNS:
+    const prompt = `Kamu adalah AI Technical Analyst EXPERT yang sangat ahli dalam menganalisis chart pattern dan technical analysis.
+
+## MARKET CONTEXT
+- TICKER: ${ticker || "UNKNOWN"}
+- TIMEFRAME: ${timeframe || "Daily"} (Interval: ${timeframeInterval || "1d"})
+- CURRENT PRICE: ${currentPrice.toLocaleString()}
+- PRICE CHANGE: ${priceChange}% (dalam ${totalDataPoints} periode)
+- PERIOD RANGE: ${periodRange}% (High-Low range)
+- TREND DIRECTION: ${trendDirection || "unknown"}
+- VOLATILITY: ${volatility || "N/A"}%
+
+## KEY TECHNICAL LEVELS
+- Support Levels: ${JSON.stringify(technicalContext.supportLevels.map(s => s.toLocaleString()))}
+- Resistance Levels: ${JSON.stringify(technicalContext.resistanceLevels.map(r => r.toLocaleString()))}
+- Pivot Point: ${technicalContext.pivotPoint.toLocaleString()}
+
+## PERIOD SUMMARY (${totalDataPoints} candles)
+- High: ${ohlcSummary?.periodHigh?.toLocaleString() || "N/A"}
+- Low: ${ohlcSummary?.periodLow?.toLocaleString() || "N/A"}
+- Open: ${ohlcSummary?.periodOpen?.toLocaleString() || "N/A"}
+- Close: ${ohlcSummary?.periodClose?.toLocaleString() || "N/A"}
+- Avg Volume: ${ohlcSummary?.avgVolume?.toLocaleString() || "N/A"}
+
+## DETECTED PATTERNS
 ${JSON.stringify(patternSummary, null, 2)}
 
-TUGAS:
-1. Validasi apakah pattern-pattern ini masuk akal berdasarkan data
-2. Berikan confidence score yang lebih akurat (0-100) untuk setiap pattern
-3. Identifikasi pattern mana yang paling kuat/reliable
-4. Berikan rekomendasi trading berdasarkan pattern yang terdeteksi
-5. Jelaskan potensi false signal jika ada
+## TIMEFRAME PATTERN GUIDELINES
+Berdasarkan timeframe ${timeframe || "Daily"}:
+${timeframeGuidelines}
 
-PENTING: Jawab dalam format JSON yang VALID seperti ini:
+## TUGAS ANALISIS
+1. VALIDASI PATTERN: Apakah pattern yang terdeteksi valid berdasarkan timeframe, current trend, volatility level, dan support/resistance alignment
+2. CONFIDENCE ADJUSTMENT: Berikan confidence score yang lebih akurat (0-100) dengan mempertimbangkan pattern clarity, volume confirmation, trend alignment, key level confluence
+3. PATTERN RANKING: Identifikasi pattern mana yang paling reliable untuk timeframe ini
+4. TRADE RECOMMENDATION: Entry zone, target, dan stop loss yang REALISTIS untuk timeframe ${timeframe || "Daily"}
+5. RISK ASSESSMENT: Identifikasi false signal indicators dan risk factors
+
+PENTING: Jawab dalam format JSON yang VALID:
 {
   "validatedPatterns": [
     {
       "name": "Pattern Name",
-      "isValid": true/false,
+      "isValid": true,
       "adjustedConfidence": 75,
-      "reasoning": "Alasan validasi",
-      "tradeRecommendation": "BUY/SELL/HOLD",
-      "entryZone": "range harga entry",
+      "reasoning": "Alasan validasi yang detail",
+      "tradeRecommendation": "BUY",
+      "entryZone": "range harga entry yang spesifik",
       "targetPrice": 1234,
       "stopLoss": 1200,
-      "riskRewardRatio": "1:2.5"
+      "riskRewardRatio": "1:2.5",
+      "timeframeNote": "Catatan khusus untuk timeframe"
     }
   ],
-  "overallAnalysis": "Analisis keseluruhan pattern",
-  "primarySignal": "BUY/SELL/HOLD",
+  "overallAnalysis": "Analisis komprehensif mempertimbangkan timeframe, trend, volatility, dan confluence level",
+  "primarySignal": "BUY",
   "primaryConfidence": 80,
-  "warnings": ["Peringatan 1", "Peringatan 2"],
-  "bestPattern": "Nama pattern terbaik"
+  "warnings": ["Peringatan spesifik berdasarkan kondisi market"],
+  "bestPattern": "Nama pattern terbaik dengan alasan",
+  "timeframeSuitability": "HIGH"
 }
 
-Berikan analisis yang objektif dan akurat.`;
+Berikan analisis yang OBJEKTIF, AKURAT, dan SPECIFIC untuk timeframe ${timeframe || "Daily"}.`;
 
     const model = genAI.getGenerativeModel({ 
       model: "gemini-2.0-flash",

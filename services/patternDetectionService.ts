@@ -920,6 +920,118 @@ export function generateDrawInstructions(
 }
 
 /**
+ * Infer timeframe from date intervals in data
+ */
+function inferTimeframe(data: IndicatorData[]): { interval: string; description: string; optimalPeriods: number } {
+  if (data.length < 2) {
+    return { interval: "1d", description: "Daily", optimalPeriods: 60 };
+  }
+
+  // Calculate average interval between data points
+  const date1 = new Date(data[data.length - 1].date);
+  const date2 = new Date(data[data.length - 2].date);
+  const diffMs = Math.abs(date1.getTime() - date2.getTime());
+  const diffHours = diffMs / (1000 * 60 * 60);
+  const diffDays = diffHours / 24;
+
+  // Infer timeframe based on interval
+  if (diffHours <= 1) {
+    return { interval: "1h", description: "Hourly", optimalPeriods: 100 };
+  } else if (diffHours <= 4) {
+    return { interval: "4h", description: "4-Hour", optimalPeriods: 80 };
+  } else if (diffDays <= 1) {
+    return { interval: "1d", description: "Daily", optimalPeriods: 60 };
+  } else if (diffDays <= 7) {
+    return { interval: "1w", description: "Weekly", optimalPeriods: 52 };
+  } else {
+    return { interval: "1M", description: "Monthly", optimalPeriods: 36 };
+  }
+}
+
+/**
+ * Calculate key technical levels for pattern analysis
+ */
+function calculateKeyLevels(data: IndicatorData[]): {
+  support: number[];
+  resistance: number[];
+  pivotPoints: { pivot: number; r1: number; r2: number; s1: number; s2: number };
+  trendDirection: string;
+  volatility: number;
+} {
+  const recentData = data.slice(-60);
+  const prices = recentData.map(d => d.close);
+  const highs = recentData.map(d => d.high);
+  const lows = recentData.map(d => d.low);
+
+  // Find support/resistance levels using price clustering
+  const support: number[] = [];
+  const resistance: number[] = [];
+  const priceRange = Math.max(...highs) - Math.min(...lows);
+  const tolerance = priceRange * 0.02; // 2% tolerance
+
+  // Find local lows for support
+  for (let i = 5; i < recentData.length - 5; i++) {
+    const current = recentData[i].low;
+    const isLocalMin = recentData.slice(i - 5, i).every(d => d.low >= current) &&
+                       recentData.slice(i + 1, i + 6).every(d => d.low >= current);
+    if (isLocalMin && !support.some(s => Math.abs(s - current) < tolerance)) {
+      support.push(current);
+    }
+  }
+
+  // Find local highs for resistance
+  for (let i = 5; i < recentData.length - 5; i++) {
+    const current = recentData[i].high;
+    const isLocalMax = recentData.slice(i - 5, i).every(d => d.high <= current) &&
+                       recentData.slice(i + 1, i + 6).every(d => d.high <= current);
+    if (isLocalMax && !resistance.some(r => Math.abs(r - current) < tolerance)) {
+      resistance.push(current);
+    }
+  }
+
+  // Calculate pivot points
+  const lastCandle = recentData[recentData.length - 1];
+  const pivot = (lastCandle.high + lastCandle.low + lastCandle.close) / 3;
+  const r1 = 2 * pivot - lastCandle.low;
+  const r2 = pivot + (lastCandle.high - lastCandle.low);
+  const s1 = 2 * pivot - lastCandle.high;
+  const s2 = pivot - (lastCandle.high - lastCandle.low);
+
+  // Calculate trend direction using SMA
+  const sma20 = prices.slice(-20).reduce((a, b) => a + b, 0) / 20;
+  const sma50 = prices.slice(-50).reduce((a, b) => a + b, 0) / Math.min(50, prices.length);
+  const currentPrice = prices[prices.length - 1];
+  
+  let trendDirection = "sideways";
+  if (currentPrice > sma20 && sma20 > sma50) {
+    trendDirection = "uptrend";
+  } else if (currentPrice < sma20 && sma20 < sma50) {
+    trendDirection = "downtrend";
+  }
+
+  // Calculate volatility (ATR-like)
+  let atrSum = 0;
+  for (let i = 1; i < recentData.length; i++) {
+    const tr = Math.max(
+      recentData[i].high - recentData[i].low,
+      Math.abs(recentData[i].high - recentData[i - 1].close),
+      Math.abs(recentData[i].low - recentData[i - 1].close)
+    );
+    atrSum += tr;
+  }
+  const atr = atrSum / (recentData.length - 1);
+  const volatility = (atr / currentPrice) * 100;
+
+  return {
+    support: support.sort((a, b) => b - a).slice(0, 3),
+    resistance: resistance.sort((a, b) => a - b).slice(0, 3),
+    pivotPoints: { pivot, r1, r2, s1, s2 },
+    trendDirection,
+    volatility,
+  };
+}
+
+/**
  * Call Gemini API to validate and enhance pattern detection
  */
 export async function validatePatternsWithAI(
@@ -928,11 +1040,39 @@ export async function validatePatternsWithAI(
   priceData: IndicatorData[]
 ): Promise<AIPatternAnalysis | null> {
   try {
+    // Infer timeframe from data
+    const timeframe = inferTimeframe(priceData);
+    
+    // Calculate key technical levels
+    const keyLevels = calculateKeyLevels(priceData);
+    
+    // Get optimal amount of data based on timeframe
+    const optimalData = priceData.slice(-timeframe.optimalPeriods);
+    
+    // Create OHLC summary for pattern context
+    const ohlcSummary = {
+      periodHigh: Math.max(...optimalData.map(d => d.high)),
+      periodLow: Math.min(...optimalData.map(d => d.low)),
+      periodOpen: optimalData[0]?.open || 0,
+      periodClose: optimalData[optimalData.length - 1]?.close || 0,
+      avgVolume: optimalData.reduce((sum, d) => sum + d.volume, 0) / optimalData.length,
+    };
+
     const response = await fetch("/api/ai?action=patterns", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         ticker,
+        timeframe: timeframe.description,
+        timeframeInterval: timeframe.interval,
+        trendDirection: keyLevels.trendDirection,
+        volatility: keyLevels.volatility.toFixed(2),
+        keyLevels: {
+          support: keyLevels.support,
+          resistance: keyLevels.resistance,
+          pivot: keyLevels.pivotPoints,
+        },
+        ohlcSummary,
         patterns: patterns.map(p => ({
           name: p.name,
           type: p.type,
@@ -941,8 +1081,10 @@ export async function validatePatternsWithAI(
           targetPrice: p.targetPrice,
           stopLoss: p.stopLoss,
           description: p.description,
+          points: p.points.map(pt => ({ price: pt.price, date: pt.date })),
         })),
-        priceData: priceData.slice(-30).map(d => ({
+        // Send more data with key OHLC points
+        priceData: optimalData.map((d, idx) => ({
           date: d.date,
           open: d.open,
           high: d.high,
@@ -950,6 +1092,12 @@ export async function validatePatternsWithAI(
           close: d.close,
           volume: d.volume,
           rsi: d.rsi,
+          sma20: d.sma20,
+          sma50: d.sma50,
+          bbUpper: d.bbUpper,
+          bbLower: d.bbLower,
+          // Mark significant candles
+          isSignificant: idx % 5 === 0 || d.high === ohlcSummary.periodHigh || d.low === ohlcSummary.periodLow,
         })),
       }),
     });
