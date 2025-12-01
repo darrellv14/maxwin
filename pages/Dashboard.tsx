@@ -135,10 +135,13 @@ const Dashboard: React.FC = () => {
     <div className="min-h-screen bg-terminal-black text-gray-200 font-sans selection:bg-green-900 selection:text-white pb-6 md:pb-10">
       <Navbar />
 
-      <main className="max-w-7xl mx-auto px-3 sm:px-4 mt-4 sm:mt-6 2xl:max-w-none">
-        <div className="grid grid-cols-1 md:grid-cols-12 gap-4 mb-6">
-          {/* Sidebar */}
-          <div className="col-span-12 md:col-span-3 space-y-4 flex flex-col">
+      <main className="max-w-7xl mx-auto px-3 sm:px-4 mt-4 sm:mt-6 2xl:max-w-none 2xl:px-6">
+        {/* Main Grid Layout */}
+        <div className="grid grid-cols-12 gap-4">
+          
+          {/* ==================== LEFT SIDEBAR ==================== */}
+          <div className="col-span-12 lg:col-span-3 space-y-4">
+            {/* Ticker Input */}
             <div className="bg-terminal-gray border border-gray-800 p-4 rounded-lg">
               <label htmlFor="ticker-input" className="block text-xs font-mono text-gray-400 mb-1">
                 ASSET TICKER (Gunakan .JK untuk saham IHSG)
@@ -176,6 +179,7 @@ const Dashboard: React.FC = () => {
               </div>
             </div>
 
+            {/* Timeframe */}
             <div className="bg-terminal-gray border border-gray-800 p-4 rounded-lg">
               <label className="block text-xs font-mono text-gray-400 mb-2">TIMEFRAME</label>
               <div className="grid grid-cols-5 gap-1 sm:gap-2">
@@ -246,16 +250,28 @@ const Dashboard: React.FC = () => {
               </div>
             </div>
 
+            {/* AI Confidence Chart */}
+            <div className="bg-terminal-dark rounded-lg border border-gray-800 p-4">
+              <h2 className="text-xs font-mono text-gray-400 mb-2 uppercase tracking-wider">
+                AI Confidence History
+              </h2>
+              <div className="h-[160px]">
+                <ConfidenceChart data={data} />
+              </div>
+            </div>
+
+            {/* Portfolio Widget */}
             <PortfolioWidget />
 
+            {/* Watchlist Widget */}
             <WatchlistWidget onSelect={handleSelectFromWatchlist} />
           </div>
 
-          {/* Main Chart Area */}
-          <div className="col-span-12 md:col-span-9 space-y-4 flex flex-col">
+          {/* ==================== MAIN CONTENT AREA ==================== */}
+          <div className="col-span-12 lg:col-span-9 space-y-4">
             {loadingData ? (
               <>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
                   <StatCardSkeleton />
                   <StatCardSkeleton />
                   <StatCardSkeleton />
@@ -265,8 +281,8 @@ const Dashboard: React.FC = () => {
               </>
             ) : (
               <>
-                {/* Top Stats */}
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                {/* Stats Cards Row */}
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
                   <StatCard
                     label="Last Price"
                     value={current?.close?.toLocaleString("id-ID") || "0"}
@@ -297,21 +313,19 @@ const Dashboard: React.FC = () => {
                   />
                 </div>
 
-                {/* Chat Assistant (kalau kamu mau tetap di sini) */}
+                {/* AI Chat Assistant */}
                 <AIChatAssistant />
 
-                {/* Main Financial Chart */}
+                {/* Financial Chart */}
                 <FinancialChart data={data} ticker={ticker} />
 
-                {/* Oracle Panel + Market Depth - Below Chart, Same Width */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {/* Oracle Panel */}
-                  <div className="h-[320px]">
-                    <OraclePanel analysis={analysis} loading={loadingAI} onAnalyze={handleAnalyze} />
-                  </div>
+                {/* Bottom Section: Oracle AI + Market Depth (Side by Side, Equal Height) */}
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                  {/* Oracle Panel - Full Height, No Scroll */}
+                  <OraclePanel analysis={analysis} loading={loadingAI} onAnalyze={handleAnalyze} />
 
                   {/* Market Depth Log */}
-                  <div className="bg-terminal-gray border border-gray-800 rounded-lg p-4 h-[320px] flex flex-col">
+                  <div className="bg-terminal-gray border border-gray-800 rounded-lg p-4 flex flex-col min-h-[400px]">
                     <h2 className="text-sm font-bold font-mono text-white mb-3">
                       MARKET DEPTH LOG
                     </h2>
@@ -328,7 +342,7 @@ const Dashboard: React.FC = () => {
                         <tbody className="text-gray-300">
                           {[...data]
                             .reverse()
-                            .slice(0, 10)
+                            .slice(0, 15)
                             .map((d, i) => (
                               <tr
                                 key={i}
@@ -359,20 +373,6 @@ const Dashboard: React.FC = () => {
                 </div>
               </>
             )}
-          </div>
-        </div>
-
-        {/* AI Confidence Chart - Same Width as Sidebar/Watchlist */}
-        <div className="grid grid-cols-1 md:grid-cols-12 gap-4 mb-6">
-          <div className="col-span-12 md:col-span-3">
-            <div className="bg-terminal-dark rounded-lg border border-gray-800 p-4 flex flex-col h-[280px]">
-              <h2 className="text-xs font-mono text-gray-400 mb-2 uppercase tracking-wider">
-                AI Confidence / Win Rate History
-              </h2>
-              <div className="flex-1 min-h-0">
-                <ConfidenceChart data={data} />
-              </div>
-            </div>
           </div>
         </div>
       </main>

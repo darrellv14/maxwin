@@ -52,7 +52,7 @@ const OraclePanel: React.FC<OraclePanelProps> = ({ analysis, loading, onAnalyze 
   }, [loading]);
 
   return (
-    <div className="bg-terminal-dark border border-gray-800 rounded-lg p-4 sm:p-6 h-full flex flex-col relative overflow-hidden">
+    <div className="bg-terminal-dark border border-gray-800 rounded-lg p-4 sm:p-6 flex flex-col relative overflow-hidden min-h-[400px]">
       {/* Background decoration */}
       <div className="absolute top-0 right-0 w-24 sm:w-32 h-24 sm:h-32 bg-purple-900 opacity-10 rounded-full blur-3xl pointer-events-none"></div>
 
@@ -153,7 +153,7 @@ const OraclePanel: React.FC<OraclePanelProps> = ({ analysis, loading, onAnalyze 
             </div>
           </div>
 
-          <div className="bg-black/30 p-3 sm:p-4 rounded border border-gray-800 flex-1 overflow-y-auto max-h-[120px] sm:max-h-[150px]">
+          <div className="bg-black/30 p-3 sm:p-4 rounded border border-gray-800">
             <div className="text-gray-400 text-[10px] sm:text-xs font-mono uppercase mb-1.5 sm:mb-2">The Verdict</div>
             <p className="text-gray-300 text-xs sm:text-sm leading-relaxed font-mono text-justify">
               "{analysis.reasoning}"
