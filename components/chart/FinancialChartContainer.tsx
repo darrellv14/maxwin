@@ -118,14 +118,26 @@ const FinancialChartContainer: React.FC<FinancialChartContainerProps> = ({
   }, []);
 
   // Drawing on canvas
-  const getCanvasCoords = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
+  const getCanvasCoords = useCallback((e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
     const canvas = canvasRef.current;
     if (!canvas) return { x: 0, y: 0 };
     const rect = canvas.getBoundingClientRect();
-    return {
-      x: e.clientX - rect.left,
-      y: e.clientY - rect.top,
-    };
+    
+    // Handle both mouse and touch events
+    if ('touches' in e) {
+      // Touch event
+      const touch = e.touches[0] || e.changedTouches[0];
+      return {
+        x: touch.clientX - rect.left,
+        y: touch.clientY - rect.top,
+      };
+    } else {
+      // Mouse event
+      return {
+        x: e.clientX - rect.left,
+        y: e.clientY - rect.top,
+      };
+    }
   }, []);
 
   const handleCanvasMouseDown = useCallback(
@@ -187,6 +199,73 @@ const FinancialChartContainer: React.FC<FinancialChartContainerProps> = ({
   const handleCanvasMouseUp = useCallback(() => {
     if (currentDrawing && currentDrawing.points.length >= 2) {
       console.log("Adding drawing:", currentDrawing);
+      setDrawings((prev) => [...prev, currentDrawing]);
+    }
+    setIsDrawing(false);
+    setCurrentDrawing(null);
+  }, [currentDrawing]);
+
+  // Touch event handlers for mobile
+  const handleTouchStart = useCallback(
+    (e: React.TouchEvent<HTMLCanvasElement>) => {
+      if (activeTool === "cursor") return;
+
+      e.preventDefault();
+      e.stopPropagation();
+
+      const coords = getCanvasCoords(e);
+      console.log("Touch start at:", coords, "Tool:", activeTool);
+
+      const newDrawing: DrawingObject = {
+        id: Date.now().toString(),
+        type: activeTool,
+        points: [coords],
+        color:
+          activeTool === "arrow-up"
+            ? "#00ff9d"
+            : activeTool === "arrow-down"
+              ? "#ff0055"
+              : "#fbbf24",
+      };
+
+      // For single-tap tools, add immediately
+      if (activeTool === "arrow-up" || activeTool === "arrow-down" || activeTool === "horizontal") {
+        if (activeTool === "horizontal") {
+          newDrawing.points = [coords, { x: coords.x + 100, y: coords.y }];
+        }
+        setDrawings((prev) => [...prev, newDrawing]);
+      } else if (activeTool === "text") {
+        // Show text input at tapped position
+        setTextInput({ visible: true, x: coords.x, y: coords.y, value: "" });
+      } else {
+        setCurrentDrawing(newDrawing);
+        setIsDrawing(true);
+      }
+    },
+    [activeTool, getCanvasCoords]
+  );
+
+  const handleTouchMove = useCallback(
+    (e: React.TouchEvent<HTMLCanvasElement>) => {
+      if (!isDrawing || !currentDrawing) return;
+
+      e.preventDefault();
+      const coords = getCanvasCoords(e);
+
+      setCurrentDrawing((prev) => {
+        if (!prev) return null;
+        return {
+          ...prev,
+          points: [prev.points[0], coords],
+        };
+      });
+    },
+    [isDrawing, currentDrawing, getCanvasCoords]
+  );
+
+  const handleTouchEnd = useCallback(() => {
+    if (currentDrawing && currentDrawing.points.length >= 2) {
+      console.log("Touch end - Adding drawing:", currentDrawing);
       setDrawings((prev) => [...prev, currentDrawing]);
     }
     setIsDrawing(false);
@@ -412,11 +491,16 @@ const FinancialChartContainer: React.FC<FinancialChartContainerProps> = ({
               pointerEvents: activeTool !== "cursor" ? "auto" : "none",
               cursor: activeTool !== "cursor" ? "crosshair" : "default",
               zIndex: activeTool !== "cursor" ? 10 : 0,
+              touchAction: activeTool !== "cursor" ? "none" : "auto", // Prevent scroll when drawing
             }}
             onMouseDown={handleCanvasMouseDown}
             onMouseMove={handleCanvasMouseMove}
             onMouseUp={handleCanvasMouseUp}
             onMouseLeave={handleCanvasMouseUp}
+            onTouchStart={handleTouchStart}
+            onTouchMove={handleTouchMove}
+            onTouchEnd={handleTouchEnd}
+            onTouchCancel={handleTouchEnd}
           />
 
           {/* Active Tool Indicator */}
@@ -500,7 +584,7 @@ const FinancialChartContainer: React.FC<FinancialChartContainerProps> = ({
       {/* Drawing Tools Help */}
       {activeTool !== "cursor" && (
         <div className="text-[10px] sm:text-xs text-gray-500 font-mono pl-0 sm:pl-12">
-          📝 <span className="text-profit-green">{activeTool.toUpperCase()}</span> — Click and drag
+          📝 <span className="text-profit-green">{activeTool.toUpperCase()}</span> — <span className="hidden sm:inline">Click and drag</span><span className="sm:hidden">Tap and drag</span>
         </div>
       )}
     </div>
