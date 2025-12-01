@@ -957,9 +957,192 @@ function inferTimeframe(data: IndicatorData[]): { interval: string; description:
 }
 
 /**
- * Analyze volume for breakout confirmation and pattern validation
+ * IHSG (IDX) Trading Hours Configuration
+ * Based on official IDX trading schedule
  */
-function analyzeVolume(data: IndicatorData[]): {
+interface MarketSession {
+  name: string;
+  startTime: string; // HH:MM:SS
+  endTime: string;   // HH:MM:SS
+  isTrading: boolean;
+}
+
+interface MarketStatus {
+  isOpen: boolean;
+  isIndonesianStock: boolean;
+  currentSession: string;
+  sessionProgress: number; // 0-100% of trading day completed
+  expectedTotalVolume: number; // Estimated based on session progress
+  volumeNormalizationFactor: number; // Factor to normalize intraday volume
+  nextSession: string;
+  marketCloseTime: string;
+  note: string;
+}
+
+/**
+ * Get current IHSG market status based on Indonesian time (WIB)
+ */
+function getIHSGMarketStatus(ticker: string, currentVolume: number, avgDailyVolume: number): MarketStatus {
+  // Check if it's an Indonesian stock
+  const isIndonesianStock = ticker.toUpperCase().endsWith('.JK') || 
+                            ticker.toUpperCase() === '^JKSE' ||
+                            ticker.toUpperCase() === 'IHSG';
+
+  if (!isIndonesianStock) {
+    return {
+      isOpen: false,
+      isIndonesianStock: false,
+      currentSession: "N/A",
+      sessionProgress: 100,
+      expectedTotalVolume: currentVolume,
+      volumeNormalizationFactor: 1,
+      nextSession: "N/A",
+      marketCloseTime: "N/A",
+      note: "Non-Indonesian stock - using full volume comparison",
+    };
+  }
+
+  // Get current time in WIB (UTC+7)
+  const now = new Date();
+  const wibOffset = 7 * 60; // UTC+7 in minutes
+  const utcTime = now.getTime() + (now.getTimezoneOffset() * 60000);
+  const wibTime = new Date(utcTime + (wibOffset * 60000));
+  
+  const dayOfWeek = wibTime.getDay(); // 0 = Sunday, 1 = Monday, ..., 5 = Friday
+  const hours = wibTime.getHours();
+  const minutes = wibTime.getMinutes();
+  const currentTimeMinutes = hours * 60 + minutes;
+
+  // Check if weekend
+  if (dayOfWeek === 0 || dayOfWeek === 6) {
+    return {
+      isOpen: false,
+      isIndonesianStock: true,
+      currentSession: "Weekend",
+      sessionProgress: 100,
+      expectedTotalVolume: currentVolume,
+      volumeNormalizationFactor: 1,
+      nextSession: "Pre-opening Monday 08:45 WIB",
+      marketCloseTime: "N/A",
+      note: "Market closed (weekend) - using last trading day volume",
+    };
+  }
+
+  const isFriday = dayOfWeek === 5;
+
+  // Define sessions in minutes from midnight
+  const sessions = {
+    preOpenInput: { start: 8 * 60 + 45, end: 8 * 60 + 58 },    // 08:45 - 08:58
+    preOpenMatch: { start: 8 * 60 + 58, end: 9 * 60 },          // 08:58 - 09:00
+    session1: { 
+      start: 9 * 60,                                             // 09:00
+      end: isFriday ? 11 * 60 + 30 : 12 * 60                    // 11:30 (Fri) or 12:00 (Mon-Thu)
+    },
+    lunchBreak: {
+      start: isFriday ? 11 * 60 + 30 : 12 * 60,
+      end: isFriday ? 14 * 60 : 13 * 60 + 30                    // 14:00 (Fri) or 13:30 (Mon-Thu)
+    },
+    session2: {
+      start: isFriday ? 14 * 60 : 13 * 60 + 30,                 // 14:00 (Fri) or 13:30 (Mon-Thu)
+      end: 15 * 60 + 50                                          // 15:50
+    },
+    preClose: { start: 15 * 60 + 50, end: 16 * 60 },            // 15:50 - 16:00
+    postClose: { start: 16 * 60, end: 16 * 60 + 15 },           // 16:00 - 16:15
+  };
+
+  // Calculate total trading minutes (excluding lunch)
+  const session1Duration = sessions.session1.end - sessions.session1.start; // 180 or 150 min
+  const session2Duration = sessions.session2.end - sessions.session2.start; // 140 or 110 min
+  const totalTradingMinutes = session1Duration + session2Duration;
+
+  // Determine current session and progress
+  let currentSession = "Closed";
+  let tradingMinutesElapsed = 0;
+  let isOpen = false;
+  let nextSession = "";
+  let note = "";
+
+  if (currentTimeMinutes < sessions.preOpenInput.start) {
+    currentSession = "Pre-Market";
+    nextSession = "Pre-opening 08:45 WIB";
+    note = "Market belum buka - volume hari ini belum tersedia";
+  } else if (currentTimeMinutes < sessions.preOpenMatch.end) {
+    currentSession = "Pre-Opening";
+    isOpen = true;
+    nextSession = "Session 1 at 09:00 WIB";
+    note = "Fase pra-pembukaan - volume masih sangat rendah, tidak bisa dibandingkan";
+  } else if (currentTimeMinutes < sessions.session1.end) {
+    currentSession = "Session 1";
+    isOpen = true;
+    tradingMinutesElapsed = currentTimeMinutes - sessions.session1.start;
+    nextSession = isFriday ? "Lunch break 11:30 WIB" : "Lunch break 12:00 WIB";
+    const pctDone = Math.round((tradingMinutesElapsed / session1Duration) * 100);
+    note = `Sesi 1 berjalan ${pctDone}% - volume masih INTRADAY, belum final!`;
+  } else if (currentTimeMinutes < sessions.session2.start) {
+    currentSession = "Lunch Break";
+    isOpen = false;
+    tradingMinutesElapsed = session1Duration; // Session 1 complete
+    nextSession = isFriday ? "Session 2 at 14:00 WIB" : "Session 2 at 13:30 WIB";
+    note = "Istirahat siang - volume = 50% dari estimasi harian";
+  } else if (currentTimeMinutes < sessions.session2.end) {
+    currentSession = "Session 2";
+    isOpen = true;
+    tradingMinutesElapsed = session1Duration + (currentTimeMinutes - sessions.session2.start);
+    nextSession = "Pre-closing 15:50 WIB";
+    const pctDone = Math.round((tradingMinutesElapsed / totalTradingMinutes) * 100);
+    note = `Sesi 2 berjalan - total trading ${pctDone}% - volume masih INTRADAY!`;
+  } else if (currentTimeMinutes < sessions.preClose.end) {
+    currentSession = "Pre-Closing";
+    isOpen = true;
+    tradingMinutesElapsed = totalTradingMinutes;
+    nextSession = "Closing 16:00 WIB";
+    note = "Fase pra-penutupan - volume mendekati final";
+  } else if (currentTimeMinutes < sessions.postClose.end) {
+    currentSession = "Post-Closing";
+    isOpen = false;
+    tradingMinutesElapsed = totalTradingMinutes;
+    nextSession = "Closed until tomorrow 08:45 WIB";
+    note = "Pasca-penutupan - volume adalah FINAL untuk hari ini";
+  } else {
+    currentSession = "Closed";
+    isOpen = false;
+    tradingMinutesElapsed = totalTradingMinutes;
+    nextSession = "Pre-opening tomorrow 08:45 WIB";
+    note = "Market tutup - volume adalah FINAL untuk hari ini";
+  }
+
+  // Calculate session progress (0-100%)
+  const sessionProgress = Math.min(100, Math.round((tradingMinutesElapsed / totalTradingMinutes) * 100));
+
+  // Calculate volume normalization factor
+  // If market is 50% done, multiply current volume by 2 to estimate final volume
+  const volumeNormalizationFactor = sessionProgress > 0 ? 100 / sessionProgress : 1;
+
+  // Estimate expected total volume based on current volume and progress
+  const expectedTotalVolume = sessionProgress > 0 
+    ? Math.round(currentVolume * volumeNormalizationFactor)
+    : avgDailyVolume;
+
+  const marketCloseTime = isFriday ? "15:50 WIB (Jumat)" : "15:50 WIB";
+
+  return {
+    isOpen,
+    isIndonesianStock: true,
+    currentSession,
+    sessionProgress,
+    expectedTotalVolume,
+    volumeNormalizationFactor,
+    nextSession,
+    marketCloseTime,
+    note,
+  };
+}
+
+/**
+ * Analyze volume for breakout confirmation and pattern validation
+ * NOW WITH IHSG MARKET HOURS AWARENESS!
+ */
+function analyzeVolume(data: IndicatorData[], ticker: string = "UNKNOWN"): {
   avgVolume: number;
   recentAvgVolume: number;
   volumeTrend: "increasing" | "decreasing" | "stable";
@@ -968,8 +1151,11 @@ function analyzeVolume(data: IndicatorData[]): {
   accumulationDistribution: "accumulation" | "distribution" | "neutral";
   volumePriceConfirmation: boolean;
   volumeAnalysis: string;
+  marketStatus: MarketStatus;
+  intradayWarning: string | null;
 } {
   if (data.length < 20) {
+    const emptyMarketStatus = getIHSGMarketStatus(ticker, 0, 0);
     return {
       avgVolume: 0,
       recentAvgVolume: 0,
@@ -979,53 +1165,102 @@ function analyzeVolume(data: IndicatorData[]): {
       accumulationDistribution: "neutral",
       volumePriceConfirmation: false,
       volumeAnalysis: "Insufficient data for volume analysis",
+      marketStatus: emptyMarketStatus,
+      intradayWarning: null,
     };
   }
 
   const volumes = data.map(d => d.volume);
   const recentData = data.slice(-20);
   const olderData = data.slice(-60, -20);
+  
+  // Get the last candle (today's data)
+  const todayData = data[data.length - 1];
+  const yesterdayData = data[data.length - 2];
 
-  // Calculate average volumes
-  const avgVolume = volumes.reduce((a, b) => a + b, 0) / volumes.length;
-  const recentAvgVolume = recentData.reduce((a, b) => a + b.volume, 0) / recentData.length;
+  // Calculate average volumes (excluding today for fair comparison)
+  const historicalVolumes = data.slice(0, -1).map(d => d.volume);
+  const avgVolume = historicalVolumes.reduce((a, b) => a + b, 0) / historicalVolumes.length;
+  
+  // Recent average (last 20 days, excluding today)
+  const recentHistoricalData = data.slice(-21, -1);
+  const recentAvgVolume = recentHistoricalData.reduce((a, b) => a + b.volume, 0) / recentHistoricalData.length;
+  
   const olderAvgVolume = olderData.length > 0 
     ? olderData.reduce((a, b) => a + b.volume, 0) / olderData.length 
     : avgVolume;
 
-  // Volume trend
-  let volumeTrend: "increasing" | "decreasing" | "stable" = "stable";
-  const volumeChangePercent = ((recentAvgVolume - olderAvgVolume) / olderAvgVolume) * 100;
-  if (volumeChangePercent > 15) {
-    volumeTrend = "increasing";
-  } else if (volumeChangePercent < -15) {
-    volumeTrend = "decreasing";
+  // Get market status for intraday awareness
+  const marketStatus = getIHSGMarketStatus(ticker, todayData.volume, avgVolume);
+
+  // Intraday warning message
+  let intradayWarning: string | null = null;
+  
+  if (marketStatus.isIndonesianStock && marketStatus.sessionProgress < 100) {
+    intradayWarning = `⚠️ INTRADAY: ${marketStatus.currentSession} (${marketStatus.sessionProgress}% selesai). ` +
+                      `Volume hari ini ${todayData.volume.toLocaleString()} masih ongoing. ` +
+                      `Estimasi final: ${marketStatus.expectedTotalVolume.toLocaleString()}. ` +
+                      `${marketStatus.note}`;
   }
 
-  // Find volume spikes (>1.5x average volume)
+  // For volume trend comparison:
+  // If market is still open, use normalized/estimated volume for today
+  const todayVolumeForComparison = marketStatus.isIndonesianStock && marketStatus.sessionProgress < 100
+    ? marketStatus.expectedTotalVolume  // Use estimated final volume
+    : todayData.volume;
+
+  // Volume trend - SMART comparison
+  // Compare estimated today volume vs yesterday's complete volume
+  let volumeTrend: "increasing" | "decreasing" | "stable" = "stable";
+  
+  if (marketStatus.sessionProgress >= 100 || !marketStatus.isIndonesianStock) {
+    // Market closed - use normal comparison
+    const volumeChangePercent = ((recentAvgVolume - olderAvgVolume) / olderAvgVolume) * 100;
+    if (volumeChangePercent > 15) {
+      volumeTrend = "increasing";
+    } else if (volumeChangePercent < -15) {
+      volumeTrend = "decreasing";
+    }
+  } else {
+    // Market STILL OPEN - compare estimated volume with yesterday
+    const estimatedVsYesterday = ((todayVolumeForComparison - yesterdayData.volume) / yesterdayData.volume) * 100;
+    
+    // Be more conservative when market is still open
+    if (estimatedVsYesterday > 25) {
+      volumeTrend = "increasing";
+    } else if (estimatedVsYesterday < -25) {
+      volumeTrend = "decreasing";
+    }
+    // Otherwise stay "stable" - don't make conclusions on incomplete data
+  }
+
+  // Find volume spikes (>1.5x average volume) - only from COMPLETED days
+  const completedDays = marketStatus.sessionProgress >= 100 ? data : data.slice(0, -1);
   const volumeSpikes: { date: string; volume: number; priceChange: number; significance: string }[] = [];
-  for (let i = 1; i < data.length; i++) {
-    if (data[i].volume > avgVolume * 1.5) {
-      const priceChange = ((data[i].close - data[i - 1].close) / data[i - 1].close) * 100;
-      const volumeRatio = data[i].volume / avgVolume;
+  
+  for (let i = 1; i < completedDays.length; i++) {
+    if (completedDays[i].volume > avgVolume * 1.5) {
+      const priceChange = ((completedDays[i].close - completedDays[i - 1].close) / completedDays[i - 1].close) * 100;
+      const volumeRatio = completedDays[i].volume / avgVolume;
       let significance = "moderate";
       if (volumeRatio > 3) significance = "extreme";
       else if (volumeRatio > 2) significance = "high";
       
       volumeSpikes.push({
-        date: data[i].date,
-        volume: data[i].volume,
+        date: completedDays[i].date,
+        volume: completedDays[i].volume,
         priceChange,
         significance,
       });
     }
   }
 
-  // Accumulation/Distribution Analysis
-  // Using simplified Money Flow concept
+  // Accumulation/Distribution Analysis - using completed days only
   let accumulationScore = 0;
-  for (let i = 0; i < recentData.length; i++) {
-    const d = recentData[i];
+  const analysisData = marketStatus.sessionProgress >= 100 ? recentData : recentData.slice(0, -1);
+  
+  for (let i = 0; i < analysisData.length; i++) {
+    const d = analysisData[i];
     const moneyFlowMultiplier = d.high !== d.low 
       ? ((d.close - d.low) - (d.high - d.close)) / (d.high - d.low)
       : 0;
@@ -1034,22 +1269,24 @@ function analyzeVolume(data: IndicatorData[]): {
   }
 
   let accumulationDistribution: "accumulation" | "distribution" | "neutral" = "neutral";
-  const avgMoneyFlow = accumulationScore / recentData.length;
+  const avgMoneyFlow = accumulationScore / analysisData.length;
   if (avgMoneyFlow > avgVolume * 0.1) {
     accumulationDistribution = "accumulation";
   } else if (avgMoneyFlow < -avgVolume * 0.1) {
     accumulationDistribution = "distribution";
   }
 
-  // Volume-Price Confirmation
-  // Check if volume confirms price movement
-  const priceUp = recentData[recentData.length - 1].close > recentData[0].close;
+  // Volume-Price Confirmation - using estimated volume if intraday
+  const priceUp = todayData.close > (analysisData[0]?.close || todayData.open);
   const volumePriceConfirmation = (priceUp && volumeTrend === "increasing") || 
                                    (!priceUp && volumeTrend === "decreasing");
 
   // Breakout Potential based on volume buildup
   let breakoutPotential: "high" | "medium" | "low" = "low";
-  const lastFiveVolume = data.slice(-5).reduce((a, b) => a + b.volume, 0) / 5;
+  
+  // Use completed days for analysis
+  const last5CompletedDays = completedDays.slice(-5);
+  const lastFiveVolume = last5CompletedDays.reduce((a, b) => a + b.volume, 0) / last5CompletedDays.length;
   const volumeBuildupRatio = lastFiveVolume / avgVolume;
   
   if (volumeBuildupRatio > 1.3 && volumeTrend === "increasing") {
@@ -1058,11 +1295,11 @@ function analyzeVolume(data: IndicatorData[]): {
     breakoutPotential = "medium";
   }
 
-  // Recent volume spikes in last 5 candles
+  // Recent volume spikes in last 5 completed days
   const recentSpikes = volumeSpikes.filter(s => {
     const spikeDate = new Date(s.date);
-    const lastDate = new Date(data[data.length - 1].date);
-    const diffDays = (lastDate.getTime() - spikeDate.getTime()) / (1000 * 60 * 60 * 24);
+    const lastCompletedDate = new Date(completedDays[completedDays.length - 1].date);
+    const diffDays = (lastCompletedDate.getTime() - spikeDate.getTime()) / (1000 * 60 * 60 * 24);
     return diffDays <= 5;
   });
 
@@ -1070,16 +1307,33 @@ function analyzeVolume(data: IndicatorData[]): {
     breakoutPotential = "high";
   }
 
-  // Build analysis summary
-  let volumeAnalysis = `Volume ${volumeTrend} (${volumeChangePercent > 0 ? "+" : ""}${volumeChangePercent.toFixed(1)}%). `;
-  volumeAnalysis += `${accumulationDistribution.charAt(0).toUpperCase() + accumulationDistribution.slice(1)} phase detected. `;
+  // Build analysis summary - WITH MARKET AWARENESS
+  let volumeAnalysis = "";
+  
+  if (marketStatus.isIndonesianStock && marketStatus.sessionProgress < 100) {
+    // INTRADAY - be careful with conclusions
+    volumeAnalysis = `📊 [INTRADAY - ${marketStatus.currentSession}] `;
+    volumeAnalysis += `Volume saat ini: ${todayData.volume.toLocaleString()} (${marketStatus.sessionProgress}% sesi). `;
+    volumeAnalysis += `Estimasi akhir hari: ~${marketStatus.expectedTotalVolume.toLocaleString()}. `;
+    volumeAnalysis += `vs Kemarin: ${yesterdayData.volume.toLocaleString()}. `;
+    
+    if (marketStatus.sessionProgress < 50) {
+      volumeAnalysis += `⚠️ JANGAN simpulkan volume trend - market baru ${marketStatus.sessionProgress}% berjalan! `;
+    }
+  } else {
+    // MARKET CLOSED - normal analysis
+    const volumeChangePercent = ((recentAvgVolume - olderAvgVolume) / olderAvgVolume) * 100;
+    volumeAnalysis = `Volume ${volumeTrend} (${volumeChangePercent > 0 ? "+" : ""}${volumeChangePercent.toFixed(1)}%). `;
+  }
+  
+  volumeAnalysis += `${accumulationDistribution.charAt(0).toUpperCase() + accumulationDistribution.slice(1)} phase. `;
   volumeAnalysis += `Breakout potential: ${breakoutPotential}. `;
   
   if (volumeSpikes.length > 0) {
     volumeAnalysis += `${volumeSpikes.length} volume spike(s) detected. `;
   }
   
-  if (!volumePriceConfirmation) {
+  if (!volumePriceConfirmation && marketStatus.sessionProgress >= 100) {
     volumeAnalysis += "⚠️ Volume-price divergence detected. ";
   }
 
@@ -1087,11 +1341,13 @@ function analyzeVolume(data: IndicatorData[]): {
     avgVolume,
     recentAvgVolume,
     volumeTrend,
-    volumeSpikes: volumeSpikes.slice(-10), // Last 10 spikes
+    volumeSpikes: volumeSpikes.slice(-10),
     breakoutPotential,
     accumulationDistribution,
     volumePriceConfirmation,
     volumeAnalysis,
+    marketStatus,
+    intradayWarning,
   };
 }
 
@@ -1193,8 +1449,8 @@ export async function validatePatternsWithAI(
     // Calculate key technical levels
     const keyLevels = calculateKeyLevels(priceData);
     
-    // Analyze volume for breakout confirmation
-    const volumeAnalysis = analyzeVolume(priceData);
+    // Analyze volume for breakout confirmation - WITH MARKET HOURS AWARENESS
+    const volumeAnalysis = analyzeVolume(priceData, ticker);
     
     // Get optimal amount of data based on timeframe
     const optimalData = priceData.slice(-timeframe.optimalPeriods);
@@ -1232,6 +1488,15 @@ export async function validatePatternsWithAI(
           volumePriceConfirmation: volumeAnalysis.volumePriceConfirmation,
           volumeSpikes: volumeAnalysis.volumeSpikes.slice(-5), // Last 5 spikes
           analysis: volumeAnalysis.volumeAnalysis,
+          // IHSG Market Hours Awareness
+          marketStatus: volumeAnalysis.marketStatus ? {
+            isOpen: volumeAnalysis.marketStatus.isOpen,
+            currentSession: volumeAnalysis.marketStatus.currentSession,
+            sessionProgress: volumeAnalysis.marketStatus.sessionProgress,
+            expectedTotalVolume: volumeAnalysis.marketStatus.expectedTotalVolume,
+            note: volumeAnalysis.marketStatus.note,
+          } : null,
+          intradayWarning: volumeAnalysis.intradayWarning,
         },
         patterns: patterns.map(p => ({
           name: p.name,

@@ -655,7 +655,31 @@ async function analyzePatterns(req, res) {
       priceConfirmation: volumeAnalysis.volumePriceConfirmation || false,
       recentSpikes: volumeAnalysis.volumeSpikes || [],
       summary: volumeAnalysis.analysis || "No volume data",
+      // IHSG Market Hours Context
+      marketStatus: volumeAnalysis.marketStatus || null,
+      intradayWarning: volumeAnalysis.intradayWarning || null,
     } : null;
+
+    // Build market hours context for IHSG
+    const marketHoursContext = volumeContext?.marketStatus ? `
+## 🕐 IHSG MARKET STATUS (SANGAT PENTING!)
+- Current Session: ${volumeContext.marketStatus.currentSession}
+- Trading Progress: ${volumeContext.marketStatus.sessionProgress}% dari sesi hari ini
+- Market Status: ${volumeContext.marketStatus.isOpen ? "🟢 OPEN" : "🔴 CLOSED"}
+- Note: ${volumeContext.marketStatus.note}
+${volumeContext.intradayWarning ? `\n⚠️ INTRADAY WARNING: ${volumeContext.intradayWarning}` : ""}
+
+### ATURAN WAJIB UNTUK VOLUME INTRADAY:
+${volumeContext.marketStatus.sessionProgress < 100 ? `
+🚨 MARKET MASIH BUKA! JANGAN BILANG "VOLUME DECREASING" ATAU "VOLUME RENDAH"!
+- Volume hari ini BELUM FINAL karena market baru ${volumeContext.marketStatus.sessionProgress}% berjalan
+- Estimasi volume akhir hari: ${volumeContext.marketStatus.expectedTotalVolume?.toLocaleString() || "N/A"}
+- Bandingkan ESTIMASI volume (bukan volume saat ini) dengan volume kemarin
+- Jika session < 50%, JANGAN membuat kesimpulan tentang volume trend
+` : `
+✅ Market sudah TUTUP - volume hari ini adalah FINAL dan bisa dibandingkan langsung
+`}
+` : "";
 
     // Build timeframe-specific guidelines
     let timeframeGuidelines = "";
@@ -677,7 +701,7 @@ async function analyzePatterns(req, res) {
 - PERIOD RANGE: ${periodRange}% (High-Low range)
 - TREND DIRECTION: ${trendDirection || "unknown"}
 - VOLATILITY: ${volatility || "N/A"}%
-
+${marketHoursContext}
 ## KEY TECHNICAL LEVELS
 - Support Levels: ${JSON.stringify(technicalContext.supportLevels.map(s => s.toLocaleString()))}
 - Resistance Levels: ${JSON.stringify(technicalContext.resistanceLevels.map(r => r.toLocaleString()))}
@@ -685,12 +709,13 @@ async function analyzePatterns(req, res) {
 
 ## 📊 VOLUME ANALYSIS (CRITICAL FOR BREAKOUT VALIDATION)
 ${volumeContext ? `
-- Volume Trend: ${volumeContext.trend.toUpperCase()} 
+- Volume Trend: ${volumeContext.trend.toUpperCase()} ${volumeContext.marketStatus?.sessionProgress < 100 ? "(⚠️ INTRADAY - belum final!)" : "(FINAL)"}
 - Breakout Potential: ${volumeContext.breakoutPotential.toUpperCase()}
 - Market Phase: ${volumeContext.phase.toUpperCase()} (Accumulation = bullish smart money, Distribution = bearish smart money)
 - Price-Volume Confirmation: ${volumeContext.priceConfirmation ? "✅ CONFIRMED" : "⚠️ DIVERGENCE DETECTED"}
 - Analysis: ${volumeContext.summary}
 ${volumeContext.recentSpikes.length > 0 ? `- Recent Volume Spikes: ${JSON.stringify(volumeContext.recentSpikes.map(s => ({ date: s.date, significance: s.significance, priceChange: s.priceChange?.toFixed(2) + "%" })))}` : "- No significant volume spikes recently"}
+${volumeContext.intradayWarning ? `\n🚨 ${volumeContext.intradayWarning}` : ""}
 ` : "- Volume data not available"}
 
 ## PERIOD SUMMARY (${totalDataPoints} candles)
