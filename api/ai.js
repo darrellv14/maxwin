@@ -595,6 +595,123 @@ ${context ? `Topik: ${context}` : ""}`;
   }
 }
 
+// ============ AI PATTERN ANALYSIS ============
+async function analyzePatterns(req, res) {
+  try {
+    const { ticker, patterns, priceData } = req.body;
+
+    if (!patterns || patterns.length === 0) {
+      return res.status(400).json({ error: "Patterns data is required" });
+    }
+
+    // Prepare price summary
+    const recentPrices = priceData?.slice(-20) || [];
+    const currentPrice = recentPrices[recentPrices.length - 1]?.close || 0;
+    const priceChange = recentPrices.length >= 2 
+      ? ((currentPrice - recentPrices[0].close) / recentPrices[0].close * 100).toFixed(2)
+      : 0;
+
+    const patternSummary = patterns.map(p => ({
+      name: p.name,
+      type: p.type,
+      direction: p.direction,
+      confidence: p.confidence,
+      targetPrice: p.targetPrice,
+      stopLoss: p.stopLoss,
+    }));
+
+    const prompt = `Kamu adalah AI Technical Analyst expert yang menganalisis chart pattern.
+
+TICKER: ${ticker || "UNKNOWN"}
+CURRENT PRICE: ${currentPrice.toLocaleString()}
+PRICE CHANGE (20 period): ${priceChange}%
+
+DETECTED PATTERNS:
+${JSON.stringify(patternSummary, null, 2)}
+
+TUGAS:
+1. Validasi apakah pattern-pattern ini masuk akal berdasarkan data
+2. Berikan confidence score yang lebih akurat (0-100) untuk setiap pattern
+3. Identifikasi pattern mana yang paling kuat/reliable
+4. Berikan rekomendasi trading berdasarkan pattern yang terdeteksi
+5. Jelaskan potensi false signal jika ada
+
+PENTING: Jawab dalam format JSON yang VALID seperti ini:
+{
+  "validatedPatterns": [
+    {
+      "name": "Pattern Name",
+      "isValid": true/false,
+      "adjustedConfidence": 75,
+      "reasoning": "Alasan validasi",
+      "tradeRecommendation": "BUY/SELL/HOLD",
+      "entryZone": "range harga entry",
+      "targetPrice": 1234,
+      "stopLoss": 1200,
+      "riskRewardRatio": "1:2.5"
+    }
+  ],
+  "overallAnalysis": "Analisis keseluruhan pattern",
+  "primarySignal": "BUY/SELL/HOLD",
+  "primaryConfidence": 80,
+  "warnings": ["Peringatan 1", "Peringatan 2"],
+  "bestPattern": "Nama pattern terbaik"
+}
+
+Berikan analisis yang objektif dan akurat.`;
+
+    const model = genAI.getGenerativeModel({ 
+      model: "gemini-2.0-flash",
+      generationConfig: {
+        temperature: 0.3,
+        maxOutputTokens: 2048,
+      }
+    });
+
+    const result = await model.generateContent(prompt);
+    const response = await result.response;
+    let text = response.text();
+
+    // Clean JSON response
+    text = text.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
+
+    try {
+      const analysis = JSON.parse(text);
+      return res.json({
+        success: true,
+        analysis,
+      });
+    } catch (parseError) {
+      console.error("Failed to parse pattern analysis:", parseError);
+      return res.json({
+        success: true,
+        analysis: {
+          validatedPatterns: patterns.map(p => ({
+            name: p.name,
+            isValid: true,
+            adjustedConfidence: p.confidence,
+            reasoning: "AI validation unavailable",
+            tradeRecommendation: p.direction === "bullish" ? "BUY" : p.direction === "bearish" ? "SELL" : "HOLD",
+            targetPrice: p.targetPrice,
+            stopLoss: p.stopLoss,
+          })),
+          overallAnalysis: text,
+          primarySignal: patterns[0]?.direction === "bullish" ? "BUY" : patterns[0]?.direction === "bearish" ? "SELL" : "HOLD",
+          primaryConfidence: patterns[0]?.confidence || 50,
+          warnings: [],
+          bestPattern: patterns[0]?.name || "None",
+        },
+      });
+    }
+  } catch (error) {
+    console.error("Pattern analysis error:", error);
+    return res.status(500).json({
+      success: false,
+      error: error.message,
+    });
+  }
+}
+
 // ============ MAIN HANDLER ============
 export default async function handler(req, res) {
   setSecurityHeaders(res);
@@ -617,6 +734,11 @@ export default async function handler(req, res) {
   // Route: POST /api/ai?action=analyze or /api/ai/analyze - stock analysis
   if (action === "analyze" || path === "/analyze") {
     return analyzeStock(req, res);
+  }
+
+  // Route: POST /api/ai?action=patterns - AI pattern validation
+  if (action === "patterns" || path === "/patterns") {
+    return analyzePatterns(req, res);
   }
 
   // Route: POST /api/ai?action=news - get news sentiment only (via Grok)

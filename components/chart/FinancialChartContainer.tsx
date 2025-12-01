@@ -9,6 +9,14 @@ import ChartHeader from "./ChartHeader";
 import { IndicatorData } from "../../types";
 import { useWatchlistStore } from "../../stores";
 import { toast } from "sonner";
+import { 
+  detectPatterns, 
+  detectPatternsWithAI,
+  generateDrawInstructions, 
+  DetectedPattern, 
+  DrawInstruction,
+  AIPatternAnalysis 
+} from "../../services/patternDetectionService";
 
 interface FinancialChartContainerProps {
   data: IndicatorData[];
@@ -18,10 +26,11 @@ interface FinancialChartContainerProps {
 // Canvas Drawing Layer for annotations
 interface DrawingObject {
   id: string;
-  type: DrawingTool;
+  type: DrawingTool | "ai-pattern";
   points: { x: number; y: number }[];
   color: string;
   text?: string;
+  aiInstructions?: DrawInstruction[];
 }
 
 const FinancialChartContainer: React.FC<FinancialChartContainerProps> = ({
@@ -52,6 +61,12 @@ const FinancialChartContainer: React.FC<FinancialChartContainerProps> = ({
     y: 0,
     value: "",
   });
+  
+  // AI Auto-Draw state
+  const [isAIDrawing, setIsAIDrawing] = useState(false);
+  const [detectedPatterns, setDetectedPatterns] = useState<DetectedPattern[]>([]);
+  const [aiDrawInstructions, setAiDrawInstructions] = useState<DrawInstruction[]>([]);
+  const [aiAnalysis, setAiAnalysis] = useState<AIPatternAnalysis | null>(null);
 
   const chartRef = useRef<TradingViewChartHandle>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -111,6 +126,88 @@ const FinancialChartContainer: React.FC<FinancialChartContainerProps> = ({
   const currentPrice = lastData?.close ?? 0;
   const priceChange = prevData ? currentPrice - prevData.close : 0;
   const priceChangePercent = prevData ? (priceChange / prevData.close) * 100 : 0;
+
+  // Calculate price range for AI drawing
+  const priceRange = React.useMemo(() => {
+    if (data.length === 0) return { min: 0, max: 100 };
+    const prices = data.flatMap(d => [d.high, d.low]);
+    const min = Math.min(...prices);
+    const max = Math.max(...prices);
+    const padding = (max - min) * 0.1;
+    return { min: min - padding, max: max + padding };
+  }, [data]);
+
+  // AI Auto-Draw handler
+  const handleAIAutoDraw = useCallback(async () => {
+    if (data.length < 20) {
+      toast.error("Not enough data for pattern detection");
+      return;
+    }
+
+    setIsAIDrawing(true);
+    toast.loading("🤖 AI scanning for chart patterns...", { id: "ai-draw" });
+
+    try {
+      // Step 1: Detect patterns algorithmically
+      toast.loading("🔍 Detecting technical patterns...", { id: "ai-draw" });
+      await new Promise(resolve => setTimeout(resolve, 300));
+
+      // Use AI-enhanced detection with Gemini validation
+      toast.loading("🧠 Gemini AI validating patterns...", { id: "ai-draw" });
+      const { patterns, aiAnalysis: analysis } = await detectPatternsWithAI(data, ticker, true);
+      
+      setDetectedPatterns(patterns);
+      setAiAnalysis(analysis);
+
+      if (patterns.length === 0) {
+        toast.info("No clear patterns detected in current timeframe", { id: "ai-draw" });
+        setIsAIDrawing(false);
+        return;
+      }
+
+      // Generate drawing instructions for all patterns
+      const allInstructions: DrawInstruction[] = [];
+      patterns.forEach(pattern => {
+        const instructions = generateDrawInstructions(
+          pattern,
+          data,
+          canvasSize.width,
+          canvasSize.height,
+          priceRange
+        );
+        allInstructions.push(...instructions);
+      });
+
+      setAiDrawInstructions(allInstructions);
+
+      // Create summary message with AI insights
+      const mainPattern = patterns[0];
+      const confidence = mainPattern.aiConfidence || mainPattern.confidence;
+      const direction = mainPattern.direction === "bullish" ? "📈" : mainPattern.direction === "bearish" ? "📉" : "➡️";
+      const aiIndicator = mainPattern.aiValidated ? "🤖 AI Verified: " : "";
+      
+      let message = `${direction} ${aiIndicator}${mainPattern.name} (${confidence}%)`;
+      if (analysis?.primarySignal) {
+        message += ` | Signal: ${analysis.primarySignal}`;
+      }
+      message += ` | Target: ${mainPattern.targetPrice.toLocaleString(undefined, { maximumFractionDigits: 0 })}`;
+
+      toast.success(message, { id: "ai-draw", duration: 6000 });
+
+      // Show warnings if any
+      if (analysis?.warnings && analysis.warnings.length > 0) {
+        setTimeout(() => {
+          toast.warning(`⚠️ ${analysis.warnings[0]}`, { duration: 4000 });
+        }, 1000);
+      }
+
+    } catch (error) {
+      console.error("AI Auto-Draw error:", error);
+      toast.error("Failed to analyze patterns", { id: "ai-draw" });
+    } finally {
+      setIsAIDrawing(false);
+    }
+  }, [data, ticker, canvasSize, priceRange]);
 
   // Handle crosshair move
   const handleCrosshairMove = useCallback((price: number | null, time: string | null) => {
@@ -283,13 +380,169 @@ const FinancialChartContainer: React.FC<FinancialChartContainerProps> = ({
     // Clear canvas
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    // Draw all saved drawings
+    // Draw AI pattern instructions first (so user drawings appear on top)
+    aiDrawInstructions.forEach((instruction) => {
+      ctx.strokeStyle = instruction.color;
+      ctx.fillStyle = instruction.color;
+      ctx.lineWidth = 2;
+      ctx.setLineDash([]);
+
+      switch (instruction.type) {
+        case "line":
+          if (instruction.points.length >= 2) {
+            ctx.beginPath();
+            ctx.moveTo(instruction.points[0].x, instruction.points[0].y);
+            for (let i = 1; i < instruction.points.length; i++) {
+              ctx.lineTo(instruction.points[i].x, instruction.points[i].y);
+            }
+            ctx.stroke();
+          }
+          break;
+
+        case "dashed-line":
+          if (instruction.points.length >= 2) {
+            ctx.beginPath();
+            ctx.setLineDash([8, 4]);
+            ctx.moveTo(instruction.points[0].x, instruction.points[0].y);
+            for (let i = 1; i < instruction.points.length; i++) {
+              ctx.lineTo(instruction.points[i].x, instruction.points[i].y);
+            }
+            ctx.stroke();
+            ctx.setLineDash([]);
+            
+            // Draw label if exists
+            if (instruction.label) {
+              const midPoint = instruction.points[Math.floor(instruction.points.length / 2)];
+              ctx.font = "bold 11px monospace";
+              ctx.fillStyle = "rgba(0, 0, 0, 0.8)";
+              const metrics = ctx.measureText(instruction.label);
+              ctx.fillRect(midPoint.x - 2, midPoint.y - 12, metrics.width + 4, 14);
+              ctx.fillStyle = instruction.color;
+              ctx.fillText(instruction.label, midPoint.x, midPoint.y - 1);
+            }
+          }
+          break;
+
+        case "target-line":
+          if (instruction.points.length >= 2) {
+            const [start, end] = instruction.points;
+            const isUp = end.y < start.y;
+            
+            // Draw vertical line
+            ctx.beginPath();
+            ctx.setLineDash([4, 4]);
+            ctx.strokeStyle = instruction.color;
+            ctx.lineWidth = 2;
+            ctx.moveTo(start.x, start.y);
+            ctx.lineTo(end.x, end.y);
+            ctx.stroke();
+            ctx.setLineDash([]);
+            
+            // Draw arrow head
+            ctx.beginPath();
+            ctx.fillStyle = instruction.color;
+            if (isUp) {
+              ctx.moveTo(end.x, end.y);
+              ctx.lineTo(end.x - 8, end.y + 12);
+              ctx.lineTo(end.x + 8, end.y + 12);
+            } else {
+              ctx.moveTo(end.x, end.y);
+              ctx.lineTo(end.x - 8, end.y - 12);
+              ctx.lineTo(end.x + 8, end.y - 12);
+            }
+            ctx.closePath();
+            ctx.fill();
+            
+            // Draw target label with glow effect
+            if (instruction.label) {
+              ctx.font = "bold 12px monospace";
+              const metrics = ctx.measureText(instruction.label);
+              const labelX = end.x - metrics.width / 2;
+              const labelY = isUp ? end.y - 18 : end.y + 28;
+              
+              // Glow background
+              ctx.shadowColor = instruction.color;
+              ctx.shadowBlur = 10;
+              ctx.fillStyle = "rgba(0, 0, 0, 0.9)";
+              ctx.fillRect(labelX - 6, labelY - 12, metrics.width + 12, 18);
+              ctx.shadowBlur = 0;
+              
+              // Text
+              ctx.fillStyle = instruction.color;
+              ctx.fillText(instruction.label, labelX, labelY);
+            }
+          }
+          break;
+
+        case "zone":
+          if (instruction.points.length >= 3 && instruction.fill) {
+            ctx.beginPath();
+            ctx.globalAlpha = 0.15;
+            ctx.moveTo(instruction.points[0].x, instruction.points[0].y);
+            for (let i = 1; i < instruction.points.length; i++) {
+              ctx.lineTo(instruction.points[i].x, instruction.points[i].y);
+            }
+            ctx.closePath();
+            ctx.fill();
+            ctx.globalAlpha = 1;
+            
+            // Draw border
+            ctx.beginPath();
+            ctx.globalAlpha = 0.6;
+            ctx.moveTo(instruction.points[0].x, instruction.points[0].y);
+            for (let i = 1; i < instruction.points.length; i++) {
+              ctx.lineTo(instruction.points[i].x, instruction.points[i].y);
+            }
+            ctx.closePath();
+            ctx.stroke();
+            ctx.globalAlpha = 1;
+          }
+          break;
+
+        case "text":
+          if (instruction.points.length >= 1 && instruction.label) {
+            const [p] = instruction.points;
+            ctx.font = "bold 12px monospace";
+            const metrics = ctx.measureText(instruction.label);
+            
+            // Background with gradient-like effect
+            ctx.fillStyle = "rgba(0, 0, 0, 0.85)";
+            ctx.fillRect(p.x - 4, p.y - 14, metrics.width + 8, 18);
+            ctx.strokeStyle = instruction.color;
+            ctx.lineWidth = 1;
+            ctx.strokeRect(p.x - 4, p.y - 14, metrics.width + 8, 18);
+            
+            // Text with glow
+            ctx.shadowColor = instruction.color;
+            ctx.shadowBlur = 6;
+            ctx.fillStyle = instruction.color;
+            ctx.fillText(instruction.label, p.x, p.y);
+            ctx.shadowBlur = 0;
+          }
+          break;
+
+        case "arrow":
+          if (instruction.points.length >= 1) {
+            const [p] = instruction.points;
+            ctx.beginPath();
+            ctx.moveTo(p.x, p.y);
+            ctx.lineTo(p.x - 10, p.y + 15);
+            ctx.lineTo(p.x + 10, p.y + 15);
+            ctx.closePath();
+            ctx.fill();
+          }
+          break;
+      }
+    });
+
+    // Draw all user drawings
     const allDrawings = currentDrawing ? [...drawings, currentDrawing] : drawings;
 
     allDrawings.forEach((drawing) => {
       ctx.strokeStyle = drawing.color;
       ctx.fillStyle = drawing.color;
       ctx.lineWidth = 2;
+      ctx.setLineDash([]);
 
       switch (drawing.type) {
         case "trendline":
@@ -373,7 +626,7 @@ const FinancialChartContainer: React.FC<FinancialChartContainerProps> = ({
           break;
       }
     });
-  }, [drawings, currentDrawing, canvasSize]); // Re-render when canvas resizes
+  }, [drawings, currentDrawing, canvasSize, aiDrawInstructions]); // Re-render when canvas resizes or AI draws
 
   // Resize canvas - must set actual pixel dimensions
   useEffect(() => {
@@ -403,6 +656,9 @@ const FinancialChartContainer: React.FC<FinancialChartContainerProps> = ({
 
   const handleClearDrawings = () => {
     setDrawings([]);
+    setAiDrawInstructions([]);
+    setDetectedPatterns([]);
+    setAiAnalysis(null);
     chartRef.current?.clearMarkers();
   };
 
@@ -458,6 +714,8 @@ const FinancialChartContainer: React.FC<FinancialChartContainerProps> = ({
           activeTool={activeTool}
           onToolChange={setActiveTool}
           onClearAll={handleClearDrawings}
+          onAIAutoDraw={handleAIAutoDraw}
+          isAIDrawing={isAIDrawing}
         />
 
         {/* Chart Container */}
@@ -579,6 +837,125 @@ const FinancialChartContainer: React.FC<FinancialChartContainerProps> = ({
         <div className="pl-0 sm:pl-12">
           <ChartLegend items={legendItems} />
         </div>
+      )}
+
+      {/* AI Detected Patterns Info */}
+      {detectedPatterns.length > 0 && (
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="pl-0 sm:pl-12 mt-2"
+        >
+          <div className="bg-gradient-to-r from-purple-900/30 to-pink-900/30 border border-purple-500/30 rounded-lg p-3 sm:p-4">
+            {/* Header with AI Analysis Summary */}
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-3">
+              <div className="flex items-center gap-2">
+                <span className="text-purple-400 text-sm font-bold font-mono">🤖 AI PATTERN ANALYSIS</span>
+                <span className="text-xs text-gray-500">({detectedPatterns.length} pattern{detectedPatterns.length > 1 ? "s" : ""} detected)</span>
+                {aiAnalysis?.primarySignal && (
+                  <span className={`text-xs font-bold px-2 py-0.5 rounded ${
+                    aiAnalysis.primarySignal === "BUY" 
+                      ? "bg-profit-green/20 text-profit-green" 
+                      : aiAnalysis.primarySignal === "SELL"
+                        ? "bg-loss-red/20 text-loss-red"
+                        : "bg-yellow-500/20 text-yellow-400"
+                  }`}>
+                    {aiAnalysis.primarySignal} ({aiAnalysis.primaryConfidence}%)
+                  </span>
+                )}
+              </div>
+              {aiAnalysis?.bestPattern && (
+                <span className="text-xs text-purple-300 font-mono">
+                  Best: {aiAnalysis.bestPattern}
+                </span>
+              )}
+            </div>
+
+            {/* AI Overall Analysis */}
+            {aiAnalysis?.overallAnalysis && (
+              <div className="bg-black/30 rounded p-2 sm:p-3 mb-3 border border-purple-500/20">
+                <div className="text-[10px] text-purple-400 font-mono mb-1">GEMINI AI ANALYSIS:</div>
+                <p className="text-xs text-gray-300 leading-relaxed">
+                  {aiAnalysis.overallAnalysis}
+                </p>
+              </div>
+            )}
+
+            {/* Pattern Cards */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 sm:gap-3">
+              {detectedPatterns.map((pattern, idx) => (
+                <div
+                  key={idx}
+                  className={`p-2 sm:p-3 rounded border ${
+                    pattern.direction === "bullish"
+                      ? "bg-profit-green/10 border-profit-green/30"
+                      : pattern.direction === "bearish"
+                        ? "bg-loss-red/10 border-loss-red/30"
+                        : "bg-yellow-500/10 border-yellow-500/30"
+                  }`}
+                >
+                  <div className="flex items-center justify-between mb-1">
+                    <span className={`text-xs sm:text-sm font-bold ${
+                      pattern.direction === "bullish" ? "text-profit-green" : pattern.direction === "bearish" ? "text-loss-red" : "text-yellow-400"
+                    }`}>
+                      {pattern.aiValidated && "🤖 "}
+                      {pattern.direction === "bullish" ? "📈" : pattern.direction === "bearish" ? "📉" : "➡️"} {pattern.name}
+                    </span>
+                    <span className={`text-[10px] sm:text-xs font-mono ${pattern.aiValidated ? "text-purple-400" : "text-gray-400"}`}>
+                      {pattern.aiConfidence || pattern.confidence}%
+                    </span>
+                  </div>
+                  
+                  {/* AI Reasoning */}
+                  {pattern.aiReasoning && (
+                    <div className="text-[10px] text-purple-300 font-mono mb-1 italic">
+                      "{pattern.aiReasoning}"
+                    </div>
+                  )}
+                  
+                  {/* Trade Recommendation */}
+                  {pattern.tradeRecommendation && (
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${
+                        pattern.tradeRecommendation === "BUY" 
+                          ? "bg-profit-green/20 text-profit-green" 
+                          : pattern.tradeRecommendation === "SELL"
+                            ? "bg-loss-red/20 text-loss-red"
+                            : "bg-yellow-500/20 text-yellow-400"
+                      }`}>
+                        {pattern.tradeRecommendation}
+                      </span>
+                      {pattern.riskRewardRatio && (
+                        <span className="text-[10px] text-gray-500">R:R {pattern.riskRewardRatio}</span>
+                      )}
+                    </div>
+                  )}
+                  
+                  <div className="flex justify-between text-[10px] sm:text-xs">
+                    <span className={pattern.targetDirection === "up" ? "text-profit-green" : "text-loss-red"}>
+                      Target: {pattern.targetPrice.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                    </span>
+                    <span className="text-loss-red">
+                      SL: {pattern.stopLoss.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* AI Warnings */}
+            {aiAnalysis?.warnings && aiAnalysis.warnings.length > 0 && (
+              <div className="mt-3 p-2 bg-yellow-500/10 border border-yellow-500/30 rounded">
+                <div className="text-[10px] text-yellow-500 font-mono font-bold mb-1">⚠️ WARNINGS:</div>
+                <ul className="text-[10px] text-yellow-400/80 space-y-0.5">
+                  {aiAnalysis.warnings.map((warning, idx) => (
+                    <li key={idx}>• {warning}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </div>
+        </motion.div>
       )}
 
       {/* Drawing Tools Help */}
