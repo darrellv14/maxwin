@@ -1,4 +1,5 @@
 import { AIAnalysisResult } from "../types";
+import { getToken } from "./authService";
 
 export interface AnalysisRecord {
   id: number;
@@ -16,6 +17,24 @@ export interface AnalysisRecord {
   confidence?: number;
 }
 
+// Helper for authenticated requests
+const authFetch = async (url: string, options: RequestInit = {}) => {
+  const token = getToken();
+  const headers: HeadersInit = {
+    "Content-Type": "application/json",
+    ...(options.headers || {}),
+  };
+
+  if (token) {
+    (headers as Record<string, string>)["Authorization"] = `Bearer ${token}`;
+  }
+
+  return fetch(url, {
+    ...options,
+    headers,
+  });
+};
+
 const parsePrice = (priceStr: string): number => {
   const match = priceStr.match(/[\d,.]+/);
   if (match) {
@@ -26,11 +45,8 @@ const parsePrice = (priceStr: string): number => {
 
 export const saveAnalysis = async (analysis: AIAnalysisResult, ticker: string) => {
   try {
-    const response = await fetch("/api/history/save", {
+    const response = await authFetch("/api/history/save", {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
       body: JSON.stringify({
         ticker,
         signal: analysis.signal,
@@ -58,7 +74,7 @@ export const getAnalysisHistory = async (
   offset: number = 0
 ): Promise<AnalysisRecord[]> => {
   try {
-    const response = await fetch(`/api/history?limit=${limit}&offset=${offset}`);
+    const response = await authFetch(`/api/history?limit=${limit}&offset=${offset}`);
     if (!response.ok) {
       throw new Error("Failed to fetch history");
     }
@@ -74,7 +90,7 @@ export const updateAnalysisStatus = async (): Promise<{
   updated_count: number;
 }> => {
   try {
-    const response = await fetch("/api/history/update-status", {
+    const response = await authFetch("/api/history/update-status", {
       method: "POST",
     });
 

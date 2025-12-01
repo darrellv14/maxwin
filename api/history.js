@@ -5,6 +5,54 @@ import { verifyToken } from "./auth.js";
 
 const yahooFinance = new YahooFinance();
 
+// Initialize analysis_history table
+const initDb = async () => {
+  try {
+    // Create analysis_history table with user_id (nullable for AI screener picks)
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS analysis_history (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+        ticker VARCHAR(20) NOT NULL,
+        signal VARCHAR(10) NOT NULL,
+        entry_price DECIMAL(15, 4) NOT NULL,
+        tp1 DECIMAL(15, 4),
+        tp2 DECIMAL(15, 4),
+        stop_loss DECIMAL(15, 4),
+        highest_price DECIMAL(15, 4),
+        lowest_price DECIMAL(15, 4),
+        status VARCHAR(20) DEFAULT 'ACTIVE',
+        reasoning TEXT,
+        date_created TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
+    // Add user_id column if it doesn't exist (for migration)
+    await pool.query(`
+      DO $$ 
+      BEGIN 
+        IF NOT EXISTS (
+          SELECT 1 FROM information_schema.columns 
+          WHERE table_name = 'analysis_history' AND column_name = 'user_id'
+        ) THEN
+          ALTER TABLE analysis_history ADD COLUMN user_id INTEGER REFERENCES users(id) ON DELETE CASCADE;
+        END IF;
+      END $$;
+    `);
+
+    // Create index on user_id for faster queries
+    await pool.query(`
+      CREATE INDEX IF NOT EXISTS idx_analysis_history_user_id ON analysis_history(user_id);
+    `);
+
+    console.log("Analysis history table initialized");
+  } catch (error) {
+    console.error("Error initializing analysis_history table:", error);
+  }
+};
+
+initDb().catch(console.error);
+
 // ============ GET HISTORY ============
 async function getHistory(req, res, userId) {
   setSecurityHeaders(res);
@@ -15,7 +63,7 @@ async function getHistory(req, res, userId) {
     const query = `
       SELECT 
         id, ticker, signal, entry_price, tp1, tp2, stop_loss, 
-        highest_price, lowest_price, status, date_created
+        highest_price, lowest_price, status, reasoning, date_created
       FROM analysis_history
       WHERE user_id = $1
       ORDER BY date_created DESC

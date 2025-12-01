@@ -73,6 +73,7 @@ export const usePortfolioStore = create<PortfolioStore>()((set, get) => ({
       set({
         positions: data.positions.map((p: any) => ({
           ...p,
+          currentPrice: p.currentPrice || undefined, // Use real price from API
           addedAt: new Date(p.addedAt),
           updatedAt: p.updatedAt ? new Date(p.updatedAt) : undefined,
         })),

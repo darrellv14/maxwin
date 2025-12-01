@@ -108,22 +108,24 @@ const IDX_UNIVERSE = [
 
 // ============ GET AI PICKS ============
 async function getAIPicks(req, res) {
-  const limit = parseInt(req.query.limit || "50", 10);
+  const limit = parseInt(req.query.limit || "20", 10);
 
   try {
+    // Get latest AI screener picks (public - no user filter)
     const query = `
       SELECT DISTINCT ON (ticker)
         id, ticker, signal, entry_price, tp1, tp2, stop_loss,
         highest_price, lowest_price, status, reasoning, date_created
       FROM analysis_history
-      WHERE status = 'ACTIVE' AND reasoning LIKE '[AI-SCREENER]%'
+      WHERE reasoning LIKE '[AI-SCREENER]%'
+        AND date_created > NOW() - INTERVAL '7 days'
       ORDER BY ticker, date_created DESC
       LIMIT $1
     `;
 
     const { rows } = await pool.query(query, [limit]);
 
-    res.setHeader("Cache-Control", "s-maxage=30, stale-while-revalidate");
+    res.setHeader("Cache-Control", "s-maxage=60, stale-while-revalidate");
     return res.status(200).json(rows);
   } catch (error) {
     console.error("AI Picks API Error:", error);
@@ -273,10 +275,11 @@ async function runScreener(req, res) {
         const tp2 = Math.round(p.tp2);
         const sl = Math.round(p.stopLoss);
 
+        // AI Picks are public (user_id = NULL) - different from personal analysis history
         await pool.query(
           `INSERT INTO analysis_history 
-          (ticker, signal, entry_price, tp1, tp2, stop_loss, highest_price, lowest_price, status, reasoning, date_created)
-          VALUES ($1, $2, $3, $4, $5, $6, $3, $3, 'ACTIVE', $7, NOW())`,
+          (user_id, ticker, signal, entry_price, tp1, tp2, stop_loss, highest_price, lowest_price, status, reasoning, date_created)
+          VALUES (NULL, $1, $2, $3, $4, $5, $6, $3, $3, 'ACTIVE', $7, NOW())`,
           [p.ticker, "BUY", entry, tp1, tp2, sl, reasoning]
         );
         savedCount++;

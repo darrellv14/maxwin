@@ -12,7 +12,7 @@ import PortfolioWidget from "@/components/PortfolioWidget";
 import { Link, useSearchParams } from "react-router-dom";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
-import { Star, Keyboard, LogOut, Shield, User } from "lucide-react";
+import { Star, Keyboard, LogOut, Shield, User, Wallet } from "lucide-react";
 import { useWatchlistStore } from "../stores/watchlistStore";
 import { logout, isAdmin, getUser } from "../services/authService";
 import AIChatAssistant from "@/components/AIChatAssistant";
@@ -181,6 +181,14 @@ const Dashboard: React.FC = () => {
               <span className="hidden lg:inline">VIEW HISTORY</span>
               <span className="lg:hidden">HISTORY</span>
             </Link>
+            <Link
+              to="/portfolio"
+              className="text-xs font-mono bg-gray-900 px-3 py-1 rounded-full border border-gray-800 hover:bg-gray-800 text-blue-400 transition-colors flex items-center gap-2"
+            >
+              <Wallet className="w-3 h-3" />
+              <span className="hidden lg:inline">PORTFOLIO</span>
+              <span className="lg:hidden">PORT</span>
+            </Link>
 
             {isAdmin() && (
               <Link
@@ -231,6 +239,12 @@ const Dashboard: React.FC = () => {
             >
               📊
             </Link>
+            <Link
+              to="/portfolio"
+              className="text-[10px] font-mono bg-gray-900 px-2 py-1 rounded-full border border-gray-800 text-blue-400"
+            >
+              💼
+            </Link>
             {isAdmin() && (
               <Link
                 to="/admin"
@@ -252,7 +266,7 @@ const Dashboard: React.FC = () => {
       <main className="max-w-7xl mx-auto px-3 sm:px-4 mt-4 sm:mt-6 2xl:max-w-none">
         <div className="grid grid-cols-1 md:grid-cols-12 gap-4 mb-6">
           {/* Sidebar */}
-          <div className="col-span-12 md:col-span-3 space-y-4 flex flex-col">
+          <div className="col-span-12 md:col-span-3 space-y-4 flex flex-col md:max-h-[calc(100vh-120px)] md:overflow-y-auto md:overflow-x-hidden scrollbar-thin scrollbar-thumb-gray-700 scrollbar-track-transparent">
             <div className="bg-terminal-gray border border-gray-800 p-4 rounded-lg">
               <label htmlFor="ticker-input" className="block text-xs font-mono text-gray-400 mb-1">
                 ASSET TICKER (Gunakan .JK untuk saham IHSG)
@@ -362,7 +376,7 @@ const Dashboard: React.FC = () => {
 
             <PortfolioWidget />
 
-            <div className="flex-1 flex flex-col">
+            <div className="flex flex-col">
               <ConfidenceChart data={data} />
             </div>
 

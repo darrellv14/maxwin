@@ -172,25 +172,12 @@ const History: React.FC = () => {
     const total = history.length;
     const winRate = total > 0 ? (wins / (wins + losses)) * 100 || 0 : 0;
 
-    // Calculate average return (simplified)
-    let totalReturn = 0;
-    history.forEach((r) => {
-      if (r.status.includes("TP1")) {
-        totalReturn += ((r.tp1 - r.entry_price) / r.entry_price) * 100;
-      } else if (r.status.includes("TP2")) {
-        totalReturn += ((r.tp2 - r.entry_price) / r.entry_price) * 100;
-      } else if (r.status.includes("SL")) {
-        totalReturn -= ((r.entry_price - r.stop_loss) / r.entry_price) * 100;
-      }
-    });
-
     return {
       wins,
       losses,
       active,
       total,
       winRate: winRate.toFixed(1),
-      avgReturn: (totalReturn / (wins + losses || 1)).toFixed(2),
     };
   }, [history]);
 
@@ -307,7 +294,7 @@ const History: React.FC = () => {
         </div>
 
         {/* Stats Grid */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3 mb-4 sm:mb-6">
+        <div className="grid grid-cols-3 gap-2 sm:gap-3 mb-4 sm:mb-6">
           <StatsCard
             title="Total Trades"
             value={stats.total}
@@ -321,13 +308,6 @@ const History: React.FC = () => {
             subtitle={`${stats.wins}W / ${stats.losses}L`}
             icon={<Target className="w-4 h-4 sm:w-5 sm:h-5 text-green-400" />}
             color={parseFloat(stats.winRate) >= 50 ? "text-green-400" : "text-red-400"}
-          />
-          <StatsCard
-            title="Avg Return"
-            value={`${parseFloat(stats.avgReturn) >= 0 ? "+" : ""}${stats.avgReturn}%`}
-            subtitle="per trade"
-            icon={<TrendingUp className="w-4 h-4 sm:w-5 sm:h-5 text-purple-400" />}
-            color={parseFloat(stats.avgReturn) >= 0 ? "text-green-400" : "text-red-400"}
           />
           <StatsCard
             title="Performance"

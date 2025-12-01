@@ -1,4 +1,10 @@
 {
+  "crons": [
+    {
+      "path": "/api/ai-picks/run-screener",
+      "schedule": "0 3 * * 1-5"
+    }
+  ],
   "rewrites": [
     {
       "source": "/api/auth/:path*",

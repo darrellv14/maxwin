@@ -1,6 +1,32 @@
 import pool from "./db.js";
 import { verifyToken } from "./auth.js";
 import { setSecurityHeaders, sanitizeInput } from "./security.js";
+import YahooFinance from "yahoo-finance2";
+
+const yahooFinance = new YahooFinance();
+
+// Helper function to fetch current prices for multiple tickers
+async function fetchCurrentPrices(tickers) {
+  const prices = {};
+  
+  // Fetch prices in parallel with error handling for each ticker
+  await Promise.all(
+    tickers.map(async (ticker) => {
+      try {
+        const quote = await yahooFinance.quote(ticker);
+        const price = quote.regularMarketPrice ?? quote.postMarketPrice ?? quote.preMarketPrice;
+        if (typeof price === "number") {
+          prices[ticker] = price;
+        }
+      } catch (error) {
+        console.warn(`Failed to fetch price for ${ticker}:`, error.message);
+        // Price will be undefined, frontend will fall back to avgPrice
+      }
+    })
+  );
+  
+  return prices;
+}
 
 // Initialize portfolio tables
 // Initialize portfolio tables
@@ -91,7 +117,7 @@ export default async function handler(req, res) {
   const path = req.url.split("?")[0].replace("/api/portfolio", "");
 
   try {
-    // GET /positions - Get all positions
+    // GET /positions - Get all positions with current prices
     if ((path === "" || path === "/positions") && req.method === "GET") {
       const result = await pool.query(
         `SELECT id, ticker, name, shares, avg_price, added_at, updated_at 
@@ -101,6 +127,10 @@ export default async function handler(req, res) {
         [userId]
       );
 
+      // Fetch current prices from Yahoo Finance
+      const tickers = result.rows.map((p) => p.ticker);
+      const currentPrices = tickers.length > 0 ? await fetchCurrentPrices(tickers) : {};
+
       return res.json({
         success: true,
         positions: result.rows.map((p) => ({
@@ -109,6 +139,7 @@ export default async function handler(req, res) {
           name: p.name,
           shares: parseFloat(p.shares),
           avgPrice: parseFloat(p.avg_price),
+          currentPrice: currentPrices[p.ticker] || null,
           addedAt: p.added_at,
           updatedAt: p.updated_at,
         })),
@@ -144,7 +175,7 @@ export default async function handler(req, res) {
       });
     }
 
-    // GET /summary - Get portfolio summary
+    // GET /summary - Get portfolio summary with real prices
     if (path === "/summary" && req.method === "GET") {
       const positionsResult = await pool.query(
         `SELECT ticker, shares, avg_price FROM portfolio_positions WHERE user_id = $1`,
@@ -152,15 +183,21 @@ export default async function handler(req, res) {
       );
 
       const positions = positionsResult.rows;
+      
+      // Fetch current prices from Yahoo Finance
+      const tickers = positions.map((p) => p.ticker);
+      const currentPrices = tickers.length > 0 ? await fetchCurrentPrices(tickers) : {};
+      
       let totalCost = 0;
       let totalValue = 0;
 
       for (const p of positions) {
         const shares = parseFloat(p.shares);
         const avgPrice = parseFloat(p.avg_price);
+        const currentPrice = currentPrices[p.ticker] || avgPrice;
+        
         totalCost += shares * avgPrice;
-        // Note: For real value, you'd need to fetch current prices
-        totalValue += shares * avgPrice; // Placeholder
+        totalValue += shares * currentPrice;
       }
 
       return res.json({
