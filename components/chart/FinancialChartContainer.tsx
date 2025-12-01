@@ -565,6 +565,71 @@ const FinancialChartContainer: React.FC<FinancialChartContainerProps> = ({
             ctx.fill();
           }
           break;
+
+        case "smooth-curve":
+          // Draw smooth curve through multiple points
+          if (instruction.points.length >= 2) {
+            ctx.beginPath();
+            ctx.lineWidth = 2;
+            ctx.strokeStyle = instruction.color;
+            ctx.moveTo(instruction.points[0].x, instruction.points[0].y);
+            
+            // Use quadratic curves for smoothness
+            for (let i = 1; i < instruction.points.length - 1; i++) {
+              const xc = (instruction.points[i].x + instruction.points[i + 1].x) / 2;
+              const yc = (instruction.points[i].y + instruction.points[i + 1].y) / 2;
+              ctx.quadraticCurveTo(instruction.points[i].x, instruction.points[i].y, xc, yc);
+            }
+            
+            // Last point
+            const lastPoint = instruction.points[instruction.points.length - 1];
+            ctx.lineTo(lastPoint.x, lastPoint.y);
+            ctx.stroke();
+          }
+          break;
+
+        case "bezier-curve":
+          // Draw bezier curve with control points
+          if (instruction.points.length >= 2 && instruction.controlPoints && instruction.controlPoints.length >= 2) {
+            ctx.beginPath();
+            ctx.lineWidth = 2;
+            ctx.strokeStyle = instruction.color;
+            const [start, end] = instruction.points;
+            const [cp1, cp2] = instruction.controlPoints;
+            ctx.moveTo(start.x, start.y);
+            ctx.bezierCurveTo(cp1.x, cp1.y, cp2.x, cp2.y, end.x, end.y);
+            ctx.stroke();
+          }
+          break;
+
+        case "circle-marker":
+          // Draw circle markers at key points
+          if (instruction.points.length >= 1) {
+            const radius = instruction.radius || 4;
+            instruction.points.forEach((p) => {
+              ctx.beginPath();
+              ctx.arc(p.x, p.y, radius, 0, 2 * Math.PI);
+              ctx.fillStyle = "rgba(0, 0, 0, 0.6)";
+              ctx.fill();
+              ctx.strokeStyle = instruction.color;
+              ctx.lineWidth = 2;
+              ctx.stroke();
+            });
+          }
+          break;
+
+        case "arc":
+          // Draw arc/curve for cup patterns
+          if (instruction.points.length >= 3) {
+            const [start, control, end] = instruction.points;
+            ctx.beginPath();
+            ctx.lineWidth = 2;
+            ctx.strokeStyle = instruction.color;
+            ctx.moveTo(start.x, start.y);
+            ctx.quadraticCurveTo(control.x, control.y, end.x, end.y);
+            ctx.stroke();
+          }
+          break;
       }
     });
 

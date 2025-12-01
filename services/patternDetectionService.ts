@@ -77,11 +77,13 @@ export interface AIPatternAnalysis {
 }
 
 export interface DrawInstruction {
-  type: "line" | "dashed-line" | "arrow" | "zone" | "arc" | "text" | "target-line";
+  type: "line" | "dashed-line" | "arrow" | "zone" | "arc" | "text" | "target-line" | "bezier-curve" | "smooth-curve" | "circle-marker";
   color: string;
   points: { x: number; y: number }[];
   label?: string;
   fill?: boolean;
+  controlPoints?: { x: number; y: number }[]; // For bezier curves
+  radius?: number; // For circle markers
 }
 
 // Helper: Find local peaks and troughs
@@ -695,6 +697,7 @@ export function detectPatterns(data: IndicatorData[]): DetectedPattern[] {
 
 /**
  * Generate drawing instructions for a pattern
+ * Enhanced version with accurate candlestick snapping and realistic curve rendering
  */
 export function generateDrawInstructions(
   pattern: DetectedPattern,
@@ -705,14 +708,67 @@ export function generateDrawInstructions(
 ): DrawInstruction[] {
   const instructions: DrawInstruction[] = [];
 
+  // Chart scale margins from TradingViewChart.tsx
+  // Price scale: scaleMargins: { top: 0.1, bottom: 0.2 }
+  // Volume: scaleMargins: { top: 0.85, bottom: 0 }
+  // This means price area is from 10% to 80% of canvas height (70% usable area)
+  const CHART_TOP_MARGIN = 0.1;    // 10% top margin
+  const CHART_BOTTOM_MARGIN = 0.2; // 20% bottom margin (for volume)
+  
+  // Right price scale takes approximately 70-80 pixels
+  // We estimate it based on canvas width or use fixed value
+  const PRICE_SCALE_WIDTH = 75; // Approximate width of right price scale
+  const USABLE_CHART_WIDTH = canvasWidth - PRICE_SCALE_WIDTH;
+
   // Helper to convert data index and price to canvas coordinates
-  const toCanvasX = (index: number) => (index / (data.length - 1)) * canvasWidth;
+  // X coordinate: data points are distributed across the usable chart width (excluding price scale)
+  const toCanvasX = (index: number) => {
+    if (data.length <= 1) return USABLE_CHART_WIDTH / 2;
+    // Map index to the visible chart area (left side, excluding price scale on right)
+    return (index / (data.length - 1)) * USABLE_CHART_WIDTH;
+  };
+  
+  // Y coordinate: map price to the usable chart area (between top and bottom margins)
   const toCanvasY = (price: number) => {
     const range = priceRange.max - priceRange.min;
-    return canvasHeight - ((price - priceRange.min) / range) * canvasHeight * 0.85 - canvasHeight * 0.075;
+    if (range === 0) return canvasHeight * 0.5;
+    
+    // Normalize price to 0-1 range
+    const normalizedPrice = (price - priceRange.min) / range;
+    
+    // Map to canvas: high prices at top (smaller Y), low prices at bottom (larger Y)
+    // Top of usable area = canvasHeight * CHART_TOP_MARGIN
+    // Bottom of usable area = canvasHeight * (1 - CHART_BOTTOM_MARGIN)
+    const topY = canvasHeight * CHART_TOP_MARGIN;
+    const bottomY = canvasHeight * (1 - CHART_BOTTOM_MARGIN);
+    
+    // Invert because canvas Y increases downward but price increases upward
+    return bottomY - normalizedPrice * (bottomY - topY);
   };
 
-  // Update point coordinates
+  // Helper to get precise candlestick coordinates
+  const getCandleHigh = (index: number) => {
+    if (index >= 0 && index < data.length) {
+      return { x: toCanvasX(index), y: toCanvasY(data[index].high), price: data[index].high };
+    }
+    return null;
+  };
+
+  const getCandleLow = (index: number) => {
+    if (index >= 0 && index < data.length) {
+      return { x: toCanvasX(index), y: toCanvasY(data[index].low), price: data[index].low };
+    }
+    return null;
+  };
+
+  const getCandleClose = (index: number) => {
+    if (index >= 0 && index < data.length) {
+      return { x: toCanvasX(index), y: toCanvasY(data[index].close), price: data[index].close };
+    }
+    return null;
+  };
+
+  // Update point coordinates with precise snapping
   pattern.points.forEach(point => {
     point.x = toCanvasX(point.index);
     point.y = toCanvasY(point.price);
@@ -723,69 +779,312 @@ export function generateDrawInstructions(
   const neutralColor = "#fbbf24";
   const patternColor = pattern.direction === "bullish" ? bullishColor : pattern.direction === "bearish" ? bearishColor : neutralColor;
 
+  // Helper to generate smooth curve points through multiple points
+  const generateSmoothCurvePoints = (keyPoints: { x: number; y: number }[], resolution: number = 20): { x: number; y: number }[] => {
+    if (keyPoints.length < 2) return keyPoints;
+    
+    const curvePoints: { x: number; y: number }[] = [];
+    
+    for (let i = 0; i < keyPoints.length - 1; i++) {
+      const p0 = keyPoints[Math.max(0, i - 1)];
+      const p1 = keyPoints[i];
+      const p2 = keyPoints[i + 1];
+      const p3 = keyPoints[Math.min(keyPoints.length - 1, i + 2)];
+      
+      for (let t = 0; t <= 1; t += 1 / resolution) {
+        // Catmull-Rom spline interpolation
+        const t2 = t * t;
+        const t3 = t2 * t;
+        
+        const x = 0.5 * (
+          (2 * p1.x) +
+          (-p0.x + p2.x) * t +
+          (2 * p0.x - 5 * p1.x + 4 * p2.x - p3.x) * t2 +
+          (-p0.x + 3 * p1.x - 3 * p2.x + p3.x) * t3
+        );
+        
+        const y = 0.5 * (
+          (2 * p1.y) +
+          (-p0.y + p2.y) * t +
+          (2 * p0.y - 5 * p1.y + 4 * p2.y - p3.y) * t2 +
+          (-p0.y + 3 * p1.y - 3 * p2.y + p3.y) * t3
+        );
+        
+        curvePoints.push({ x, y });
+      }
+    }
+    
+    return curvePoints;
+  };
+
+  // Helper to generate cup-shaped curve
+  const generateCupCurve = (
+    leftPeak: { x: number; y: number },
+    bottom: { x: number; y: number },
+    rightPeak: { x: number; y: number },
+    resolution: number = 30
+  ): { x: number; y: number }[] => {
+    const curvePoints: { x: number; y: number }[] = [];
+    
+    // Generate U-shaped curve using quadratic bezier approximation
+    for (let t = 0; t <= 1; t += 1 / resolution) {
+      // Use a parabolic curve that passes through all three points
+      const x = leftPeak.x + t * (rightPeak.x - leftPeak.x);
+      
+      // Parabolic interpolation
+      const a = (t - 0.5) * 2; // Range from -1 to 1
+      const curveFactor = 1 - a * a; // Parabola peaking at t=0.5
+      
+      // Interpolate y between peaks and bottom
+      const peakY = leftPeak.y + t * (rightPeak.y - leftPeak.y);
+      const y = peakY + curveFactor * (bottom.y - peakY);
+      
+      curvePoints.push({ x, y });
+    }
+    
+    return curvePoints;
+  };
+
   switch (pattern.type) {
     case "cup-and-handle":
-      // Draw cup curve
       if (pattern.points.length >= 3) {
         const [left, bottom, right] = pattern.points;
         
-        // Left side of cup
+        // Find intermediate points along the cup from actual data
+        const leftIdx = left.index;
+        const bottomIdx = bottom.index;
+        const rightIdx = right.index;
+        
+        // Collect actual price points for the cup shape
+        const cupPoints: { x: number; y: number }[] = [];
+        
+        // Left side descending
+        for (let i = leftIdx; i <= bottomIdx; i++) {
+          const candle = getCandleLow(i);
+          if (candle) cupPoints.push({ x: candle.x, y: candle.y });
+        }
+        
+        // Right side ascending
+        for (let i = bottomIdx + 1; i <= rightIdx; i++) {
+          const candle = getCandleLow(i);
+          if (candle) cupPoints.push({ x: candle.x, y: candle.y });
+        }
+        
+        // Generate smooth curve through the actual data points
+        if (cupPoints.length >= 3) {
+          const smoothCup = generateSmoothCurvePoints(cupPoints, 10);
+          instructions.push({
+            type: "smooth-curve",
+            color: patternColor,
+            points: smoothCup,
+          });
+        } else {
+          // Fallback: generate idealized cup curve
+          const cupCurve = generateCupCurve(left, bottom, right);
+          instructions.push({
+            type: "smooth-curve",
+            color: patternColor,
+            points: cupCurve,
+          });
+        }
+        
+        // Mark key points with circles
         instructions.push({
-          type: "line",
+          type: "circle-marker",
           color: patternColor,
-          points: [{ x: left.x, y: left.y }, { x: bottom.x, y: bottom.y }],
+          points: [left, bottom, right],
+          radius: 4,
         });
-        // Right side of cup
-        instructions.push({
-          type: "line",
-          color: patternColor,
-          points: [{ x: bottom.x, y: bottom.y }, { x: right.x, y: right.y }],
-        });
-        // Resistance line
+        
+        // Resistance/Breakout line at cup rim
+        const rimPrice = Math.max(left.price, right.price);
+        const rimY = toCanvasY(rimPrice);
         instructions.push({
           type: "dashed-line",
-          color: patternColor,
-          points: [{ x: left.x, y: left.y }, { x: canvasWidth, y: left.y }],
+          color: neutralColor,
+          points: [{ x: left.x, y: rimY }, { x: USABLE_CHART_WIDTH, y: rimY }],
+          label: `Breakout: ${rimPrice.toFixed(0)}`,
         });
-        // Target arrow
+        
+        // Handle zone (if data extends beyond right peak)
+        if (rightIdx < data.length - 3) {
+          const handlePoints: { x: number; y: number }[] = [];
+          for (let i = rightIdx; i < data.length; i++) {
+            const candle = getCandleClose(i);
+            if (candle) handlePoints.push({ x: candle.x, y: candle.y });
+          }
+          if (handlePoints.length >= 2) {
+            instructions.push({
+              type: "line",
+              color: patternColor,
+              points: handlePoints,
+            });
+          }
+        }
+        
+        // Target projection
         instructions.push({
           type: "target-line",
           color: bullishColor,
-          points: [{ x: canvasWidth - 50, y: right.y }, { x: canvasWidth - 50, y: toCanvasY(pattern.targetPrice) }],
+          points: [{ x: USABLE_CHART_WIDTH - 50, y: rimY }, { x: USABLE_CHART_WIDTH - 50, y: toCanvasY(pattern.targetPrice) }],
           label: `Target: ${pattern.targetPrice.toFixed(0)}`,
         });
       }
       break;
 
     case "head-and-shoulders":
-    case "inverse-head-and-shoulders":
       if (pattern.points.length >= 5) {
         const [ls, ln, head, rn, rs] = pattern.points;
         
-        // Draw pattern outline
+        // Collect actual price data for smooth curves
+        const lsIdx = ls.index;
+        const lnIdx = ln.index;
+        const headIdx = head.index;
+        const rnIdx = rn.index;
+        const rsIdx = rs.index;
+        
+        // Generate smooth curve following actual candle tops
+        const patternPoints: { x: number; y: number }[] = [];
+        
+        // Left shoulder curve
+        for (let i = lsIdx; i <= lnIdx; i++) {
+          const candle = i <= lsIdx ? getCandleHigh(i) : getCandleLow(i);
+          if (candle) patternPoints.push({ x: candle.x, y: candle.y });
+        }
+        
+        // Up to head
+        for (let i = lnIdx; i <= headIdx; i++) {
+          const candle = i >= lnIdx && i <= headIdx ? getCandleHigh(i) : getCandleLow(i);
+          if (candle) patternPoints.push({ x: candle.x, y: candle.y });
+        }
+        
+        // Down to right neck
+        for (let i = headIdx; i <= rnIdx; i++) {
+          const candle = i <= headIdx ? getCandleHigh(i) : getCandleLow(i);
+          if (candle) patternPoints.push({ x: candle.x, y: candle.y });
+        }
+        
+        // Right shoulder
+        for (let i = rnIdx; i <= rsIdx; i++) {
+          const candle = i <= rsIdx ? getCandleHigh(i) : getCandleLow(i);
+          if (candle) patternPoints.push({ x: candle.x, y: candle.y });
+        }
+        
+        // Draw smooth curve if we have enough points
+        if (patternPoints.length >= 5) {
+          const smoothPattern = generateSmoothCurvePoints(patternPoints, 8);
+          instructions.push({
+            type: "smooth-curve",
+            color: patternColor,
+            points: smoothPattern,
+          });
+        } else {
+          // Fallback to connected lines
+          instructions.push({
+            type: "line",
+            color: patternColor,
+            points: [
+              { x: ls.x, y: ls.y },
+              { x: ln.x, y: ln.y },
+              { x: head.x, y: head.y },
+              { x: rn.x, y: rn.y },
+              { x: rs.x, y: rs.y },
+            ],
+          });
+        }
+        
+        // Mark key points
         instructions.push({
-          type: "line",
+          type: "circle-marker",
           color: patternColor,
-          points: [
-            { x: ls.x, y: ls.y },
-            { x: ln.x, y: ln.y },
-            { x: head.x, y: head.y },
-            { x: rn.x, y: rn.y },
-            { x: rs.x, y: rs.y },
-          ],
+          points: [ls, ln, head, rn, rs],
+          radius: 4,
+          label: "LS,LN,H,RN,RS",
         });
-        // Neckline
+        
+        // Neckline - extended
+        const necklineSlope = (rn.y - ln.y) / (rn.x - ln.x);
+        const extendedNecklineEndY = ln.y + necklineSlope * (USABLE_CHART_WIDTH - ln.x);
         instructions.push({
           type: "dashed-line",
           color: neutralColor,
-          points: [{ x: ln.x, y: ln.y }, { x: canvasWidth, y: rn.y }],
+          points: [{ x: ln.x, y: ln.y }, { x: USABLE_CHART_WIDTH, y: extendedNecklineEndY }],
           label: "Neckline",
         });
+        
         // Target
         instructions.push({
           type: "target-line",
           color: patternColor,
-          points: [{ x: canvasWidth - 50, y: rn.y }, { x: canvasWidth - 50, y: toCanvasY(pattern.targetPrice) }],
+          points: [{ x: USABLE_CHART_WIDTH - 50, y: rn.y }, { x: USABLE_CHART_WIDTH - 50, y: toCanvasY(pattern.targetPrice) }],
+          label: `Target: ${pattern.targetPrice.toFixed(0)}`,
+        });
+      }
+      break;
+
+    case "inverse-head-and-shoulders":
+      if (pattern.points.length >= 5) {
+        const [ls, ln, head, rn, rs] = pattern.points;
+        
+        // Generate smooth curve following actual candle bottoms
+        const patternPoints: { x: number; y: number }[] = [];
+        const lsIdx = ls.index;
+        const lnIdx = ln.index;
+        const headIdx = head.index;
+        const rnIdx = rn.index;
+        const rsIdx = rs.index;
+        
+        for (let i = lsIdx; i <= rsIdx; i++) {
+          const isAtPeak = i === lnIdx || i === rnIdx;
+          const isAtTrough = i === lsIdx || i === headIdx || i === rsIdx;
+          const candle = isAtPeak ? getCandleHigh(i) : getCandleLow(i);
+          if (candle) patternPoints.push({ x: candle.x, y: candle.y });
+        }
+        
+        if (patternPoints.length >= 5) {
+          const smoothPattern = generateSmoothCurvePoints(patternPoints, 8);
+          instructions.push({
+            type: "smooth-curve",
+            color: patternColor,
+            points: smoothPattern,
+          });
+        } else {
+          instructions.push({
+            type: "line",
+            color: patternColor,
+            points: [
+              { x: ls.x, y: ls.y },
+              { x: ln.x, y: ln.y },
+              { x: head.x, y: head.y },
+              { x: rn.x, y: rn.y },
+              { x: rs.x, y: rs.y },
+            ],
+          });
+        }
+        
+        // Mark key points
+        instructions.push({
+          type: "circle-marker",
+          color: patternColor,
+          points: [ls, ln, head, rn, rs],
+          radius: 4,
+        });
+        
+        // Neckline
+        const necklineSlope = (rn.y - ln.y) / (rn.x - ln.x);
+        const extendedNecklineEndY = ln.y + necklineSlope * (USABLE_CHART_WIDTH - ln.x);
+        instructions.push({
+          type: "dashed-line",
+          color: neutralColor,
+          points: [{ x: ln.x, y: ln.y }, { x: USABLE_CHART_WIDTH, y: extendedNecklineEndY }],
+          label: "Neckline",
+        });
+        
+        // Target
+        instructions.push({
+          type: "target-line",
+          color: bullishColor,
+          points: [{ x: USABLE_CHART_WIDTH - 50, y: rn.y }, { x: USABLE_CHART_WIDTH - 50, y: toCanvasY(pattern.targetPrice) }],
           label: `Target: ${pattern.targetPrice.toFixed(0)}`,
         });
       }
@@ -795,69 +1094,221 @@ export function generateDrawInstructions(
     case "bear-flag":
       if (pattern.points.length >= 3) {
         const [poleStart, poleEnd, current] = pattern.points;
+        const isBullish = pattern.type === "bull-flag";
         
-        // Pole
+        // Draw pole with thickness effect
         instructions.push({
           type: "line",
           color: patternColor,
           points: [{ x: poleStart.x, y: poleStart.y }, { x: poleEnd.x, y: poleEnd.y }],
-          label: "Pole",
         });
-        // Flag zone
+        
+        // Draw flag as converging triangle (pennant shape)
+        const poleIdx = poleEnd.index;
+        const currentIdx = current.index;
+        
+        // Collect highs and lows for the flag portion
+        const flagHighs: { x: number; y: number }[] = [];
+        const flagLows: { x: number; y: number }[] = [];
+        
+        for (let i = poleIdx; i <= currentIdx && i < data.length; i++) {
+          const high = getCandleHigh(i);
+          const low = getCandleLow(i);
+          if (high) flagHighs.push(high);
+          if (low) flagLows.push(low);
+        }
+        
+        if (flagHighs.length >= 2 && flagLows.length >= 2) {
+          // Draw upper trendline of flag
+          instructions.push({
+            type: "line",
+            color: patternColor,
+            points: [flagHighs[0], flagHighs[flagHighs.length - 1]],
+          });
+          
+          // Draw lower trendline of flag
+          instructions.push({
+            type: "line",
+            color: patternColor,
+            points: [flagLows[0], flagLows[flagLows.length - 1]],
+          });
+          
+          // Fill the flag zone
+          instructions.push({
+            type: "zone",
+            color: patternColor,
+            points: [
+              flagHighs[0],
+              flagHighs[flagHighs.length - 1],
+              flagLows[flagLows.length - 1],
+              flagLows[0],
+            ],
+            fill: true,
+          });
+        } else {
+          // Fallback: simple parallelogram
+          const flagHeight = Math.abs(poleEnd.y - poleStart.y) * 0.15;
+          instructions.push({
+            type: "zone",
+            color: patternColor,
+            points: [
+              { x: poleEnd.x, y: poleEnd.y - flagHeight },
+              { x: current.x, y: current.y - flagHeight * 0.7 },
+              { x: current.x, y: current.y + flagHeight * 0.7 },
+              { x: poleEnd.x, y: poleEnd.y + flagHeight },
+            ],
+            fill: true,
+          });
+        }
+        
+        // Breakout level
+        const breakoutY = isBullish ? poleEnd.y : poleEnd.y;
         instructions.push({
-          type: "zone",
-          color: patternColor,
-          points: [
-            { x: poleEnd.x, y: poleEnd.y - 10 },
-            { x: current.x, y: current.y - 10 },
-            { x: current.x, y: current.y + 10 },
-            { x: poleEnd.x, y: poleEnd.y + 10 },
-          ],
-          fill: true,
+          type: "dashed-line",
+          color: neutralColor,
+          points: [{ x: poleEnd.x, y: breakoutY }, { x: USABLE_CHART_WIDTH, y: breakoutY }],
+          label: "Breakout",
         });
+        
         // Target
         instructions.push({
           type: "target-line",
           color: patternColor,
-          points: [{ x: canvasWidth - 50, y: current.y }, { x: canvasWidth - 50, y: toCanvasY(pattern.targetPrice) }],
+          points: [{ x: USABLE_CHART_WIDTH - 50, y: current.y }, { x: USABLE_CHART_WIDTH - 50, y: toCanvasY(pattern.targetPrice) }],
           label: `Target: ${pattern.targetPrice.toFixed(0)}`,
         });
       }
       break;
 
     case "double-top":
+      if (pattern.points.length >= 3) {
+        const [first, middle, second] = pattern.points;
+        
+        // Draw curve connecting the two tops through the middle
+        const topPoints: { x: number; y: number }[] = [];
+        
+        for (let i = first.index; i <= second.index && i < data.length; i++) {
+          const candle = i <= first.index || i >= second.index ? getCandleHigh(i) : getCandleLow(i);
+          if (candle) topPoints.push({ x: candle.x, y: candle.y });
+        }
+        
+        if (topPoints.length >= 5) {
+          const smoothCurve = generateSmoothCurvePoints(topPoints, 8);
+          instructions.push({
+            type: "smooth-curve",
+            color: patternColor,
+            points: smoothCurve,
+          });
+        } else {
+          // W-shape for double top
+          instructions.push({
+            type: "line",
+            color: patternColor,
+            points: [
+              { x: first.x, y: first.y },
+              { x: middle.x, y: middle.y },
+              { x: second.x, y: second.y },
+            ],
+          });
+        }
+        
+        // Mark the two tops
+        instructions.push({
+          type: "circle-marker",
+          color: bearishColor,
+          points: [first, second],
+          radius: 5,
+        });
+        
+        // Horizontal resistance at tops
+        const resistanceY = Math.min(first.y, second.y);
+        instructions.push({
+          type: "dashed-line",
+          color: bearishColor,
+          points: [{ x: first.x, y: resistanceY }, { x: USABLE_CHART_WIDTH, y: resistanceY }],
+          label: "Resistance",
+        });
+        
+        // Neckline at middle trough
+        instructions.push({
+          type: "dashed-line",
+          color: neutralColor,
+          points: [{ x: 0, y: middle.y }, { x: USABLE_CHART_WIDTH, y: middle.y }],
+          label: "Neckline",
+        });
+        
+        // Target
+        instructions.push({
+          type: "target-line",
+          color: bearishColor,
+          points: [{ x: USABLE_CHART_WIDTH - 50, y: middle.y }, { x: USABLE_CHART_WIDTH - 50, y: toCanvasY(pattern.targetPrice) }],
+          label: `Target: ${pattern.targetPrice.toFixed(0)}`,
+        });
+      }
+      break;
+
     case "double-bottom":
       if (pattern.points.length >= 3) {
         const [first, middle, second] = pattern.points;
         
-        // Connect peaks/troughs
+        // Draw curve connecting the two bottoms through the middle
+        const bottomPoints: { x: number; y: number }[] = [];
+        
+        for (let i = first.index; i <= second.index && i < data.length; i++) {
+          const candle = i <= first.index || i >= second.index ? getCandleLow(i) : getCandleHigh(i);
+          if (candle) bottomPoints.push({ x: candle.x, y: candle.y });
+        }
+        
+        if (bottomPoints.length >= 5) {
+          const smoothCurve = generateSmoothCurvePoints(bottomPoints, 8);
+          instructions.push({
+            type: "smooth-curve",
+            color: patternColor,
+            points: smoothCurve,
+          });
+        } else {
+          // W-shape for double bottom
+          instructions.push({
+            type: "line",
+            color: patternColor,
+            points: [
+              { x: first.x, y: first.y },
+              { x: middle.x, y: middle.y },
+              { x: second.x, y: second.y },
+            ],
+          });
+        }
+        
+        // Mark the two bottoms
         instructions.push({
-          type: "line",
-          color: patternColor,
-          points: [
-            { x: first.x, y: first.y },
-            { x: middle.x, y: middle.y },
-            { x: second.x, y: second.y },
-          ],
+          type: "circle-marker",
+          color: bullishColor,
+          points: [first, second],
+          radius: 5,
         });
-        // Horizontal line at top/bottom
+        
+        // Horizontal support at bottoms
+        const supportY = Math.max(first.y, second.y);
         instructions.push({
           type: "dashed-line",
-          color: patternColor,
-          points: [{ x: first.x, y: first.y }, { x: canvasWidth, y: first.y }],
+          color: bullishColor,
+          points: [{ x: first.x, y: supportY }, { x: USABLE_CHART_WIDTH, y: supportY }],
+          label: "Support",
         });
-        // Neckline
+        
+        // Neckline at middle peak
         instructions.push({
           type: "dashed-line",
           color: neutralColor,
-          points: [{ x: 0, y: middle.y }, { x: canvasWidth, y: middle.y }],
+          points: [{ x: 0, y: middle.y }, { x: USABLE_CHART_WIDTH, y: middle.y }],
           label: "Neckline",
         });
+        
         // Target
         instructions.push({
           type: "target-line",
-          color: patternColor,
-          points: [{ x: canvasWidth - 50, y: middle.y }, { x: canvasWidth - 50, y: toCanvasY(pattern.targetPrice) }],
+          color: bullishColor,
+          points: [{ x: USABLE_CHART_WIDTH - 50, y: middle.y }, { x: USABLE_CHART_WIDTH - 50, y: toCanvasY(pattern.targetPrice) }],
           label: `Target: ${pattern.targetPrice.toFixed(0)}`,
         });
       }
@@ -865,49 +1316,203 @@ export function generateDrawInstructions(
 
     case "ascending-triangle":
     case "descending-triangle":
-      // Draw resistance/support lines through points
-      const peaks = pattern.points.filter((_, i) => i < pattern.points.length / 2);
-      const troughs = pattern.points.filter((_, i) => i >= pattern.points.length / 2);
-
-      if (peaks.length >= 2) {
+      {
+        // Collect actual highs and lows from data for triangle lines
+        const patternStart = pattern.points.length > 0 ? pattern.points[0].index : Math.max(0, data.length - 30);
+        const patternEnd = data.length - 1;
+        
+        const highs: { x: number; y: number; price: number }[] = [];
+        const lows: { x: number; y: number; price: number }[] = [];
+        
+        // Use findPeaksAndTroughs-like logic for the pattern range
+        for (let i = patternStart + 2; i < patternEnd - 2; i++) {
+          const curr = data[i];
+          let isPeak = true;
+          let isTrough = true;
+          
+          for (let j = i - 2; j <= i + 2; j++) {
+            if (j === i) continue;
+            if (data[j].high >= curr.high) isPeak = false;
+            if (data[j].low <= curr.low) isTrough = false;
+          }
+          
+          if (isPeak) {
+            const candle = getCandleHigh(i);
+            if (candle) highs.push({ x: candle.x, y: candle.y, price: data[i].high });
+          }
+          if (isTrough) {
+            const candle = getCandleLow(i);
+            if (candle) lows.push({ x: candle.x, y: candle.y, price: data[i].low });
+          }
+        }
+        
+        if (pattern.type === "ascending-triangle") {
+          // Flat resistance line at highest highs
+          if (highs.length >= 2) {
+            const avgHighY = highs.reduce((sum, h) => sum + h.y, 0) / highs.length;
+            instructions.push({
+              type: "dashed-line",
+              color: bearishColor,
+              points: [{ x: highs[0].x, y: avgHighY }, { x: USABLE_CHART_WIDTH, y: avgHighY }],
+              label: "Resistance",
+            });
+            
+            // Mark resistance touches
+            instructions.push({
+              type: "circle-marker",
+              color: bearishColor,
+              points: highs.map(h => ({ x: h.x, y: h.y })),
+              radius: 3,
+            });
+          }
+          
+          // Rising support line
+          if (lows.length >= 2) {
+            const firstLow = lows[0];
+            const lastLow = lows[lows.length - 1];
+            const slope = (lastLow.y - firstLow.y) / (lastLow.x - firstLow.x);
+            const extendedX = USABLE_CHART_WIDTH;
+            const extendedY = firstLow.y + slope * (extendedX - firstLow.x);
+            
+            instructions.push({
+              type: "line",
+              color: bullishColor,
+              points: [{ x: firstLow.x, y: firstLow.y }, { x: extendedX, y: extendedY }],
+              label: "Rising Support",
+            });
+            
+            // Mark support touches
+            instructions.push({
+              type: "circle-marker",
+              color: bullishColor,
+              points: lows.map(l => ({ x: l.x, y: l.y })),
+              radius: 3,
+            });
+          }
+        } else {
+          // Descending triangle - flat support, falling resistance
+          if (lows.length >= 2) {
+            const avgLowY = lows.reduce((sum, l) => sum + l.y, 0) / lows.length;
+            instructions.push({
+              type: "dashed-line",
+              color: bullishColor,
+              points: [{ x: lows[0].x, y: avgLowY }, { x: USABLE_CHART_WIDTH, y: avgLowY }],
+              label: "Support",
+            });
+            
+            instructions.push({
+              type: "circle-marker",
+              color: bullishColor,
+              points: lows.map(l => ({ x: l.x, y: l.y })),
+              radius: 3,
+            });
+          }
+          
+          if (highs.length >= 2) {
+            const firstHigh = highs[0];
+            const lastHigh = highs[highs.length - 1];
+            const slope = (lastHigh.y - firstHigh.y) / (lastHigh.x - firstHigh.x);
+            const extendedX = USABLE_CHART_WIDTH;
+            const extendedY = firstHigh.y + slope * (extendedX - firstHigh.x);
+            
+            instructions.push({
+              type: "line",
+              color: bearishColor,
+              points: [{ x: firstHigh.x, y: firstHigh.y }, { x: extendedX, y: extendedY }],
+              label: "Falling Resistance",
+            });
+            
+            instructions.push({
+              type: "circle-marker",
+              color: bearishColor,
+              points: highs.map(h => ({ x: h.x, y: h.y })),
+              radius: 3,
+            });
+          }
+        }
+        
+        // Target
         instructions.push({
-          type: pattern.type === "ascending-triangle" ? "dashed-line" : "line",
-          color: bearishColor,
-          points: peaks.map(p => ({ x: p.x, y: p.y })),
-          label: "Resistance",
+          type: "target-line",
+          color: patternColor,
+          points: [
+            { x: USABLE_CHART_WIDTH - 50, y: toCanvasY(data[data.length - 1].close) },
+            { x: USABLE_CHART_WIDTH - 50, y: toCanvasY(pattern.targetPrice) },
+          ],
+          label: `Target: ${pattern.targetPrice.toFixed(0)}`,
         });
       }
-      if (troughs.length >= 2) {
-        instructions.push({
-          type: pattern.type === "descending-triangle" ? "dashed-line" : "line",
-          color: bullishColor,
-          points: troughs.map(p => ({ x: p.x, y: p.y })),
-          label: "Support",
-        });
-      }
-      // Target
-      instructions.push({
-        type: "target-line",
-        color: patternColor,
-        points: [
-          { x: canvasWidth - 50, y: toCanvasY(data[data.length - 1].close) },
-          { x: canvasWidth - 50, y: toCanvasY(pattern.targetPrice) },
-        ],
-        label: `Target: ${pattern.targetPrice.toFixed(0)}`,
-      });
       break;
 
     case "support-resistance":
-      // Draw horizontal support/resistance lines
-      pattern.points.forEach((point, i) => {
+      // Draw horizontal support/resistance lines with zone shading
+      pattern.points.forEach((point) => {
         const isResistance = point.price > data[data.length - 1].close;
+        const zoneHeight = 8; // pixels
+        
+        // Draw zone
+        instructions.push({
+          type: "zone",
+          color: isResistance ? bearishColor : bullishColor,
+          points: [
+            { x: 0, y: point.y - zoneHeight },
+            { x: USABLE_CHART_WIDTH, y: point.y - zoneHeight },
+            { x: USABLE_CHART_WIDTH, y: point.y + zoneHeight },
+            { x: 0, y: point.y + zoneHeight },
+          ],
+          fill: true,
+        });
+        
+        // Main line
         instructions.push({
           type: "dashed-line",
           color: isResistance ? bearishColor : bullishColor,
-          points: [{ x: 0, y: point.y }, { x: canvasWidth, y: point.y }],
+          points: [{ x: 0, y: point.y }, { x: USABLE_CHART_WIDTH, y: point.y }],
           label: isResistance ? `R: ${point.price.toFixed(0)}` : `S: ${point.price.toFixed(0)}`,
         });
       });
+      break;
+
+    case "rising-wedge":
+    case "falling-wedge":
+    case "channel-up":
+    case "channel-down":
+      // Draw two parallel or converging trendlines
+      if (pattern.points.length >= 4) {
+        const upperPoints = pattern.points.filter((_, i) => i % 2 === 0);
+        const lowerPoints = pattern.points.filter((_, i) => i % 2 === 1);
+        
+        if (upperPoints.length >= 2) {
+          instructions.push({
+            type: "line",
+            color: bearishColor,
+            points: upperPoints.map(p => ({ x: p.x, y: p.y })),
+          });
+        }
+        
+        if (lowerPoints.length >= 2) {
+          instructions.push({
+            type: "line",
+            color: bullishColor,
+            points: lowerPoints.map(p => ({ x: p.x, y: p.y })),
+          });
+        }
+        
+        // Fill zone between lines
+        if (upperPoints.length >= 2 && lowerPoints.length >= 2) {
+          instructions.push({
+            type: "zone",
+            color: patternColor,
+            points: [
+              upperPoints[0],
+              upperPoints[upperPoints.length - 1],
+              lowerPoints[lowerPoints.length - 1],
+              lowerPoints[0],
+            ],
+            fill: true,
+          });
+        }
+      }
       break;
   }
 
@@ -919,8 +1524,8 @@ export function generateDrawInstructions(
     instructions.push({
       type: "text",
       color: patternColor,
-      points: [{ x: labelPoint.x, y: labelPoint.y - 20 }],
-      label: `${aiIndicator}${pattern.name} (${confidence}%)`,
+      points: [{ x: labelPoint.x, y: labelPoint.y - 25 }],
+      label: `${aiIndicator}${pattern.name} (${confidence.toFixed(0)}%)`,
     });
   }
 
