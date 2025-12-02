@@ -610,33 +610,38 @@ async function getHistoricalData(req, res) {
     // =====================================
     let interval = "1d"; // default daily
     
-    // Check if Indonesian stock (doesn't support intraday intervals well)
+    // Check if Indonesian stock - now using same intervals as BTC-USD for better granularity
     const isIndonesian = ticker.toUpperCase().endsWith(".JK") || ticker.toUpperCase() === "^JKSE";
     
+    // Use same intervals for all stocks (including Indonesian) - same as BTC-USD
     switch (period) {
       case "1D":
-        startDate.setDate(startDate.getDate() - 1);
-        interval = isIndonesian ? "1h" : "5m"; // Indonesian stocks: hourly, US: 5min
+        startDate.setDate(startDate.getDate() - 2); // Get 2 days to ensure trading hours
+        interval = "15m"; // 15-minute bars for 1 day view (same as BTC-USD)
         break;
       case "5D":
         startDate.setDate(startDate.getDate() - 7); // Get 7 days to ensure 5 trading days
-        interval = isIndonesian ? "1h" : "15m"; // Indonesian stocks: hourly, US: 15min
+        interval = "15m"; // 15-minute bars for 5 day view
         break;
       case "1M":
         startDate.setMonth(startDate.getMonth() - 1);
-        interval = isIndonesian ? "1d" : "1h"; // Indonesian stocks: daily, US: hourly
+        interval = "1h"; // Hourly for 1 month (same as BTC-USD)
         break;
       case "3M":
         startDate.setMonth(startDate.getMonth() - 3);
+        interval = "1d"; // Daily for 3 months
         break;
       case "6M":
         startDate.setMonth(startDate.getMonth() - 6);
+        interval = "1d"; // Daily for 6 months
         break;
       case "1Y":
         startDate.setFullYear(startDate.getFullYear() - 1);
+        interval = "1d"; // Daily for 1 year
         break;
       case "YTD":
         startDate = new Date(startDate.getFullYear(), 0, 1);
+        interval = "1d"; // Daily for YTD
         break;
       case "5Y":
         startDate.setFullYear(startDate.getFullYear() - 5);
@@ -653,38 +658,67 @@ async function getHistoricalData(req, res) {
     // Store original values for smart fallback
     const originalStartDate = new Date(startDate);
     const originalInterval = interval;
-    const isIntraday = ["1D", "5D", "1M"].includes(period) && !isIndonesian;
+    const isIntraday = ["1D", "5D", "1M"].includes(period);
 
     // ===========================================
     // 3️⃣ CHART FETCH + SMART RETRY
     // ===========================================
     async function fetchChart() {
-      try {
-        const r = await yahooFinance.chart(ticker, {
-          period1: startDate,
-          period2: endDate,
-          interval: interval,
-        });
+      // Define fallback chain for intervals
+      const fallbackIntervals = {
+        "5m": ["15m", "30m", "1h", "1d"],
+        "15m": ["30m", "1h", "1d"],
+        "30m": ["1h", "1d"],
+        "1h": ["1d"],
+        "1d": ["1wk"],
+        "1wk": ["1mo"],
+      };
 
-        if (r.quotes && r.quotes.length > 0) return { result: r, usedInterval: interval };
+      async function tryFetch(currentInterval) {
+        try {
+          const r = await yahooFinance.chart(ticker, {
+            period1: startDate,
+            period2: endDate,
+            interval: currentInterval,
+          });
 
-        // If empty, maybe range was bad.
-        throw new Error("Empty quotes");
-      } catch (err) {
-        // If it's a 404/Not Found, propagate it immediately
-        if (err.message && (err.message.includes("Not Found") || err.message.includes("404"))) {
-          throw new Error("Ticker Not Found");
+          if (r.quotes && r.quotes.length > 0) {
+            console.log(`[Market] Success: ${ticker} with interval ${currentInterval}, got ${r.quotes.length} quotes`);
+            return { result: r, usedInterval: currentInterval };
+          }
+          throw new Error("Empty quotes");
+        } catch (err) {
+          // If it's a 404/Not Found, propagate it immediately
+          if (err.message && (err.message.includes("Not Found") || err.message.includes("404"))) {
+            throw new Error("Ticker Not Found");
+          }
+          return null;
         }
-
-        // Smart fallback: use same date range but with daily interval
-        console.log(`Fallback for ${ticker} ${period}: ${interval} -> 1d`);
-        const fallbackResult = await yahooFinance.chart(ticker, {
-          period1: originalStartDate,
-          period2: endDate,
-          interval: "1d",
-        });
-        return { result: fallbackResult, usedInterval: "1d" };
       }
+
+      // Try original interval first
+      const firstTry = await tryFetch(interval);
+      if (firstTry) return firstTry;
+
+      // Try fallback intervals
+      const fallbacks = fallbackIntervals[interval] || ["1d"];
+      for (const fallbackInterval of fallbacks) {
+        console.log(`[Market] Fallback for ${ticker} ${period}: ${interval} -> ${fallbackInterval}`);
+        const result = await tryFetch(fallbackInterval);
+        if (result) return result;
+      }
+
+      // Last resort: daily with extended date range
+      console.log(`[Market] Last resort for ${ticker}: using 1d with extended range`);
+      const extendedStart = new Date(originalStartDate);
+      extendedStart.setDate(extendedStart.getDate() - 30); // Extend by 30 days
+      
+      const lastResort = await yahooFinance.chart(ticker, {
+        period1: extendedStart,
+        period2: endDate,
+        interval: "1d",
+      });
+      return { result: lastResort, usedInterval: "1d" };
     }
 
     const { result, usedInterval } = await fetchChart();
@@ -716,6 +750,8 @@ async function getHistoricalData(req, res) {
       }));
 
     res.setHeader("Cache-Control", "s-maxage=60, stale-while-revalidate");
+    res.setHeader("X-Data-Interval", usedInterval); // Add interval info to response header
+    res.setHeader("X-Requested-Interval", originalInterval); // Add original requested interval
     return res.status(200).json(formattedData);
   } catch (error) {
     // =====================================================
