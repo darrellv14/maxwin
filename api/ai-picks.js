@@ -180,14 +180,14 @@ async function getAIPicks(req, res) {
   const limit = parseInt(req.query.limit || "20", 10);
 
   try {
-    // Get latest AI screener picks (public - no user filter)
+    // Get AI screener picks for TODAY only (daily screening)
     const query = `
       SELECT DISTINCT ON (ticker)
         id, ticker, signal, entry_price, tp1, tp2, stop_loss,
         highest_price, lowest_price, status, reasoning, date_created
       FROM analysis_history
       WHERE reasoning LIKE '[AI-SCREENER]%'
-        AND date_created > NOW() - INTERVAL '7 days'
+        AND date_created::date = CURRENT_DATE
       ORDER BY ticker, date_created DESC
       LIMIT $1
     `;
@@ -214,6 +214,15 @@ async function runScreener(req, res) {
       const authHeader = req.headers["authorization"] || req.headers["Authorization"];
       if (authHeader !== secret) return res.status(401).json({ error: "Unauthorized" });
     }
+
+    // Delete old AI screener picks (keep only today's - this is daily screening)
+    console.log(`[AI-ORACLE] Cleaning up old screener picks...`);
+    const deleteResult = await pool.query(`
+      DELETE FROM analysis_history 
+      WHERE reasoning LIKE '[AI-SCREENER]%' 
+        AND date_created::date < CURRENT_DATE
+    `);
+    console.log(`[AI-ORACLE] Deleted ${deleteResult.rowCount} old picks`);
 
     const yf = new YahooFinance();
     const symbols = IDX_UNIVERSE;
