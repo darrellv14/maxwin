@@ -123,56 +123,209 @@ const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "");
 
 // IDX Universe - Comprehensive list of Indonesian stocks
 const IDX_UNIVERSE = [
-  // === BANKING ===
-  "BBCA.JK", "BBRI.JK", "BMRI.JK", "BBNI.JK", "BNGA.JK", "ARTO.JK", "BBHI.JK", "BBYB.JK", "BANK.JK", "BABP.JK",
-  
-  // === GRUP PRAJOGO PANGESTU (Barito Pacific) ===
-  "BRPT.JK", "TPIA.JK", "BREN.JK", "CUAN.JK", "PTRO.JK", "CDIA.JK", "SSIA.JK",
-  
-  // === GRUP HAPSORO SUKMONOHADI ===
-  "RAJA.JK", "RATU.JK", "MINA.JK", "SINI.JK", "BUVA.JK", "UANG.JK",
-  
-  // === GRUP SALIM ===
-  "INDF.JK", "ICBP.JK", "AMMN.JK", "DNET.JK", "IMAS.JK", "SIMP.JK", "BUMI.JK", "EMTK.JK",
-  
-  // === GRUP DJARUM (Hartono Bersaudara) ===
-  "TOWR.JK", "BELI.JK", "RANC.JK",
-  
+  // === BANKING (BIG CAPS & DIGITAL) ===
+  "BBCA.JK",
+  "BBRI.JK",
+  "BMRI.JK",
+  "BBNI.JK", // Big 4
+  "BNGA.JK",
+  "BDMN.JK",
+  "NISP.JK",
+  "BRIS.JK", // Second Liner
+  "ARTO.JK",
+  "BBHI.JK",
+  "BBYB.JK",
+  "BANK.JK",
+  "BABP.JK",
+  "AGRO.JK",
+  "AMAR.JK",
+  "BEKS.JK", // Digital & Volatile
+
+  // === GRUP PRAJOGO PANGESTU (Barito - The Mover) ===
+  "BRPT.JK",
+  "TPIA.JK",
+  "BREN.JK",
+  "CUAN.JK",
+  "PTRO.JK",
+  "CDIA.JK",
+  "SSIA.JK",
+
+  // === GRUP HAPSORO (Happy Hapsoro) ===
+  "RAJA.JK",
+  "RATU.JK",
+  "MINA.JK",
+  "SINI.JK",
+  "BUVA.JK",
+  "UANG.JK",
+  "CBRE.JK",
+
+  // === GRUP SALIM (Indofood & Tech) ===
+  "INDF.JK",
+  "ICBP.JK",
+  "AMMN.JK",
+  "DNET.JK",
+  "IMAS.JK",
+  "SIMP.JK",
+  "BUMI.JK",
+  "EMTK.JK",
+  "LSIP.JK",
+  "META.JK",
+
+  // === GRUP BAKRIE (High Volatility/Legendary Gorengan) ===
+  "BRMS.JK",
+  "DEWA.JK",
+  "ENRG.JK",
+  "BUMI.JK",
+  "VKTR.JK",
+  "BNBR.JK",
+  "UNSP.JK",
+  "VIVA.JK",
+  "MDIA.JK",
+  "ELTY.JK",
+
+  // === GRUP LIPPO (Sering Spike Tiba-tiba) ===
+  "LPKR.JK",
+  "LPCK.JK",
+  "MLPL.JK",
+  "MLPT.JK",
+  "MPPA.JK",
+  "LPPF.JK",
+  "SILO.JK",
+
+  // === GRUP PANIN (Value Trap / Volatile) ===
+  "PNIN.JK",
+  "PNLF.JK",
+  "PNBN.JK",
+  "PANS.JK",
+
   // === GRUP SINAR MAS (Keluarga Widjaja) ===
-  "BSDE.JK", "DSSA.JK", "INKP.JK", "TKIM.JK", "SMAR.JK", "GEMS.JK", "FREN.JK",
-  
-  // === LOW TUCK KWONG ===
-  "BYAN.JK", "MYOH.JK",
-  
+  "BSDE.JK",
+  "DSSA.JK",
+  "INKP.JK",
+  "TKIM.JK",
+  "SMAR.JK",
+  "GEMS.JK",
+  "FREN.JK",
+  "DMAS.JK",
+
+  // === GRUP DJARUM (Hartono) ===
+  "TOWR.JK",
+  "BELI.JK",
+  "RANC.JK",
+
+  // === BUMN "GORENGAN" / HIGH BETA (GIAA, Karya, Pharma) ===
+  "GIAA.JK",
+  "GMFI.JK", // Airlines
+  "WSKT.JK",
+  "WIKA.JK",
+  "PTPP.JK",
+  "ADHI.JK",
+  "PPRO.JK",
+  "WEGE.JK", // Konstruksi & Properti
+  "KAEF.JK",
+  "INAF.JK",
+  "SMBR.JK",
+  "KRAS.JK",
+  "ANTM.JK",
+  "TINS.JK", // Others
+
+  // === LOW TUCK KWONG (Coal King) ===
+  "BYAN.JK",
+  "MYOH.JK",
+
   // === GARIBALDI "BOY" THOHIR ===
-  "ADRO.JK", "ADMR.JK", "MDKA.JK", "MBMA.JK",
-  
-  // === HERMANTO TANOKO (Tancorp Group) ===
-  "AVIA.JK", "CLEO.JK", "DEPO.JK", "RISE.JK",
-  
-  // === EDWIN SOERYADJAYA (Saratoga) ===
-  "SRTG.JK", "ASII.JK",
-  
-  // === HARY TANOESOEDIBJO (MNC Group) ===
-  "MNCN.JK", "BHIT.JK", "KPIG.JK",
-  
-  // === HOT PICKS 2025 ===
-  "ARCI.JK", "EMAS.JK", "WIFI.JK", "PACK.JK", "BRMS.JK",
-  
-  // === PROPERTY ===
-  "BKSL.JK", "SMRA.JK", "CTRA.JK", "ASRI.JK", "PANI.JK", "PWON.JK", "LPKR.JK",
-  
-  // === MINING & ENERGY ===
-  "PTBA.JK", "ITMG.JK", "HRUM.JK", "MEDC.JK", "PGAS.JK", "ANTM.JK", "INCO.JK", "TINS.JK", "ENRG.JK", "DEWA.JK", "PSAB.JK",
-  
+  "ADRO.JK",
+  "ADMR.JK",
+  "MDKA.JK",
+  "MBMA.JK",
+  "ESSA.JK",
+
+  // === HERMANTO TANOKO (Tancorp) ===
+  "AVIA.JK",
+  "CLEO.JK",
+  "DEPO.JK",
+  "RISE.JK",
+  "PEVE.JK",
+  "BLES.JK",
+
+  // === HARY TANOE (MNC Group) ===
+  "MNCN.JK",
+  "BHIT.JK",
+  "KPIG.JK",
+  "IPTV.JK",
+  "BCAP.JK",
+  "BABP.JK",
+
+  // === PROPERTY AGUAN (PIK) & OTHERS ===
+  "PANI.JK", // Aguan / Sedayu
+  "BSBK.JK", // Wulandari (Sering dimainin)
+  "SMRA.JK",
+  "CTRA.JK",
+  "ASRI.JK",
+  "PWON.JK",
+  "BKSL.JK",
+  "DILD.JK",
+  "BEST.JK",
+
+  // === MINING & ENERGY (Commodity Swing) ===
+  "PTBA.JK",
+  "ITMG.JK",
+  "HRUM.JK",
+  "MEDC.JK",
+  "PGAS.JK",
+  "INCO.JK",
+  "PSAB.JK",
+  "DOID.JK",
+  "ELSA.JK",
+  "APEX.JK",
+  "SOCI.JK",
+
+  // === SAHAM GOCAP / THIRD LINER / SERING DITERBANGIN ===
+  "ZATA.JK",
+  "GTBO.JK",
+  "STRK.JK",
+  "WIDI.JK",
+  "NICE.JK",
+  "AEGS.JK",
+  "AYLS.JK",
+  "REAL.JK",
+  "SBAT.JK",
+  "POSA.JK",
+  "CARE.JK",
+  "WINR.JK",
+  "GOTO.JK",
+
+  // === TRENDING / HOT PICKS / RECENT MOVERS ===
+  "DAAZ.JK",
+  "AWAN.JK",
+  "PYFA.JK",
+  "SRAJ.JK", // Kesehatan lagi manggung
+  "WIFI.JK",
+  "PACK.JK",
+  "ARCI.JK",
+  "EMAS.JK",
+  "DCII.JK",
+  "BUKA.JK",
+  "BOAT.JK",
+  "JARR.JK",
+
   // === CONSUMER & RETAIL ===
-  "MYOR.JK", "AMRT.JK", "CPIN.JK", "JPFA.JK", "UNVR.JK", "KLBF.JK", "HMSP.JK", "GGRM.JK",
-  
-  // === TELCO & TECH ===
-  "TLKM.JK", "ISAT.JK", "EXCL.JK", "GOTO.JK",
-  
-  // === OTHERS / TRENDING ===
-  "DAAZ.JK", "MLPT.JK", "MLPL.JK", "AWAN.JK", "PYFA.JK", "ESSA.JK", "BUKA.JK", "DCII.JK", "AKRA.JK", "SMGR.JK",
+  "MYOR.JK",
+  "AMRT.JK",
+  "MIDI.JK",
+  "CPIN.JK",
+  "JPFA.JK",
+  "UNVR.JK",
+  "KLBF.JK",
+  "HMSP.JK",
+  "GGRM.JK",
+  "SIDO.JK",
+  "ACES.JK",
+
+  // === TELCO ===
+  "TLKM.JK",
+  "ISAT.JK",
+  "EXCL.JK",
 ];
 
 // ============ GET AI PICKS ============
@@ -194,8 +347,18 @@ async function getAIPicks(req, res) {
 
     const { rows } = await pool.query(query, [limit]);
 
+    // Extract confidence from reasoning field (format: "[AI-SCREENER] Conf=85% | ...")
+    const rowsWithConfidence = rows.map(row => {
+      let confidence = 75; // default
+      const match = row.reasoning?.match(/Conf=(\d+)%/);
+      if (match) {
+        confidence = parseInt(match[1], 10);
+      }
+      return { ...row, confidence };
+    });
+
     res.setHeader("Cache-Control", "s-maxage=60, stale-while-revalidate");
-    return res.status(200).json(rows);
+    return res.status(200).json(rowsWithConfidence);
   } catch (error) {
     console.error("AI Picks API Error:", error);
     return res.status(500).json({ error: error.message });
@@ -208,7 +371,7 @@ async function runScreener(req, res) {
     // Check auth only for /run-screener path, skip for ?action=generate (dev mode)
     const url = new URL(req.url, `http://${req.headers.host}`);
     const isDevMode = url.searchParams.get("action") === "generate";
-    
+
     const secret = process.env.CRON_SECRET;
     if (secret && !isDevMode) {
       const authHeader = req.headers["authorization"] || req.headers["Authorization"];
