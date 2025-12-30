@@ -286,7 +286,7 @@ async function analyzeNewsWithGemini(articles, ticker, isIHSGFallback = false) {
   }
 
   try {
-    const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
+    const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
 
     // Format articles for Gemini
     let newsText = "";
@@ -513,7 +513,7 @@ async function chat(req, res) {
       return res.status(400).json({ success: false, message: "Prompt harus diisi" });
     }
 
-    const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
+    const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
 
     let systemPrompt = "";
 
@@ -784,7 +784,7 @@ PENTING: Jawab dalam format JSON yang VALID:
 Berikan analisis yang OBJEKTIF, AKURAT, dan SPECIFIC dengan FOKUS PADA VOLUME CONFIRMATION untuk timeframe ${timeframe || "Daily"}.`;
 
     const model = genAI.getGenerativeModel({ 
-      model: "gemini-2.0-flash",
+      model: "gemini-2.5-flash",
       generationConfig: {
         temperature: 0.3,
         maxOutputTokens: 2048,

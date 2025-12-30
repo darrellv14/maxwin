@@ -675,7 +675,6 @@ export function detectPatterns(data: IndicatorData[]): DetectedPattern[] {
     detectDoubleBottom,
     detectAscendingTriangle,
     detectDescendingTriangle,
-    detectSupportResistance,
   ];
 
   for (const detector of detectors) {
@@ -692,12 +691,161 @@ export function detectPatterns(data: IndicatorData[]): DetectedPattern[] {
   // Sort by confidence
   patterns.sort((a, b) => b.confidence - a.confidence);
 
+  // ALWAYS add support/resistance levels (even if other patterns found)
+  // This ensures we always show key levels to the user
+  try {
+    const srPattern = detectSupportResistanceEnhanced(data);
+    if (srPattern) {
+      // Add SR pattern but with lower priority if we have other patterns
+      if (patterns.length > 0) {
+        srPattern.confidence = 60; // Lower confidence to appear after main patterns
+      }
+      patterns.push(srPattern);
+    }
+  } catch (e) {
+    console.error("S/R detection error:", e);
+  }
+
   return patterns;
+}
+
+// Enhanced Support/Resistance detection with strong levels
+function detectSupportResistanceEnhanced(data: IndicatorData[]): DetectedPattern | null {
+  if (data.length < 20) return null;
+
+  const { peaks, troughs } = findPeaksAndTroughs(data, 3);
+  const currentPrice = data[data.length - 1].close;
+  
+  // Find strong resistance levels (multiple touches)
+  const resistanceClusters: { price: number; touches: number; indices: number[] }[] = [];
+  const supportClusters: { price: number; touches: number; indices: number[] }[] = [];
+  
+  // Group peaks into resistance clusters
+  peaks.forEach(peak => {
+    const existingCluster = resistanceClusters.find(r => approxEqual(r.price, peak.price, 0.025));
+    if (existingCluster) {
+      existingCluster.touches++;
+      existingCluster.indices.push(peak.index);
+      existingCluster.price = (existingCluster.price * (existingCluster.touches - 1) + peak.price) / existingCluster.touches;
+    } else {
+      resistanceClusters.push({ price: peak.price, touches: 1, indices: [peak.index] });
+    }
+  });
+
+  // Group troughs into support clusters
+  troughs.forEach(trough => {
+    const existingCluster = supportClusters.find(s => approxEqual(s.price, trough.price, 0.025));
+    if (existingCluster) {
+      existingCluster.touches++;
+      existingCluster.indices.push(trough.index);
+      existingCluster.price = (existingCluster.price * (existingCluster.touches - 1) + trough.price) / existingCluster.touches;
+    } else {
+      supportClusters.push({ price: trough.price, touches: 1, indices: [trough.index] });
+    }
+  });
+
+  // Filter for strong levels (at least 2 touches) and sort by strength
+  const strongResistance = resistanceClusters
+    .filter(r => r.touches >= 2 && r.price > currentPrice)
+    .sort((a, b) => b.touches - a.touches || a.price - b.price);
+  
+  const strongSupport = supportClusters
+    .filter(s => s.touches >= 2 && s.price < currentPrice)
+    .sort((a, b) => b.touches - a.touches || b.price - a.price);
+
+  // If no strong levels, find the nearest single-touch levels
+  let nearestResistance = strongResistance[0];
+  let nearestSupport = strongSupport[0];
+  
+  if (!nearestResistance) {
+    const singleResistance = resistanceClusters
+      .filter(r => r.price > currentPrice)
+      .sort((a, b) => a.price - b.price)[0];
+    if (singleResistance) nearestResistance = singleResistance;
+  }
+  
+  if (!nearestSupport) {
+    const singleSupport = supportClusters
+      .filter(s => s.price < currentPrice)
+      .sort((a, b) => b.price - a.price)[0];
+    if (singleSupport) nearestSupport = singleSupport;
+  }
+
+  // Also find second level (strong) support/resistance
+  const strongResistance2 = strongResistance[1];
+  const strongSupport2 = strongSupport[1];
+
+  if (!nearestResistance && !nearestSupport) return null;
+
+  const points: PatternPoint[] = [];
+  
+  // Add strong support first
+  if (strongSupport2) {
+    points.push({
+      index: strongSupport2.indices[0],
+      x: 0, y: 0,
+      price: strongSupport2.price,
+      date: data[strongSupport2.indices[0]]?.date || "",
+    });
+  }
+  
+  // Current support
+  if (nearestSupport) {
+    points.push({
+      index: nearestSupport.indices[0],
+      x: 0, y: 0,
+      price: nearestSupport.price,
+      date: data[nearestSupport.indices[0]]?.date || "",
+    });
+  }
+  
+  // Current resistance
+  if (nearestResistance) {
+    points.push({
+      index: nearestResistance.indices[0],
+      x: 0, y: 0,
+      price: nearestResistance.price,
+      date: data[nearestResistance.indices[0]]?.date || "",
+    });
+  }
+  
+  // Strong resistance
+  if (strongResistance2) {
+    points.push({
+      index: strongResistance2.indices[0],
+      x: 0, y: 0,
+      price: strongResistance2.price,
+      date: data[strongResistance2.indices[0]]?.date || "",
+    });
+  }
+
+  const distanceToResistance = nearestResistance ? (nearestResistance.price - currentPrice) / currentPrice : 1;
+  const distanceToSupport = nearestSupport ? (currentPrice - nearestSupport.price) / currentPrice : 1;
+
+  // Build description
+  let description = "Key Levels: ";
+  if (strongSupport2) description += `Strong S: ${strongSupport2.price.toFixed(0)} (${strongSupport2.touches}x) | `;
+  if (nearestSupport) description += `Support: ${nearestSupport.price.toFixed(0)} (${nearestSupport.touches}x) | `;
+  if (nearestResistance) description += `Resistance: ${nearestResistance.price.toFixed(0)} (${nearestResistance.touches}x) | `;
+  if (strongResistance2) description += `Strong R: ${strongResistance2.price.toFixed(0)} (${strongResistance2.touches}x)`;
+
+  return {
+    type: "support-resistance",
+    name: "Support & Resistance",
+    direction: distanceToSupport < distanceToResistance ? "bullish" : "bearish",
+    confidence: 70 + Math.min((nearestSupport?.touches || 0) + (nearestResistance?.touches || 0), 20),
+    points,
+    targetPrice: nearestResistance?.price || currentPrice * 1.05,
+    targetDirection: distanceToSupport < distanceToResistance ? "up" : "down",
+    stopLoss: nearestSupport?.price || currentPrice * 0.95,
+    description,
+    drawInstructions: [],
+  };
 }
 
 /**
  * Generate drawing instructions for a pattern
- * Enhanced version with accurate candlestick snapping and realistic curve rendering
+ * Enhanced version with IDEALIZED pattern shapes (not jagged candle-following lines)
  */
 export function generateDrawInstructions(
   pattern: DetectedPattern,
@@ -850,50 +998,35 @@ export function generateDrawInstructions(
       if (pattern.points.length >= 3) {
         const [left, bottom, right] = pattern.points;
         
-        // Find intermediate points along the cup from actual data
-        const leftIdx = left.index;
-        const bottomIdx = bottom.index;
-        const rightIdx = right.index;
-        
-        // Collect actual price points for the cup shape
-        const cupPoints: { x: number; y: number }[] = [];
-        
-        // Left side descending
-        for (let i = leftIdx; i <= bottomIdx; i++) {
-          const candle = getCandleLow(i);
-          if (candle) cupPoints.push({ x: candle.x, y: candle.y });
-        }
-        
-        // Right side ascending
-        for (let i = bottomIdx + 1; i <= rightIdx; i++) {
-          const candle = getCandleLow(i);
-          if (candle) cupPoints.push({ x: candle.x, y: candle.y });
-        }
-        
-        // Generate smooth curve through the actual data points
-        if (cupPoints.length >= 3) {
-          const smoothCup = generateSmoothCurvePoints(cupPoints, 10);
-          instructions.push({
-            type: "smooth-curve",
-            color: patternColor,
-            points: smoothCup,
-          });
-        } else {
-          // Fallback: generate idealized cup curve
-          const cupCurve = generateCupCurve(left, bottom, right);
-          instructions.push({
-            type: "smooth-curve",
-            color: patternColor,
-            points: cupCurve,
-          });
-        }
+        // Draw IDEALIZED cup shape (smooth U curve) - not following jagged candles
+        const cupCurve = generateCupCurve(left, bottom, right, 40);
+        instructions.push({
+          type: "smooth-curve",
+          color: patternColor,
+          points: cupCurve,
+        });
         
         // Mark key points with circles
         instructions.push({
           type: "circle-marker",
           color: patternColor,
           points: [left, bottom, right],
-          radius: 4,
+          radius: 5,
+        });
+        
+        // Handle (small pullback after right peak) - draw as small flag
+        const handleStartX = right.x;
+        const handleEndX = right.x + (right.x - left.x) * 0.15;
+        const handlePullbackY = right.y + (bottom.y - right.y) * 0.2;
+        
+        instructions.push({
+          type: "line",
+          color: patternColor,
+          points: [
+            { x: handleStartX, y: right.y },
+            { x: (handleStartX + handleEndX) / 2, y: handlePullbackY },
+            { x: handleEndX, y: right.y - 5 },
+          ],
         });
         
         // Resistance/Breakout line at cup rim
@@ -905,22 +1038,6 @@ export function generateDrawInstructions(
           points: [{ x: left.x, y: rimY }, { x: USABLE_CHART_WIDTH, y: rimY }],
           label: `Breakout: ${rimPrice.toFixed(0)}`,
         });
-        
-        // Handle zone (if data extends beyond right peak)
-        if (rightIdx < data.length - 3) {
-          const handlePoints: { x: number; y: number }[] = [];
-          for (let i = rightIdx; i < data.length; i++) {
-            const candle = getCandleClose(i);
-            if (candle) handlePoints.push({ x: candle.x, y: candle.y });
-          }
-          if (handlePoints.length >= 2) {
-            instructions.push({
-              type: "line",
-              color: patternColor,
-              points: handlePoints,
-            });
-          }
-        }
         
         // Target projection
         instructions.push({
@@ -936,70 +1053,78 @@ export function generateDrawInstructions(
       if (pattern.points.length >= 5) {
         const [ls, ln, head, rn, rs] = pattern.points;
         
-        // Collect actual price data for smooth curves
-        const lsIdx = ls.index;
-        const lnIdx = ln.index;
-        const headIdx = head.index;
-        const rnIdx = rn.index;
-        const rsIdx = rs.index;
+        // Draw IDEALIZED Head & Shoulders shape with smooth curves
+        // This creates the classic H&S silhouette instead of jagged lines
         
-        // Generate smooth curve following actual candle tops
-        const patternPoints: { x: number; y: number }[] = [];
+        // Helper to create smooth shoulder curve
+        const createShoulderCurve = (
+          start: { x: number; y: number },
+          peak: { x: number; y: number },
+          end: { x: number; y: number }
+        ): { x: number; y: number }[] => {
+          const points: { x: number; y: number }[] = [];
+          for (let t = 0; t <= 1; t += 0.05) {
+            // Quadratic bezier through the three points
+            const oneMinusT = 1 - t;
+            const x = oneMinusT * oneMinusT * start.x + 2 * oneMinusT * t * peak.x + t * t * end.x;
+            const y = oneMinusT * oneMinusT * start.y + 2 * oneMinusT * t * peak.y + t * t * end.y;
+            points.push({ x, y });
+          }
+          return points;
+        };
         
-        // Left shoulder curve
-        for (let i = lsIdx; i <= lnIdx; i++) {
-          const candle = i <= lsIdx ? getCandleHigh(i) : getCandleLow(i);
-          if (candle) patternPoints.push({ x: candle.x, y: candle.y });
-        }
+        // Create left shoulder curve (from before LS, up to LS, down to LN)
+        const leftShoulderCurve = createShoulderCurve(
+          { x: ls.x - (ln.x - ls.x) * 0.3, y: ln.y },
+          ls,
+          ln
+        );
         
-        // Up to head
-        for (let i = lnIdx; i <= headIdx; i++) {
-          const candle = i >= lnIdx && i <= headIdx ? getCandleHigh(i) : getCandleLow(i);
-          if (candle) patternPoints.push({ x: candle.x, y: candle.y });
-        }
+        // Create head curve (from LN, up to Head, down to RN)
+        const headCurve = createShoulderCurve(ln, head, rn);
         
-        // Down to right neck
-        for (let i = headIdx; i <= rnIdx; i++) {
-          const candle = i <= headIdx ? getCandleHigh(i) : getCandleLow(i);
-          if (candle) patternPoints.push({ x: candle.x, y: candle.y });
-        }
+        // Create right shoulder curve (from RN, up to RS, down to after RS)
+        const rightShoulderCurve = createShoulderCurve(
+          rn,
+          rs,
+          { x: rs.x + (rs.x - rn.x) * 0.3, y: rn.y }
+        );
         
-        // Right shoulder
-        for (let i = rnIdx; i <= rsIdx; i++) {
-          const candle = i <= rsIdx ? getCandleHigh(i) : getCandleLow(i);
-          if (candle) patternPoints.push({ x: candle.x, y: candle.y });
-        }
+        // Combine all curves
+        const fullPattern = [...leftShoulderCurve, ...headCurve, ...rightShoulderCurve];
         
-        // Draw smooth curve if we have enough points
-        if (patternPoints.length >= 5) {
-          const smoothPattern = generateSmoothCurvePoints(patternPoints, 8);
-          instructions.push({
-            type: "smooth-curve",
-            color: patternColor,
-            points: smoothPattern,
-          });
-        } else {
-          // Fallback to connected lines
-          instructions.push({
-            type: "line",
-            color: patternColor,
-            points: [
-              { x: ls.x, y: ls.y },
-              { x: ln.x, y: ln.y },
-              { x: head.x, y: head.y },
-              { x: rn.x, y: rn.y },
-              { x: rs.x, y: rs.y },
-            ],
-          });
-        }
+        instructions.push({
+          type: "smooth-curve",
+          color: patternColor,
+          points: fullPattern,
+        });
         
-        // Mark key points
+        // Mark key points with labels
         instructions.push({
           type: "circle-marker",
           color: patternColor,
-          points: [ls, ln, head, rn, rs],
-          radius: 4,
-          label: "LS,LN,H,RN,RS",
+          points: [ls, head, rs],
+          radius: 5,
+        });
+        
+        // Add text labels for shoulders and head
+        instructions.push({
+          type: "text",
+          color: patternColor,
+          points: [{ x: ls.x, y: ls.y - 15 }],
+          label: "LS",
+        });
+        instructions.push({
+          type: "text",
+          color: patternColor,
+          points: [{ x: head.x, y: head.y - 15 }],
+          label: "Head",
+        });
+        instructions.push({
+          type: "text",
+          color: patternColor,
+          points: [{ x: rs.x, y: rs.y - 15 }],
+          label: "RS",
         });
         
         // Neckline - extended
@@ -1026,48 +1151,78 @@ export function generateDrawInstructions(
       if (pattern.points.length >= 5) {
         const [ls, ln, head, rn, rs] = pattern.points;
         
-        // Generate smooth curve following actual candle bottoms
-        const patternPoints: { x: number; y: number }[] = [];
-        const lsIdx = ls.index;
-        const lnIdx = ln.index;
-        const headIdx = head.index;
-        const rnIdx = rn.index;
-        const rsIdx = rs.index;
+        // Draw IDEALIZED Inverse Head & Shoulders shape with smooth curves
+        // This creates the classic inverted H&S silhouette
         
-        for (let i = lsIdx; i <= rsIdx; i++) {
-          const isAtPeak = i === lnIdx || i === rnIdx;
-          const isAtTrough = i === lsIdx || i === headIdx || i === rsIdx;
-          const candle = isAtPeak ? getCandleHigh(i) : getCandleLow(i);
-          if (candle) patternPoints.push({ x: candle.x, y: candle.y });
-        }
+        // Helper to create smooth inverted shoulder curve
+        const createInvShoulderCurve = (
+          start: { x: number; y: number },
+          trough: { x: number; y: number },
+          end: { x: number; y: number }
+        ): { x: number; y: number }[] => {
+          const points: { x: number; y: number }[] = [];
+          for (let t = 0; t <= 1; t += 0.05) {
+            // Quadratic bezier through the three points
+            const oneMinusT = 1 - t;
+            const x = oneMinusT * oneMinusT * start.x + 2 * oneMinusT * t * trough.x + t * t * end.x;
+            const y = oneMinusT * oneMinusT * start.y + 2 * oneMinusT * t * trough.y + t * t * end.y;
+            points.push({ x, y });
+          }
+          return points;
+        };
         
-        if (patternPoints.length >= 5) {
-          const smoothPattern = generateSmoothCurvePoints(patternPoints, 8);
-          instructions.push({
-            type: "smooth-curve",
-            color: patternColor,
-            points: smoothPattern,
-          });
-        } else {
-          instructions.push({
-            type: "line",
-            color: patternColor,
-            points: [
-              { x: ls.x, y: ls.y },
-              { x: ln.x, y: ln.y },
-              { x: head.x, y: head.y },
-              { x: rn.x, y: rn.y },
-              { x: rs.x, y: rs.y },
-            ],
-          });
-        }
+        // Create left shoulder curve
+        const leftShoulderCurve = createInvShoulderCurve(
+          { x: ls.x - (ln.x - ls.x) * 0.3, y: ln.y },
+          ls,
+          ln
+        );
         
-        // Mark key points
+        // Create head curve (inverted - going down)
+        const headCurve = createInvShoulderCurve(ln, head, rn);
+        
+        // Create right shoulder curve
+        const rightShoulderCurve = createInvShoulderCurve(
+          rn,
+          rs,
+          { x: rs.x + (rs.x - rn.x) * 0.3, y: rn.y }
+        );
+        
+        // Combine all curves
+        const fullPattern = [...leftShoulderCurve, ...headCurve, ...rightShoulderCurve];
+        
+        instructions.push({
+          type: "smooth-curve",
+          color: patternColor,
+          points: fullPattern,
+        });
+        
+        // Mark key points with labels
         instructions.push({
           type: "circle-marker",
           color: patternColor,
-          points: [ls, ln, head, rn, rs],
-          radius: 4,
+          points: [ls, head, rs],
+          radius: 5,
+        });
+        
+        // Add text labels
+        instructions.push({
+          type: "text",
+          color: patternColor,
+          points: [{ x: ls.x, y: ls.y + 20 }],
+          label: "LS",
+        });
+        instructions.push({
+          type: "text",
+          color: patternColor,
+          points: [{ x: head.x, y: head.y + 20 }],
+          label: "Head",
+        });
+        instructions.push({
+          type: "text",
+          color: patternColor,
+          points: [{ x: rs.x, y: rs.y + 20 }],
+          label: "RS",
         });
         
         // Neckline
@@ -1096,73 +1251,55 @@ export function generateDrawInstructions(
         const [poleStart, poleEnd, current] = pattern.points;
         const isBullish = pattern.type === "bull-flag";
         
-        // Draw pole with thickness effect
+        // Draw IDEALIZED flag pattern
+        // 1. Draw pole (thick line)
         instructions.push({
           type: "line",
           color: patternColor,
           points: [{ x: poleStart.x, y: poleStart.y }, { x: poleEnd.x, y: poleEnd.y }],
         });
         
-        // Draw flag as converging triangle (pennant shape)
-        const poleIdx = poleEnd.index;
-        const currentIdx = current.index;
+        // Mark pole start and end
+        instructions.push({
+          type: "circle-marker",
+          color: patternColor,
+          points: [poleStart, poleEnd],
+          radius: 4,
+        });
         
-        // Collect highs and lows for the flag portion
-        const flagHighs: { x: number; y: number }[] = [];
-        const flagLows: { x: number; y: number }[] = [];
+        // 2. Draw idealized flag (parallelogram with slight slope)
+        const poleHeight = Math.abs(poleEnd.y - poleStart.y);
+        const flagWidth = (current.x - poleEnd.x);
+        const flagHeight = poleHeight * 0.2; // Flag is 20% of pole height
+        const slopeDirection = isBullish ? 0.1 : -0.1; // Slight downward slope for bull flag
         
-        for (let i = poleIdx; i <= currentIdx && i < data.length; i++) {
-          const high = getCandleHigh(i);
-          const low = getCandleLow(i);
-          if (high) flagHighs.push(high);
-          if (low) flagLows.push(low);
-        }
+        const flagTopStart = { x: poleEnd.x, y: poleEnd.y - flagHeight };
+        const flagTopEnd = { x: current.x, y: poleEnd.y - flagHeight * 0.5 + (flagWidth * slopeDirection) };
+        const flagBottomStart = { x: poleEnd.x, y: poleEnd.y + flagHeight };
+        const flagBottomEnd = { x: current.x, y: poleEnd.y + flagHeight * 0.5 + (flagWidth * slopeDirection) };
         
-        if (flagHighs.length >= 2 && flagLows.length >= 2) {
-          // Draw upper trendline of flag
-          instructions.push({
-            type: "line",
-            color: patternColor,
-            points: [flagHighs[0], flagHighs[flagHighs.length - 1]],
-          });
-          
-          // Draw lower trendline of flag
-          instructions.push({
-            type: "line",
-            color: patternColor,
-            points: [flagLows[0], flagLows[flagLows.length - 1]],
-          });
-          
-          // Fill the flag zone
-          instructions.push({
-            type: "zone",
-            color: patternColor,
-            points: [
-              flagHighs[0],
-              flagHighs[flagHighs.length - 1],
-              flagLows[flagLows.length - 1],
-              flagLows[0],
-            ],
-            fill: true,
-          });
-        } else {
-          // Fallback: simple parallelogram
-          const flagHeight = Math.abs(poleEnd.y - poleStart.y) * 0.15;
-          instructions.push({
-            type: "zone",
-            color: patternColor,
-            points: [
-              { x: poleEnd.x, y: poleEnd.y - flagHeight },
-              { x: current.x, y: current.y - flagHeight * 0.7 },
-              { x: current.x, y: current.y + flagHeight * 0.7 },
-              { x: poleEnd.x, y: poleEnd.y + flagHeight },
-            ],
-            fill: true,
-          });
-        }
+        // Draw flag boundary lines
+        instructions.push({
+          type: "line",
+          color: patternColor,
+          points: [flagTopStart, flagTopEnd],
+        });
+        instructions.push({
+          type: "line",
+          color: patternColor,
+          points: [flagBottomStart, flagBottomEnd],
+        });
+        
+        // Fill the flag zone
+        instructions.push({
+          type: "zone",
+          color: patternColor,
+          points: [flagTopStart, flagTopEnd, flagBottomEnd, flagBottomStart],
+          fill: true,
+        });
         
         // Breakout level
-        const breakoutY = isBullish ? poleEnd.y : poleEnd.y;
+        const breakoutY = poleEnd.y;
         instructions.push({
           type: "dashed-line",
           color: neutralColor,
@@ -1170,7 +1307,7 @@ export function generateDrawInstructions(
           label: "Breakout",
         });
         
-        // Target
+        // Target projection arrow
         instructions.push({
           type: "target-line",
           color: patternColor,
@@ -1184,40 +1321,53 @@ export function generateDrawInstructions(
       if (pattern.points.length >= 3) {
         const [first, middle, second] = pattern.points;
         
-        // Draw curve connecting the two tops through the middle
-        const topPoints: { x: number; y: number }[] = [];
-        
-        for (let i = first.index; i <= second.index && i < data.length; i++) {
-          const candle = i <= first.index || i >= second.index ? getCandleHigh(i) : getCandleLow(i);
-          if (candle) topPoints.push({ x: candle.x, y: candle.y });
+        // Draw IDEALIZED Double Top (M shape) with smooth curves
+        // First peak curve
+        const firstPeakCurve: { x: number; y: number }[] = [];
+        const startX = first.x - (middle.x - first.x) * 0.3;
+        for (let t = 0; t <= 1; t += 0.05) {
+          const oneMinusT = 1 - t;
+          const x = oneMinusT * oneMinusT * startX + 2 * oneMinusT * t * first.x + t * t * middle.x;
+          const y = oneMinusT * oneMinusT * middle.y + 2 * oneMinusT * t * first.y + t * t * middle.y;
+          firstPeakCurve.push({ x, y });
         }
         
-        if (topPoints.length >= 5) {
-          const smoothCurve = generateSmoothCurvePoints(topPoints, 8);
-          instructions.push({
-            type: "smooth-curve",
-            color: patternColor,
-            points: smoothCurve,
-          });
-        } else {
-          // W-shape for double top
-          instructions.push({
-            type: "line",
-            color: patternColor,
-            points: [
-              { x: first.x, y: first.y },
-              { x: middle.x, y: middle.y },
-              { x: second.x, y: second.y },
-            ],
-          });
+        // Second peak curve
+        const secondPeakCurve: { x: number; y: number }[] = [];
+        const endX = second.x + (second.x - middle.x) * 0.3;
+        for (let t = 0; t <= 1; t += 0.05) {
+          const oneMinusT = 1 - t;
+          const x = oneMinusT * oneMinusT * middle.x + 2 * oneMinusT * t * second.x + t * t * endX;
+          const y = oneMinusT * oneMinusT * middle.y + 2 * oneMinusT * t * second.y + t * t * middle.y;
+          secondPeakCurve.push({ x, y });
         }
+        
+        instructions.push({
+          type: "smooth-curve",
+          color: patternColor,
+          points: [...firstPeakCurve, ...secondPeakCurve],
+        });
         
         // Mark the two tops
         instructions.push({
           type: "circle-marker",
           color: bearishColor,
           points: [first, second],
-          radius: 5,
+          radius: 6,
+        });
+        
+        // Labels
+        instructions.push({
+          type: "text",
+          color: bearishColor,
+          points: [{ x: first.x, y: first.y - 15 }],
+          label: "Top 1",
+        });
+        instructions.push({
+          type: "text",
+          color: bearishColor,
+          points: [{ x: second.x, y: second.y - 15 }],
+          label: "Top 2",
         });
         
         // Horizontal resistance at tops
@@ -1225,7 +1375,7 @@ export function generateDrawInstructions(
         instructions.push({
           type: "dashed-line",
           color: bearishColor,
-          points: [{ x: first.x, y: resistanceY }, { x: USABLE_CHART_WIDTH, y: resistanceY }],
+          points: [{ x: first.x - 20, y: resistanceY }, { x: USABLE_CHART_WIDTH, y: resistanceY }],
           label: "Resistance",
         });
         
@@ -1251,40 +1401,53 @@ export function generateDrawInstructions(
       if (pattern.points.length >= 3) {
         const [first, middle, second] = pattern.points;
         
-        // Draw curve connecting the two bottoms through the middle
-        const bottomPoints: { x: number; y: number }[] = [];
-        
-        for (let i = first.index; i <= second.index && i < data.length; i++) {
-          const candle = i <= first.index || i >= second.index ? getCandleLow(i) : getCandleHigh(i);
-          if (candle) bottomPoints.push({ x: candle.x, y: candle.y });
+        // Draw IDEALIZED Double Bottom (W shape) with smooth curves
+        // First trough curve
+        const firstTroughCurve: { x: number; y: number }[] = [];
+        const startXDb = first.x - (middle.x - first.x) * 0.3;
+        for (let t = 0; t <= 1; t += 0.05) {
+          const oneMinusT = 1 - t;
+          const x = oneMinusT * oneMinusT * startXDb + 2 * oneMinusT * t * first.x + t * t * middle.x;
+          const y = oneMinusT * oneMinusT * middle.y + 2 * oneMinusT * t * first.y + t * t * middle.y;
+          firstTroughCurve.push({ x, y });
         }
         
-        if (bottomPoints.length >= 5) {
-          const smoothCurve = generateSmoothCurvePoints(bottomPoints, 8);
-          instructions.push({
-            type: "smooth-curve",
-            color: patternColor,
-            points: smoothCurve,
-          });
-        } else {
-          // W-shape for double bottom
-          instructions.push({
-            type: "line",
-            color: patternColor,
-            points: [
-              { x: first.x, y: first.y },
-              { x: middle.x, y: middle.y },
-              { x: second.x, y: second.y },
-            ],
-          });
+        // Second trough curve
+        const secondTroughCurve: { x: number; y: number }[] = [];
+        const endXDb = second.x + (second.x - middle.x) * 0.3;
+        for (let t = 0; t <= 1; t += 0.05) {
+          const oneMinusT = 1 - t;
+          const x = oneMinusT * oneMinusT * middle.x + 2 * oneMinusT * t * second.x + t * t * endXDb;
+          const y = oneMinusT * oneMinusT * middle.y + 2 * oneMinusT * t * second.y + t * t * middle.y;
+          secondTroughCurve.push({ x, y });
         }
+        
+        instructions.push({
+          type: "smooth-curve",
+          color: patternColor,
+          points: [...firstTroughCurve, ...secondTroughCurve],
+        });
         
         // Mark the two bottoms
         instructions.push({
           type: "circle-marker",
           color: bullishColor,
           points: [first, second],
-          radius: 5,
+          radius: 6,
+        });
+        
+        // Labels
+        instructions.push({
+          type: "text",
+          color: bullishColor,
+          points: [{ x: first.x, y: first.y + 20 }],
+          label: "Bottom 1",
+        });
+        instructions.push({
+          type: "text",
+          color: bullishColor,
+          points: [{ x: second.x, y: second.y + 20 }],
+          label: "Bottom 2",
         });
         
         // Horizontal support at bottoms
@@ -1292,7 +1455,7 @@ export function generateDrawInstructions(
         instructions.push({
           type: "dashed-line",
           color: bullishColor,
-          points: [{ x: first.x, y: supportY }, { x: USABLE_CHART_WIDTH, y: supportY }],
+          points: [{ x: first.x - 20, y: supportY }, { x: USABLE_CHART_WIDTH, y: supportY }],
           label: "Support",
         });
         
@@ -1445,32 +1608,84 @@ export function generateDrawInstructions(
       break;
 
     case "support-resistance":
-      // Draw horizontal support/resistance lines with zone shading
-      pattern.points.forEach((point) => {
-        const isResistance = point.price > data[data.length - 1].close;
-        const zoneHeight = 8; // pixels
+      {
+        // Draw horizontal support/resistance lines with zone shading
+        // Sort points by price to identify strong vs current levels
+        const currentPrice = data[data.length - 1].close;
+        const sortedPoints = [...pattern.points].sort((a, b) => a.price - b.price);
         
-        // Draw zone
-        instructions.push({
-          type: "zone",
-          color: isResistance ? bearishColor : bullishColor,
-          points: [
-            { x: 0, y: point.y - zoneHeight },
-            { x: USABLE_CHART_WIDTH, y: point.y - zoneHeight },
-            { x: USABLE_CHART_WIDTH, y: point.y + zoneHeight },
-            { x: 0, y: point.y + zoneHeight },
-          ],
-          fill: true,
+        // Categorize levels
+        const supportLevels = sortedPoints.filter(p => p.price < currentPrice);
+        const resistanceLevels = sortedPoints.filter(p => p.price > currentPrice);
+        
+        // Draw support levels (green zones)
+        supportLevels.forEach((point, idx) => {
+          const isStrongLevel = idx === 0 && supportLevels.length > 1; // Lowest = strongest
+          const zoneHeight = isStrongLevel ? 12 : 6;
+          const lineWidth = isStrongLevel ? 2 : 1;
+          const label = isStrongLevel ? `Strong S: ${point.price.toFixed(0)}` : `S: ${point.price.toFixed(0)}`;
+          const color = isStrongLevel ? "#00ff9d" : "#22c55e";
+          
+          // Draw zone
+          instructions.push({
+            type: "zone",
+            color: color,
+            points: [
+              { x: 0, y: point.y - zoneHeight },
+              { x: USABLE_CHART_WIDTH, y: point.y - zoneHeight },
+              { x: USABLE_CHART_WIDTH, y: point.y + zoneHeight },
+              { x: 0, y: point.y + zoneHeight },
+            ],
+            fill: true,
+          });
+          
+          // Main line
+          instructions.push({
+            type: isStrongLevel ? "line" : "dashed-line",
+            color: color,
+            points: [{ x: 0, y: point.y }, { x: USABLE_CHART_WIDTH, y: point.y }],
+            label: label,
+          });
         });
         
-        // Main line
+        // Draw resistance levels (red zones)
+        resistanceLevels.forEach((point, idx) => {
+          const isStrongLevel = idx === resistanceLevels.length - 1 && resistanceLevels.length > 1; // Highest = strongest
+          const zoneHeight = isStrongLevel ? 12 : 6;
+          const label = isStrongLevel ? `Strong R: ${point.price.toFixed(0)}` : `R: ${point.price.toFixed(0)}`;
+          const color = isStrongLevel ? "#ff0055" : "#ef4444";
+          
+          // Draw zone
+          instructions.push({
+            type: "zone",
+            color: color,
+            points: [
+              { x: 0, y: point.y - zoneHeight },
+              { x: USABLE_CHART_WIDTH, y: point.y - zoneHeight },
+              { x: USABLE_CHART_WIDTH, y: point.y + zoneHeight },
+              { x: 0, y: point.y + zoneHeight },
+            ],
+            fill: true,
+          });
+          
+          // Main line
+          instructions.push({
+            type: isStrongLevel ? "line" : "dashed-line",
+            color: color,
+            points: [{ x: 0, y: point.y }, { x: USABLE_CHART_WIDTH, y: point.y }],
+            label: label,
+          });
+        });
+        
+        // Draw current price line
+        const currentPriceY = toCanvasY(currentPrice);
         instructions.push({
           type: "dashed-line",
-          color: isResistance ? bearishColor : bullishColor,
-          points: [{ x: 0, y: point.y }, { x: USABLE_CHART_WIDTH, y: point.y }],
-          label: isResistance ? `R: ${point.price.toFixed(0)}` : `S: ${point.price.toFixed(0)}`,
+          color: "#fbbf24",
+          points: [{ x: 0, y: currentPriceY }, { x: USABLE_CHART_WIDTH, y: currentPriceY }],
+          label: `Current: ${currentPrice.toFixed(0)}`,
         });
-      });
+      }
       break;
 
     case "rising-wedge":
