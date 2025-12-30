@@ -140,6 +140,13 @@ const IDX_UNIVERSE = [
   "AGRO.JK",
   "AMAR.JK",
   "BEKS.JK", // Digital & Volatile
+  "BGTG.JK",
+  "BINA.JK",
+  "BTPS.JK",
+  "BVIC.JK",
+  "MCOR.JK",
+  "NOBU.JK",
+  "SDRA.JK",
 
   // === GRUP PRAJOGO PANGESTU (Barito - The Mover) ===
   "BRPT.JK",
@@ -150,7 +157,7 @@ const IDX_UNIVERSE = [
   "CDIA.JK",
   "SSIA.JK",
 
-  // === GRUP HAPSORO (Happy Hapsoro) ===
+  // === GRUP HAPSORO (Happy Hapsoro - Sering Digoreng) ===
   "RAJA.JK",
   "RATU.JK",
   "MINA.JK",
@@ -158,6 +165,27 @@ const IDX_UNIVERSE = [
   "BUVA.JK",
   "UANG.JK",
   "CBRE.JK",
+  "HADE.JK",
+  "BEER.JK",
+  "FUJI.JK",
+  "LUCK.JK",
+  "PAMG.JK",
+  "IKAN.JK",
+  "DEAL.JK",
+
+  // === GRUP HUMI / GTSI (Sering Pump) ===
+  "HUMI.JK",
+  "GTSI.JK",
+  "MABA.JK",
+  "NASI.JK",
+  "NASA.JK",
+  "NAIK.JK",
+  "KIOS.JK",
+  "TAMU.JK",
+  "DAYA.JK",
+  "CITY.JK",
+  "TECH.JK",
+  "BLUE.JK",
 
   // === GRUP SALIM (Indofood & Tech) ===
   "INDF.JK",
@@ -191,6 +219,7 @@ const IDX_UNIVERSE = [
   "MPPA.JK",
   "LPPF.JK",
   "SILO.JK",
+  "GOLL.JK",
 
   // === GRUP PANIN (Value Trap / Volatile) ===
   "PNIN.JK",
@@ -228,6 +257,12 @@ const IDX_UNIVERSE = [
   "KRAS.JK",
   "ANTM.JK",
   "TINS.JK", // Others
+  "JSMR.JK",
+  "WTON.JK",
+  "NRCA.JK",
+  "DGIK.JK",
+  "ACST.JK",
+  "TOTL.JK",
 
   // === LOW TUCK KWONG (Coal King) ===
   "BYAN.JK",
@@ -266,6 +301,15 @@ const IDX_UNIVERSE = [
   "BKSL.JK",
   "DILD.JK",
   "BEST.JK",
+  "KIJA.JK",
+  "JRPT.JK",
+  "RBMS.JK",
+  "NZIA.JK",
+  "URBN.JK",
+  "LAND.JK",
+  "OMRE.JK",
+  "POLL.JK",
+  "RODA.JK",
 
   // === MINING & ENERGY (Commodity Swing) ===
   "PTBA.JK",
@@ -279,6 +323,13 @@ const IDX_UNIVERSE = [
   "ELSA.JK",
   "APEX.JK",
   "SOCI.JK",
+  "FIRE.JK",
+  "ZINC.JK",
+  "SMMT.JK",
+  "IFII.JK",
+  "BSSR.JK",
+  "COAL.JK",
+  "AKRA.JK",
 
   // === SAHAM GOCAP / THIRD LINER / SERING DITERBANGIN ===
   "ZATA.JK",
@@ -294,6 +345,26 @@ const IDX_UNIVERSE = [
   "CARE.JK",
   "WINR.JK",
   "GOTO.JK",
+  "GTRA.JK",
+  "KJEN.JK",
+  "LUCK.JK",
+  "FILM.JK",
+  "BOLA.JK",
+  "JSKY.JK",
+  "SAFE.JK",
+  "CBMF.JK",
+  "CLAY.JK",
+  "PSGO.JK",
+  "EAST.JK",
+  "BOSS.JK",
+  "SATU.JK",
+  "SOTS.JK",
+  "MPRO.JK",
+  "SOFA.JK",
+  "OBMD.JK",
+  "WAPO.JK",
+  "YELO.JK",
+  "NPGF.JK",
 
   // === TRENDING / HOT PICKS / RECENT MOVERS ===
   "DAAZ.JK",
@@ -308,6 +379,22 @@ const IDX_UNIVERSE = [
   "BUKA.JK",
   "BOAT.JK",
   "JARR.JK",
+  "RONY.JK",
+  "GULA.JK",
+  "BAUT.JK",
+  "CASH.JK",
+  "HILL.JK",
+  "KOPI.JK",
+  "KEEN.JK",
+  "NETV.JK",
+  "OILS.JK",
+  "PGJO.JK",
+  "SAPX.JK",
+  "SGER.JK",
+  "TEBE.JK",
+  "TRIM.JK",
+  "WIFI.JK",
+  "ZONE.JK",
 
   // === CONSUMER & RETAIL ===
   "MYOR.JK",
@@ -321,11 +408,33 @@ const IDX_UNIVERSE = [
   "GGRM.JK",
   "SIDO.JK",
   "ACES.JK",
+  "ERAA.JK",
+  "ERAL.JK",
+  "LUCY.JK",
+  "HERO.JK",
+  "LPPF.JK",
+  "MAPI.JK",
+  "RALS.JK",
+  "SUPRA.JK",
+  "TSPC.JK",
 
   // === TELCO ===
   "TLKM.JK",
   "ISAT.JK",
   "EXCL.JK",
+
+  // === AUTO & INDUSTRIAL ===
+  "ASII.JK",
+  "AUTO.JK",
+  "GJTL.JK",
+  "INDS.JK",
+  "SMSM.JK",
+  "BOLT.JK",
+  "DRMA.JK",
+  "IMPC.JK",
+  "ARNA.JK",
+  "MARK.JK",
+  "TOTO.JK",
 ];
 
 // ============ GET AI PICKS ============
@@ -441,7 +550,7 @@ async function runScreener(req, res) {
 
     const topCandidates = processedData
       .sort((a, b) => b.technicalConfidence - a.technicalConfidence)
-      .slice(0, 15);
+      .slice(0, 25);
 
     if (topCandidates.length === 0) {
       return res.status(200).json({ message: "Market bearish. No candidates passed filter." });
@@ -450,7 +559,7 @@ async function runScreener(req, res) {
     const prompt = `
       Anda adalah "The Oracle", algoritma hedge fund elit khusus IHSG (Indonesia).
       
-      Tugas: Analisis kandidat berikut dan pilih TOP 3-5 saham untuk posisi SWING TRADE.
+      Tugas: Analisis kandidat berikut dan pilih TOP 7-10 saham untuk posisi SWING TRADE.
       
       DATA YANG DIBERIKAN UNTUK SETIAP SAHAM:
       1. Indicators: RSI, MACD, Bollinger Bands, OBV Slope (Volume Flow).

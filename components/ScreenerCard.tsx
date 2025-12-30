@@ -136,6 +136,7 @@ const ScreenerCard: React.FC<ScreenerCardProps> = ({
   onViewChart,
 }) => {
   const { addToWatchlist, removeFromWatchlist, isInWatchlist } = useWatchlistStore();
+  const [isReasoningExpanded, setIsReasoningExpanded] = useState(false);
 
   // Normalize props - support both analysis object and individual props
   const analysis: AIAnalysisResult = analysisProp || {
@@ -195,7 +196,20 @@ const ScreenerCard: React.FC<ScreenerCardProps> = ({
       </div>
 
       {/* Reasoning */}
-      <p className="text-gray-400 text-sm mb-4 line-clamp-2 font-mono">"{analysis.reasoning}"</p>
+      <div className="mb-4">
+        <p className={`text-gray-400 text-sm font-mono ${!isReasoningExpanded ? 'line-clamp-2' : ''}`}>
+          "{analysis.reasoning}"
+        </p>
+        {analysis.reasoning && analysis.reasoning.length > 100 && (
+          <button
+            onClick={() => setIsReasoningExpanded(!isReasoningExpanded)}
+            className="text-terminal-green hover:text-terminal-green/80 text-xs font-mono mt-1 flex items-center gap-1 transition-colors"
+          >
+            <ChevronDown className={`w-3 h-3 transition-transform ${isReasoningExpanded ? 'rotate-180' : ''}`} />
+            {isReasoningExpanded ? 'Show Less' : 'Read More'}
+          </button>
+        )}
+      </div>
 
       {/* Trade Plan */}
       <div className="grid grid-cols-3 gap-2 mb-4">
