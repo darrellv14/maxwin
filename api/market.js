@@ -664,8 +664,26 @@ async function getHistoricalData(req, res) {
     // 3️⃣ CHART FETCH + SMART RETRY
     // ===========================================
     async function fetchChart() {
+      // Helper for retrying on rate limits
+      async function fetchWithRetry(symbol, options, retries = 3) {
+        for (let i = 0; i < retries; i++) {
+          try {
+            return await yahooFinance.chart(symbol, options);
+          } catch (err) {
+            if (i === retries - 1) throw err;
+            
+            if (err.message && (err.message.includes("Too Many Requests") || err.message.includes("429"))) {
+              console.log(`[Market API] Rate limited for ${symbol}. Retry ${i+1}/${retries}...`);
+              await new Promise(resolve => setTimeout(resolve, 1000 * (i + 1) + Math.random() * 500));
+              continue;
+            }
+            throw err;
+          }
+        }
+      }
+
       try {
-        const r = await yahooFinance.chart(ticker, {
+        const r = await fetchWithRetry(ticker, {
           period1: startDate,
           period2: endDate,
           interval: interval,
@@ -680,10 +698,15 @@ async function getHistoricalData(req, res) {
         if (err.message && (err.message.includes("Not Found") || err.message.includes("404"))) {
           throw new Error("Ticker Not Found");
         }
+        
+        // If it's a 429 that persisted after retries, propagate it
+        if (err.message && (err.message.includes("Too Many Requests") || err.message.includes("429"))) {
+           throw err;
+        }
 
         // Smart fallback: use same date range but with daily interval
         console.log(`Fallback for ${ticker} ${period}: ${interval} -> 1d`);
-        const fallbackResult = await yahooFinance.chart(ticker, {
+        const fallbackResult = await fetchWithRetry(ticker, {
           period1: originalStartDate,
           period2: endDate,
           interval: "1d",
