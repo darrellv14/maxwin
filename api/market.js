@@ -1,7 +1,67 @@
-import YahooFinance from "yahoo-finance2";
+import yahooFinance from "yahoo-finance2";
 import { setSecurityHeaders, sanitizeInput } from "./security.js";
 
-const yahooFinance = new YahooFinance();
+// Configure yahoo-finance2 - the library uses a default instance
+// We can configure it via options on individual calls
+
+// ============ IN-MEMORY CACHE ============
+// Simple cache to reduce Yahoo Finance API calls and avoid rate limits
+const cache = new Map();
+const CACHE_TTL = {
+  "1D": 60 * 1000,        // 1 minute for intraday
+  "5D": 5 * 60 * 1000,    // 5 minutes
+  "1M": 10 * 60 * 1000,   // 10 minutes
+  "3M": 15 * 60 * 1000,   // 15 minutes
+  "6M": 30 * 60 * 1000,   // 30 minutes
+  "1Y": 60 * 60 * 1000,   // 1 hour
+  "5Y": 60 * 60 * 1000,   // 1 hour
+  "ALL": 60 * 60 * 1000,  // 1 hour
+};
+
+// Track request timing to avoid hitting rate limits
+let lastYahooRequest = 0;
+const MIN_REQUEST_INTERVAL = 1500; // 1.5 seconds between Yahoo requests
+
+async function throttleYahooRequest() {
+  const now = Date.now();
+  const timeSinceLastRequest = now - lastYahooRequest;
+  if (timeSinceLastRequest < MIN_REQUEST_INTERVAL) {
+    const waitTime = MIN_REQUEST_INTERVAL - timeSinceLastRequest;
+    console.log(`[Throttle] Waiting ${waitTime}ms before Yahoo request`);
+    await new Promise(resolve => setTimeout(resolve, waitTime));
+  }
+  lastYahooRequest = Date.now();
+}
+
+function getCacheKey(ticker, period) {
+  return `${ticker.toUpperCase()}_${period}`;
+}
+
+function getFromCache(ticker, period) {
+  const key = getCacheKey(ticker, period);
+  const cached = cache.get(key);
+  if (cached && Date.now() - cached.timestamp < (CACHE_TTL[period] || 15 * 60 * 1000)) {
+    console.log(`[Cache] HIT for ${ticker} ${period}`);
+    return cached.data;
+  }
+  return null;
+}
+
+function setCache(ticker, period, data) {
+  const key = getCacheKey(ticker, period);
+  cache.set(key, { data, timestamp: Date.now() });
+  console.log(`[Cache] SET for ${ticker} ${period}`);
+  
+  // Cleanup old entries if cache gets too big
+  if (cache.size > 500) {
+    const now = Date.now();
+    for (const [k, v] of cache) {
+      if (now - v.timestamp > 60 * 60 * 1000) { // Remove entries older than 1 hour
+        cache.delete(k);
+      }
+    }
+  }
+}
 
 // ============ TRADINGVIEW SYMBOL MAPPING ============
 // Symbols that don't exist in Yahoo Finance but are available on TradingView
@@ -316,6 +376,7 @@ async function fetchMetalsData(symbol, period) {
     else if (period === "1M") interval = "1h";
     else if (period === "5Y" || period === "ALL") interval = "1wk";
     
+    await throttleYahooRequest();
     const result = await yahooFinance.chart(yahooSymbol, {
       period1: startDate,
       period2: new Date(),
@@ -578,6 +639,16 @@ async function getHistoricalData(req, res) {
     }
   }
 
+  // =====================================================
+  // 0.5️⃣ CHECK CACHE FIRST
+  // =====================================================
+  const cachedData = getFromCache(ticker, period);
+  if (cachedData) {
+    res.setHeader("Cache-Control", "s-maxage=60, stale-while-revalidate");
+    res.setHeader("X-Data-Source", "cache");
+    return res.status(200).json(cachedData);
+  }
+
   try {
     let startDate = new Date();
     const endDate = new Date();
@@ -664,17 +735,23 @@ async function getHistoricalData(req, res) {
     // 3️⃣ CHART FETCH + SMART RETRY
     // ===========================================
     async function fetchChart() {
-      // Helper for retrying on rate limits
-      async function fetchWithRetry(symbol, options, retries = 3) {
+      // Helper for retrying on rate limits with exponential backoff
+      async function fetchWithRetry(symbol, options, retries = 4) {
         for (let i = 0; i < retries; i++) {
           try {
             return await yahooFinance.chart(symbol, options);
           } catch (err) {
-            if (i === retries - 1) throw err;
+            const isRateLimited = err.message && (
+              err.message.includes("Too Many Requests") || 
+              err.message.includes("429") ||
+              err.message.includes("rate limit")
+            );
             
-            if (err.message && (err.message.includes("Too Many Requests") || err.message.includes("429"))) {
-              console.log(`[Market API] Rate limited for ${symbol}. Retry ${i+1}/${retries}...`);
-              await new Promise(resolve => setTimeout(resolve, 1000 * (i + 1) + Math.random() * 500));
+            if (isRateLimited && i < retries - 1) {
+              // Exponential backoff: 2s, 4s, 8s + random jitter
+              const delay = Math.pow(2, i + 1) * 1000 + Math.random() * 1000;
+              console.log(`[Market API] Rate limited for ${symbol}. Waiting ${Math.round(delay/1000)}s before retry ${i+1}/${retries}...`);
+              await new Promise(resolve => setTimeout(resolve, delay));
               continue;
             }
             throw err;
@@ -743,7 +820,11 @@ async function getHistoricalData(req, res) {
         volume: q.volume || 0,
       }));
 
+    // Save to cache before returning
+    setCache(ticker, period, formattedData);
+    
     res.setHeader("Cache-Control", "s-maxage=60, stale-while-revalidate");
+    res.setHeader("X-Data-Source", "yahoo");
     return res.status(200).json(formattedData);
   } catch (error) {
     // =====================================================
