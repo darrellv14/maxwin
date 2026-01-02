@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { AIAnalysisResult, SignalType } from "../types";
-import { Sparkles, TrendingUp, TrendingDown, BarChart2, RefreshCw } from "lucide-react";
+import { Sparkles, TrendingUp, TrendingDown, BarChart2, RefreshCw, ChevronDown } from "lucide-react";
 
 interface OraclePanelProps {
   analysis: AIAnalysisResult | null;
@@ -26,6 +26,7 @@ const OraclePanel: React.FC<OraclePanelProps> = ({ analysis, loading, onAnalyze 
   const [expandedSections, setExpandedSections] = useState<{ [key: string]: boolean }>({
     verdict: false,
     sentiment: false,
+    tradePlan: false,
   });
 
   const toggleExpand = (section: string) => {
@@ -134,31 +135,64 @@ const OraclePanel: React.FC<OraclePanelProps> = ({ analysis, loading, onAnalyze 
           </div>
 
           {/* Trade Plan Grid */}
-          <div className="grid grid-cols-2 gap-1.5 sm:gap-2 mb-3 sm:mb-4">
-            <div className="bg-gray-900/50 p-1.5 sm:p-2 rounded border border-gray-700/50">
-              <div className="text-[10px] sm:text-xs text-gray-500 font-mono">ENTRY ZONE</div>
-              <div className="text-xs sm:text-sm font-bold text-white truncate">{analysis.entryArea}</div>
-            </div>
-            <div className="bg-gray-900/50 p-1.5 sm:p-2 rounded border border-gray-700/50">
-              <div className="text-[10px] sm:text-xs text-gray-500 font-mono">TIMING</div>
-              <div className="text-xs sm:text-sm font-bold text-blue-300 truncate">{analysis.predictionTime}</div>
-            </div>
-            <div className="bg-gray-900/50 p-1.5 sm:p-2 rounded border border-gray-700/50">
-              <div className="text-[10px] sm:text-xs text-gray-500 font-mono">STOP LOSS</div>
-              <div className="text-xs sm:text-sm font-bold text-loss-red truncate">{analysis.stopLoss}</div>
-            </div>
-            <div className="bg-gray-900/50 p-1.5 sm:p-2 rounded border border-gray-700/50">
-              <div className="text-[10px] sm:text-xs text-gray-500 font-mono">
-                {analysis.signal === "SELL" && analysis.takeProfit1 !== "N/A"
-                  ? "TARGETS"
-                  : "TARGETS"}
+          <div className="mb-3 sm:mb-4">
+            {/* Compact View */}
+            {!expandedSections.tradePlan ? (
+              <div className="grid grid-cols-2 gap-1.5 sm:gap-2">
+                <div className="bg-gray-900/50 p-1.5 sm:p-2 rounded border border-gray-700/50">
+                  <div className="text-[10px] sm:text-xs text-gray-500 font-mono">ENTRY ZONE</div>
+                  <div className="text-xs sm:text-sm font-bold text-white truncate">{analysis.entryArea}</div>
+                </div>
+                <div className="bg-gray-900/50 p-1.5 sm:p-2 rounded border border-gray-700/50">
+                  <div className="text-[10px] sm:text-xs text-gray-500 font-mono">TIMING</div>
+                  <div className="text-xs sm:text-sm font-bold text-blue-300 truncate">{analysis.predictionTime}</div>
+                </div>
+                <div className="bg-gray-900/50 p-1.5 sm:p-2 rounded border border-gray-700/50">
+                  <div className="text-[10px] sm:text-xs text-gray-500 font-mono">STOP LOSS</div>
+                  <div className="text-xs sm:text-sm font-bold text-loss-red truncate">{analysis.stopLoss}</div>
+                </div>
+                <div className="bg-gray-900/50 p-1.5 sm:p-2 rounded border border-gray-700/50">
+                  <div className="text-[10px] sm:text-xs text-gray-500 font-mono">TARGETS</div>
+                  <div className="text-xs sm:text-sm font-bold text-profit-green truncate">
+                    TP1: {analysis.takeProfit1}
+                  </div>
+                </div>
               </div>
-              <div className="text-xs sm:text-sm font-bold text-profit-green">
-                TP1: {analysis.takeProfit1}
-                <br />
-                TP2: {analysis.takeProfit2}
+            ) : (
+              /* Expanded View */
+              <div className="space-y-2">
+                <div className="bg-gray-900/50 p-3 rounded border border-gray-700/50">
+                  <div className="text-[10px] sm:text-xs text-gray-500 font-mono mb-1">ENTRY ZONE</div>
+                  <div className="text-sm sm:text-base font-bold text-white break-words">{analysis.entryArea}</div>
+                </div>
+                <div className="bg-gray-900/50 p-3 rounded border border-gray-700/50">
+                  <div className="text-[10px] sm:text-xs text-gray-500 font-mono mb-1">TIMING</div>
+                  <div className="text-sm sm:text-base font-bold text-blue-300 break-words">{analysis.predictionTime}</div>
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="bg-gray-900/50 p-3 rounded border border-red-900/30">
+                    <div className="text-[10px] sm:text-xs text-gray-500 font-mono mb-1">STOP LOSS</div>
+                    <div className="text-sm sm:text-base font-bold text-loss-red break-words">{analysis.stopLoss}</div>
+                  </div>
+                  <div className="bg-gray-900/50 p-3 rounded border border-green-900/30">
+                    <div className="text-[10px] sm:text-xs text-gray-500 font-mono mb-1">TAKE PROFIT 1</div>
+                    <div className="text-sm sm:text-base font-bold text-profit-green break-words">{analysis.takeProfit1}</div>
+                  </div>
+                </div>
+                <div className="bg-gray-900/50 p-3 rounded border border-green-900/30">
+                  <div className="text-[10px] sm:text-xs text-gray-500 font-mono mb-1">TAKE PROFIT 2</div>
+                  <div className="text-sm sm:text-base font-bold text-profit-green break-words">{analysis.takeProfit2}</div>
+                </div>
               </div>
-            </div>
+            )}
+            {/* Toggle Button */}
+            <button
+              onClick={() => toggleExpand('tradePlan')}
+              className="mt-2 w-full flex items-center justify-center gap-1 text-purple-400 hover:text-purple-300 text-[10px] sm:text-xs font-mono transition-colors py-1 rounded hover:bg-purple-500/10"
+            >
+              <ChevronDown className={`w-3 h-3 transition-transform ${expandedSections.tradePlan ? 'rotate-180' : ''}`} />
+              {expandedSections.tradePlan ? 'Compact View' : 'Expand Trade Plan'}
+            </button>
           </div>
 
           <div className="bg-black/30 p-3 sm:p-4 rounded border border-gray-800">
