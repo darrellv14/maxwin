@@ -14,6 +14,8 @@ import {
   Activity,
   TrendingUp,
   AlertTriangle,
+  Sparkles,
+  Zap,
 } from "lucide-react";
 import {
   isAdmin,
@@ -34,6 +36,7 @@ const AdminDashboard: React.FC = () => {
   const [users, setUsers] = useState<User[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState<number | null>(null);
+  const [aiPicksLoading, setAiPicksLoading] = useState(false);
 
   useEffect(() => {
     if (!isAuthenticated() || !isAdmin()) {
@@ -88,6 +91,24 @@ const AdminDashboard: React.FC = () => {
       showToast("Terjadi kesalahan", "error");
     } finally {
       setActionLoading(null);
+    }
+  };
+
+  const handleGenerateAIPicks = async () => {
+    setAiPicksLoading(true);
+    showToast("Generating AI Picks... Ini bisa memakan waktu 2-3 menit", "info");
+    try {
+      const response = await fetch("/api/ai-picks?action=generate");
+      const data = await response.json();
+      if (response.ok && data.success) {
+        showToast(`AI Picks berhasil! ${data.signals_saved} sinyal disimpan dari ${data.analyzed} saham dianalisis`, "success");
+      } else {
+        showToast(data.error || data.message || "Gagal generate AI Picks", "error");
+      }
+    } catch (error) {
+      showToast("Terjadi kesalahan saat generate AI Picks", "error");
+    } finally {
+      setAiPicksLoading(false);
     }
   };
 
@@ -256,15 +277,32 @@ const AdminDashboard: React.FC = () => {
               </button>
             </div>
 
-            <button
-              onClick={loadUsers}
-              disabled={isLoading}
-              className="flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-1.5 sm:py-2 bg-black border border-gray-700 text-gray-400 
-                hover:text-white hover:border-gray-600 rounded-lg transition-colors font-mono text-[10px] sm:text-sm disabled:opacity-50"
-            >
-              <RefreshCw className={`w-3 h-3 sm:w-4 sm:h-4 ${isLoading ? "animate-spin" : ""}`} />
-              <span className="hidden xs:inline">REFRESH</span>
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={handleGenerateAIPicks}
+                disabled={aiPicksLoading}
+                className="flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-1.5 sm:py-2 bg-purple-600 hover:bg-purple-700
+                  text-white rounded-lg transition-colors font-mono text-[10px] sm:text-sm disabled:opacity-50
+                  shadow-[0_0_15px_rgba(147,51,234,0.3)] border border-purple-500/30"
+              >
+                {aiPicksLoading ? (
+                  <Loader2 className="w-3 h-3 sm:w-4 sm:h-4 animate-spin" />
+                ) : (
+                  <Sparkles className="w-3 h-3 sm:w-4 sm:h-4" />
+                )}
+                <span className="hidden xs:inline">{aiPicksLoading ? "GENERATING..." : "GENERATE AI PICKS"}</span>
+                <span className="xs:hidden">{aiPicksLoading ? "..." : "AI"}</span>
+              </button>
+              <button
+                onClick={loadUsers}
+                disabled={isLoading}
+                className="flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-1.5 sm:py-2 bg-black border border-gray-700 text-gray-400 
+                  hover:text-white hover:border-gray-600 rounded-lg transition-colors font-mono text-[10px] sm:text-sm disabled:opacity-50"
+              >
+                <RefreshCw className={`w-3 h-3 sm:w-4 sm:h-4 ${isLoading ? "animate-spin" : ""}`} />
+                <span className="hidden xs:inline">REFRESH</span>
+              </button>
+            </div>
           </div>
         </div>
 

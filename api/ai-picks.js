@@ -477,16 +477,25 @@ async function getAIPicks(req, res) {
 // ============ RUN SCREENER (CRON) ============
 async function runScreener(req, res) {
   try {
-    // Check auth only for /run-screener path, skip for ?action=generate (dev mode)
+    // Check auth only for /run-screener path from external sources
+    // Allow ?action=generate for admin manual trigger
     const url = new URL(req.url, `http://${req.headers.host}`);
     const isDevMode = url.searchParams.get("action") === "generate";
 
+    // For cron job from Vercel, check CRON_SECRET
+    // For manual trigger (action=generate), allow without auth (admin only via frontend)
     const secret = process.env.CRON_SECRET;
     if (secret && !isDevMode) {
       const authHeader = req.headers["authorization"] || req.headers["Authorization"];
-      if (authHeader !== secret) return res.status(401).json({ error: "Unauthorized" });
+      // Vercel cron sends secret as Bearer token
+      const token = authHeader?.replace("Bearer ", "");
+      if (token !== secret && authHeader !== secret) {
+        console.log("[AI-ORACLE] Unauthorized cron request");
+        return res.status(401).json({ error: "Unauthorized" });
+      }
     }
 
+    console.log(`[AI-ORACLE] Screener triggered - isDevMode: ${isDevMode}`);
     const yf = new YahooFinance();
     const symbols = IDX_UNIVERSE;
     console.log(`[AI-ORACLE] Analyzing ${symbols.length} stocks...`);

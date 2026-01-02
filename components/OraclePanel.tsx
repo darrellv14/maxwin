@@ -23,6 +23,14 @@ const PROGRESS_MESSAGES = [
 const OraclePanel: React.FC<OraclePanelProps> = ({ analysis, loading, onAnalyze }) => {
   const [progress, setProgress] = useState(0);
   const [messageIndex, setMessageIndex] = useState(0);
+  const [expandedSections, setExpandedSections] = useState<{ [key: string]: boolean }>({
+    verdict: false,
+    sentiment: false,
+  });
+
+  const toggleExpand = (section: string) => {
+    setExpandedSections(prev => ({ ...prev, [section]: !prev[section] }));
+  };
 
   // Animate progress bar when loading
   useEffect(() => {
@@ -155,9 +163,19 @@ const OraclePanel: React.FC<OraclePanelProps> = ({ analysis, loading, onAnalyze 
 
           <div className="bg-black/30 p-3 sm:p-4 rounded border border-gray-800">
             <div className="text-gray-400 text-[10px] sm:text-xs font-mono uppercase mb-1.5 sm:mb-2">The Verdict</div>
-            <p className="text-gray-300 text-xs sm:text-sm leading-relaxed font-mono text-justify">
-              "{analysis.reasoning}"
-            </p>
+            <div className="relative">
+              <p className={`text-gray-300 text-xs sm:text-sm leading-relaxed font-mono text-justify ${!expandedSections.verdict && analysis.reasoning && analysis.reasoning.length > 200 ? 'line-clamp-3' : ''}`}>
+                "{analysis.reasoning}"
+              </p>
+              {analysis.reasoning && analysis.reasoning.length > 200 && (
+                <button
+                  onClick={() => toggleExpand('verdict')}
+                  className="mt-1 text-purple-400 hover:text-purple-300 text-[10px] sm:text-xs font-mono transition-colors"
+                >
+                  {expandedSections.verdict ? '← Show less' : 'Read more →'}
+                </button>
+              )}
+            </div>
           </div>
 
           {/* Sentiment Section */}
@@ -214,9 +232,19 @@ const OraclePanel: React.FC<OraclePanelProps> = ({ analysis, loading, onAnalyze 
                 </div>
               </div>
               {analysis.sentiment.description && (
-                <p className="text-gray-400 text-[10px] sm:text-xs font-mono leading-relaxed text-justify pl-7 sm:pl-9 border-l-2 border-gray-700/50 ml-2">
-                  {analysis.sentiment.description}
-                </p>
+                <div className="pl-7 sm:pl-9 border-l-2 border-gray-700/50 ml-2">
+                  <p className={`text-gray-400 text-[10px] sm:text-xs font-mono leading-relaxed text-justify ${!expandedSections.sentiment && analysis.sentiment.description.length > 150 ? 'line-clamp-2' : ''}`}>
+                    {analysis.sentiment.description}
+                  </p>
+                  {analysis.sentiment.description.length > 150 && (
+                    <button
+                      onClick={() => toggleExpand('sentiment')}
+                      className="mt-1 text-purple-400 hover:text-purple-300 text-[10px] sm:text-xs font-mono transition-colors"
+                    >
+                      {expandedSections.sentiment ? '← Show less' : 'Read more →'}
+                    </button>
+                  )}
+                </div>
               )}
             </div>
           )}
