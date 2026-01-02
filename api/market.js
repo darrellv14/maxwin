@@ -1,8 +1,8 @@
-import yahooFinance from "yahoo-finance2";
+import YahooFinance from "yahoo-finance2";
 import { setSecurityHeaders, sanitizeInput } from "./security.js";
 
-// Configure yahoo-finance2 - the library uses a default instance
-// We can configure it via options on individual calls
+// Create yahoo-finance2 instance (required in v3.x)
+const yahooFinance = new YahooFinance();
 
 // ============ IN-MEMORY CACHE ============
 // Simple cache to reduce Yahoo Finance API calls and avoid rate limits
