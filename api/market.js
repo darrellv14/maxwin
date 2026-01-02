@@ -26,7 +26,7 @@ const TRADINGVIEW_SYMBOLS = {
 
 // Check if symbol should use TradingView data
 function shouldUseTradingView(ticker) {
-  const upperTicker = ticker.toUpperCase().replace(/[:\s]/g, "");
+  const upperTicker = ticker.toUpperCase().replace(/[:\s-]/g, "");
   
   // Direct match
   if (TRADINGVIEW_SYMBOLS[upperTicker]) {
@@ -744,6 +744,15 @@ async function getHistoricalData(req, res) {
       
       return res.status(404).json({
         error: `Ticker '${ticker}' not found. Please check the symbol. For forex/commodities, try: GC=F (Gold), SI=F (Silver), EURUSD=X (EUR/USD).`,
+      });
+    }
+
+    if (
+      error.message.includes("Too Many Requests") || 
+      error.message.includes("429")
+    ) {
+      return res.status(429).json({
+        error: "Too many requests to data provider. Please try again later.",
       });
     }
 
