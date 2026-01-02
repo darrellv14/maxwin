@@ -367,7 +367,7 @@ const AIPicksPage: React.FC = () => {
                 </div>
               </div>
             )}
-          </motion.div>
+          </div>
         ) : (
           /* Table View - Flat list for table */
           <div className="bg-terminal-gray border border-gray-800 rounded-lg overflow-hidden shadow-xl">
