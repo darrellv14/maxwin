@@ -1,21 +1,30 @@
 import React, { useEffect, useState } from "react";
 import { getAIPicks, AnalysisRecord } from "../services/analysisService";
 import { useNavigate } from "react-router-dom";
-import { Loader2, Bot, TrendingUp, Grid, List, Filter, SortAsc, RefreshCw } from "lucide-react";
+import { Loader2, Bot, TrendingUp, Grid, List, Filter, SortAsc, RefreshCw, Calendar, ChevronDown, ChevronRight, Zap, Target, Sparkles } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import ScreenerCard from "../components/ScreenerCard";
 import Navbar from "../components/Navbar";
 
 type ViewMode = "grid" | "table";
 type SortOption = "date" | "confidence" | "ticker";
+type SignalFilter = "ALL" | "STRONG BUY" | "BUY" | "SPECULATIVE BUY";
+
+interface DateGroup {
+  date: string;
+  displayDate: string;
+  picks: AnalysisRecord[];
+  isExpanded: boolean;
+}
 
 const AIPicksPage: React.FC = () => {
   const navigate = useNavigate();
   const [picks, setPicks] = useState<AnalysisRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [viewMode, setViewMode] = useState<ViewMode>("grid");
-  const [sortBy, setSortBy] = useState<SortOption>("date");
-  const [filterSignal, setFilterSignal] = useState<"ALL" | "BUY" | "SELL">("ALL");
+  const [sortBy, setSortBy] = useState<SortOption>("confidence");
+  const [filterSignal, setFilterSignal] = useState<SignalFilter>("ALL");
+  const [expandedDates, setExpandedDates] = useState<Set<string>>(new Set());
 
   const handleViewChart = (ticker: string) => {
     navigate(`/?ticker=${encodeURIComponent(ticker)}`);
@@ -26,6 +35,9 @@ const AIPicksPage: React.FC = () => {
     try {
       const data = await getAIPicks();
       setPicks(data);
+      // Auto-expand today's picks
+      const today = new Date().toISOString().split('T')[0];
+      setExpandedDates(new Set([today]));
     } catch (error) {
       console.error("Failed to load AI picks", error);
     } finally {
@@ -37,27 +49,101 @@ const AIPicksPage: React.FC = () => {
     fetchPicks();
   }, []);
 
-  const sortedAndFilteredPicks = React.useMemo(() => {
+  // Group picks by date
+  const groupedByDate = React.useMemo(() => {
     let filtered = picks;
 
     // Filter by signal
     if (filterSignal !== "ALL") {
-      filtered = filtered.filter((p) => p.signal === filterSignal);
+      filtered = filtered.filter((p) => p.signal?.toUpperCase() === filterSignal);
     }
 
-    // Sort
-    return [...filtered].sort((a, b) => {
-      switch (sortBy) {
-        case "confidence":
-          return (b.confidence || 0) - (a.confidence || 0);
-        case "ticker":
-          return a.ticker.localeCompare(b.ticker);
-        case "date":
-        default:
-          return new Date(b.date_created).getTime() - new Date(a.date_created).getTime();
+    // Group by date
+    const groups: Map<string, AnalysisRecord[]> = new Map();
+    filtered.forEach((pick) => {
+      const dateKey = new Date(pick.date_created).toISOString().split('T')[0];
+      if (!groups.has(dateKey)) {
+        groups.set(dateKey, []);
       }
+      groups.get(dateKey)!.push(pick);
     });
-  }, [picks, sortBy, filterSignal]);
+
+    // Sort picks within each group
+    groups.forEach((groupPicks, key) => {
+      groups.set(key, groupPicks.sort((a, b) => {
+        switch (sortBy) {
+          case "confidence":
+            return (b.confidence || 0) - (a.confidence || 0);
+          case "ticker":
+            return a.ticker.localeCompare(b.ticker);
+          case "date":
+          default:
+            return new Date(b.date_created).getTime() - new Date(a.date_created).getTime();
+        }
+      }));
+    });
+
+    // Sort groups by date (newest first) and convert to array
+    const sortedGroups: DateGroup[] = Array.from(groups.entries())
+      .sort((a, b) => new Date(b[0]).getTime() - new Date(a[0]).getTime())
+      .map(([date, picks]) => {
+        const dateObj = new Date(date);
+        const today = new Date();
+        const yesterday = new Date(today);
+        yesterday.setDate(yesterday.getDate() - 1);
+
+        let displayDate: string;
+        if (dateObj.toDateString() === today.toDateString()) {
+          displayDate = "📅 TODAY'S PICKS";
+        } else if (dateObj.toDateString() === yesterday.toDateString()) {
+          displayDate = "📆 YESTERDAY";
+        } else {
+          displayDate = `📆 ${dateObj.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })}`;
+        }
+
+        return {
+          date,
+          displayDate,
+          picks,
+          isExpanded: expandedDates.has(date)
+        };
+      });
+
+    return sortedGroups;
+  }, [picks, sortBy, filterSignal, expandedDates]);
+
+  const totalPicks = groupedByDate.reduce((sum, g) => sum + g.picks.length, 0);
+
+  const toggleDateExpansion = (date: string) => {
+    setExpandedDates(prev => {
+      const next = new Set(prev);
+      if (next.has(date)) {
+        next.delete(date);
+      } else {
+        next.add(date);
+      }
+      return next;
+    });
+  };
+
+  const expandAll = () => {
+    setExpandedDates(new Set(groupedByDate.map(g => g.date)));
+  };
+
+  const collapseAll = () => {
+    setExpandedDates(new Set());
+  };
+
+  // Get signal badge style
+  const getSignalBadge = (signal: string) => {
+    const upperSignal = signal?.toUpperCase() || "BUY";
+    if (upperSignal.includes("STRONG")) {
+      return { icon: Zap, color: "text-green-400 bg-green-900/40 border-green-700", label: "STRONG BUY" };
+    } else if (upperSignal.includes("SPECULATIVE")) {
+      return { icon: Sparkles, color: "text-yellow-400 bg-yellow-900/40 border-yellow-700", label: "SPECULATIVE" };
+    }
+    return { icon: Target, color: "text-emerald-400 bg-emerald-900/40 border-emerald-700", label: "BUY" };
+  };
 
   return (
     <div className="min-h-screen bg-terminal-black text-gray-300 font-sans selection:bg-profit-green selection:text-black">
@@ -112,12 +198,13 @@ const AIPicksPage: React.FC = () => {
               <Filter className="w-4 h-4 text-gray-500 hidden sm:block" />
               <select
                 value={filterSignal}
-                onChange={(e) => setFilterSignal(e.target.value as any)}
+                onChange={(e) => setFilterSignal(e.target.value as SignalFilter)}
                 className="bg-black border border-gray-700 text-gray-300 text-xs sm:text-sm rounded px-2 sm:px-3 py-1 sm:py-1.5 focus:outline-none focus:border-profit-green"
               >
-                <option value="ALL">All</option>
-                <option value="BUY">BUY</option>
-                <option value="SELL">SELL</option>
+                <option value="ALL">All Signals</option>
+                <option value="STRONG BUY">🟢 Strong Buy</option>
+                <option value="BUY">🟡 Buy</option>
+                <option value="SPECULATIVE BUY">🔵 Speculative</option>
               </select>
             </div>
 
@@ -138,8 +225,23 @@ const AIPicksPage: React.FC = () => {
 
           <div className="flex items-center justify-between sm:justify-end gap-3 sm:gap-4">
             <span className="text-[10px] sm:text-xs font-mono text-gray-500">
-              {sortedAndFilteredPicks.length} picks
+              {totalPicks} picks in {groupedByDate.length} days
             </span>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={expandAll}
+                className="text-xs text-gray-500 hover:text-gray-300 font-mono"
+              >
+                Expand
+              </button>
+              <span className="text-gray-700">|</span>
+              <button
+                onClick={collapseAll}
+                className="text-xs text-gray-500 hover:text-gray-300 font-mono"
+              >
+                Collapse
+              </button>
+            </div>
             <motion.button
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
@@ -161,38 +263,100 @@ const AIPicksPage: React.FC = () => {
             <span className="sm:hidden">SCANNING...</span>
           </div>
         ) : viewMode === "grid" ? (
-          /* Grid View with ScreenerCards */
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4"
-          >
+          /* Grid View with Date Groups */
+          <div className="space-y-6">
             <AnimatePresence>
-              {sortedAndFilteredPicks.map((record, index) => (
+              {groupedByDate.map((group, groupIndex) => (
                 <motion.div
-                  key={record.id}
-                  initial={{ opacity: 0, scale: 0.9 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  exit={{ opacity: 0, scale: 0.9 }}
-                  transition={{ delay: index * 0.05 }}
+                  key={group.date}
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -20 }}
+                  transition={{ delay: groupIndex * 0.1 }}
+                  className="bg-terminal-darker border border-gray-800 rounded-xl overflow-hidden"
                 >
-                  <ScreenerCard
-                    ticker={record.ticker}
-                    signal={record.signal as "BUY" | "SELL"}
-                    confidence={record.confidence || 75}
-                    entryPrice={record.entry_price}
-                    tp1={record.tp1}
-                    tp2={record.tp2}
-                    stopLoss={record.stop_loss}
-                    reasoning={record.reasoning.replace("[AI-SCREENER] ", "")}
-                    date={new Date(record.date_created)}
-                    onViewChart={handleViewChart}
-                  />
+                  {/* Date Header */}
+                  <button
+                    onClick={() => toggleDateExpansion(group.date)}
+                    className="w-full flex items-center justify-between p-4 bg-gradient-to-r from-gray-900 to-terminal-darker hover:from-gray-800 hover:to-gray-900 transition-colors"
+                  >
+                    <div className="flex items-center gap-3">
+                      <Calendar className="w-5 h-5 text-profit-green" />
+                      <span className="font-mono font-bold text-white text-lg">
+                        {group.displayDate}
+                      </span>
+                      <span className="text-xs text-gray-500 bg-gray-800 px-2 py-0.5 rounded-full">
+                        {group.picks.length} picks
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {/* Signal summary badges */}
+                      <div className="hidden sm:flex items-center gap-1">
+                        {group.picks.filter(p => p.signal?.toUpperCase().includes("STRONG")).length > 0 && (
+                          <span className="text-xs bg-green-900/40 text-green-400 px-2 py-0.5 rounded-full border border-green-700">
+                            {group.picks.filter(p => p.signal?.toUpperCase().includes("STRONG")).length} Strong
+                          </span>
+                        )}
+                        {group.picks.filter(p => p.signal?.toUpperCase() === "BUY").length > 0 && (
+                          <span className="text-xs bg-emerald-900/40 text-emerald-400 px-2 py-0.5 rounded-full border border-emerald-700">
+                            {group.picks.filter(p => p.signal?.toUpperCase() === "BUY").length} Buy
+                          </span>
+                        )}
+                        {group.picks.filter(p => p.signal?.toUpperCase().includes("SPECULATIVE")).length > 0 && (
+                          <span className="text-xs bg-yellow-900/40 text-yellow-400 px-2 py-0.5 rounded-full border border-yellow-700">
+                            {group.picks.filter(p => p.signal?.toUpperCase().includes("SPECULATIVE")).length} Spec
+                          </span>
+                        )}
+                      </div>
+                      {expandedDates.has(group.date) ? (
+                        <ChevronDown className="w-5 h-5 text-gray-400" />
+                      ) : (
+                        <ChevronRight className="w-5 h-5 text-gray-400" />
+                      )}
+                    </div>
+                  </button>
+
+                  {/* Picks Grid */}
+                  <AnimatePresence>
+                    {expandedDates.has(group.date) && (
+                      <motion.div
+                        initial={{ height: 0, opacity: 0 }}
+                        animate={{ height: "auto", opacity: 1 }}
+                        exit={{ height: 0, opacity: 0 }}
+                        transition={{ duration: 0.3 }}
+                        className="overflow-hidden"
+                      >
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 p-4 bg-terminal-black/50">
+                          {group.picks.map((record, index) => (
+                            <motion.div
+                              key={record.id}
+                              initial={{ opacity: 0, scale: 0.9 }}
+                              animate={{ opacity: 1, scale: 1 }}
+                              transition={{ delay: index * 0.05 }}
+                            >
+                              <ScreenerCard
+                                ticker={record.ticker}
+                                signal={record.signal as "BUY" | "SELL"}
+                                confidence={record.confidence || 75}
+                                entryPrice={record.entry_price}
+                                tp1={record.tp1}
+                                tp2={record.tp2}
+                                stopLoss={record.stop_loss}
+                                reasoning={record.reasoning?.replace("[AI-SCREENER] ", "") || ""}
+                                date={new Date(record.date_created)}
+                                onViewChart={handleViewChart}
+                              />
+                            </motion.div>
+                          ))}
+                        </div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
                 </motion.div>
               ))}
             </AnimatePresence>
 
-            {sortedAndFilteredPicks.length === 0 && (
+            {groupedByDate.length === 0 && (
               <div className="col-span-full p-12 text-center text-gray-500 bg-terminal-gray border border-gray-800 rounded-lg">
                 <div className="flex flex-col items-center gap-3">
                   <Bot className="w-12 h-12 opacity-20" />
@@ -205,7 +369,7 @@ const AIPicksPage: React.FC = () => {
             )}
           </motion.div>
         ) : (
-          /* Table View (Original) */
+          /* Table View - Flat list for table */
           <div className="bg-terminal-gray border border-gray-800 rounded-lg overflow-hidden shadow-xl">
             <div className="overflow-x-auto">
               <table className="w-full text-left text-sm font-mono">
@@ -214,6 +378,7 @@ const AIPicksPage: React.FC = () => {
                     <th className="p-4">DATE</th>
                     <th className="p-4">TICKER</th>
                     <th className="p-4">SIGNAL</th>
+                    <th className="p-4">RRR</th>
                     <th className="p-4">ENTRY AREA</th>
                     <th className="p-4">TARGETS (TP)</th>
                     <th className="p-4">STOP LOSS</th>
@@ -222,62 +387,70 @@ const AIPicksPage: React.FC = () => {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-800">
-                  {sortedAndFilteredPicks.map((record) => (
-                    <tr key={record.id} className="hover:bg-gray-800/50 transition-colors group">
-                      <td className="p-4 text-gray-500 whitespace-nowrap">
-                        {new Date(record.date_created).toLocaleDateString()} <br />
-                        <span className="text-xs opacity-70">
-                          {new Date(record.date_created).toLocaleTimeString()}
-                        </span>
-                      </td>
-                      <td className="p-4 font-bold text-white text-lg">{record.ticker}</td>
-                      <td className="p-4">
-                        <span
-                          className={`inline-flex items-center gap-1 px-2 py-1 rounded text-xs font-bold ${
-                            record.signal === "BUY"
-                              ? "bg-green-900/30 text-profit-green border border-green-900"
-                              : "bg-red-900/30 text-loss-red border border-red-900"
-                          }`}
-                        >
-                          {record.signal === "BUY" && <TrendingUp className="w-3 h-3" />}
-                          {record.signal}
-                        </span>
-                      </td>
-                      <td className="p-4 font-medium text-gray-300">
-                        {record.entry_price.toLocaleString()}
-                      </td>
-                      <td className="p-4">
-                        <div className="flex flex-col gap-1">
-                          <span className="text-profit-green font-medium">
-                            TP1: {record.tp1.toLocaleString()}
+                  {groupedByDate.flatMap(group => group.picks).map((record) => {
+                    const signalBadge = getSignalBadge(record.signal);
+                    // Extract RRR from reasoning if available
+                    const rrrMatch = record.reasoning?.match(/RRR:\s*([\d.:]+)/);
+                    const rrr = rrrMatch ? rrrMatch[1] : "N/A";
+                    
+                    return (
+                      <tr key={record.id} className="hover:bg-gray-800/50 transition-colors group">
+                        <td className="p-4 text-gray-500 whitespace-nowrap">
+                          {new Date(record.date_created).toLocaleDateString()} <br />
+                          <span className="text-xs opacity-70">
+                            {new Date(record.date_created).toLocaleTimeString()}
                           </span>
-                          <span className="text-green-400/70 text-xs">
-                            TP2: {record.tp2.toLocaleString()}
+                        </td>
+                        <td className="p-4 font-bold text-white text-lg">{record.ticker}</td>
+                        <td className="p-4">
+                          <span
+                            className={`inline-flex items-center gap-1 px-2 py-1 rounded text-xs font-bold border ${signalBadge.color}`}
+                          >
+                            {React.createElement(signalBadge.icon, { className: "w-3 h-3" })}
+                            {signalBadge.label}
                           </span>
-                        </div>
-                      </td>
-                      <td className="p-4 text-loss-red font-medium">
-                        {record.stop_loss.toLocaleString()}
-                      </td>
-                      <td className="p-4 text-gray-400 text-xs leading-relaxed">
-                        <div className="line-clamp-3 group-hover:line-clamp-none transition-all duration-300">
-                          {record.reasoning.replace("[AI-SCREENER] ", "")}
-                        </div>
-                      </td>
-                      <td className="p-4">
-                        <button
-                          onClick={() => handleViewChart(record.ticker)}
-                          className="px-3 py-1.5 bg-terminal-green/20 hover:bg-terminal-green/30 text-terminal-green 
-                            border border-terminal-green/50 rounded text-xs font-mono transition-colors"
-                        >
-                          View Chart
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                  {sortedAndFilteredPicks.length === 0 && (
+                        </td>
+                        <td className="p-4">
+                          <span className="text-cyan-400 font-mono text-sm bg-cyan-900/20 px-2 py-0.5 rounded">
+                            {rrr}
+                          </span>
+                        </td>
+                        <td className="p-4 font-medium text-gray-300">
+                          {record.entry_price.toLocaleString()}
+                        </td>
+                        <td className="p-4">
+                          <div className="flex flex-col gap-1">
+                            <span className="text-profit-green font-medium">
+                              TP1: {record.tp1.toLocaleString()}
+                            </span>
+                            <span className="text-green-400/70 text-xs">
+                              TP2: {record.tp2.toLocaleString()}
+                            </span>
+                          </div>
+                        </td>
+                        <td className="p-4 text-loss-red font-medium">
+                          {record.stop_loss.toLocaleString()}
+                        </td>
+                        <td className="p-4 text-gray-400 text-xs leading-relaxed">
+                          <div className="line-clamp-3 group-hover:line-clamp-none transition-all duration-300">
+                            {record.reasoning?.replace(/\[AI-SCREENER\].*?\|/g, "").trim() || ""}
+                          </div>
+                        </td>
+                        <td className="p-4">
+                          <button
+                            onClick={() => handleViewChart(record.ticker)}
+                            className="px-3 py-1.5 bg-terminal-green/20 hover:bg-terminal-green/30 text-terminal-green 
+                              border border-terminal-green/50 rounded text-xs font-mono transition-colors"
+                          >
+                            View Chart
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                  {totalPicks === 0 && (
                     <tr>
-                      <td colSpan={8} className="p-12 text-center text-gray-500">
+                      <td colSpan={9} className="p-12 text-center text-gray-500">
                         <div className="flex flex-col items-center gap-3">
                           <Bot className="w-12 h-12 opacity-20" />
                           <p>NO AI PICKS GENERATED YET</p>

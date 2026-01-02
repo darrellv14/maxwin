@@ -15,6 +15,8 @@ import {
   ChevronDown,
   X,
   BarChart3,
+  Sparkles,
+  ArrowUpCircle,
 } from "lucide-react";
 import { AIAnalysisResult, SignalType } from "../types";
 import { useWatchlistStore } from "../stores";
@@ -87,37 +89,71 @@ const ConfidenceMeter: React.FC<{ value: number }> = ({ value }) => {
   );
 };
 
-// Signal badge
-const SignalBadge: React.FC<{ signal: SignalType }> = ({ signal }) => {
-  const config = {
-    [SignalType.BUY]: {
-      bg: "bg-green-500/20",
-      border: "border-green-500/50",
-      text: "text-green-400",
-      icon: TrendingUp,
-    },
-    [SignalType.SELL]: {
-      bg: "bg-red-500/20",
-      border: "border-red-500/50",
-      text: "text-red-400",
-      icon: TrendingDown,
-    },
-    [SignalType.HOLD]: {
+// Enhanced Signal badge with support for new signal types
+const SignalBadge: React.FC<{ signal: SignalType | string }> = ({ signal }) => {
+  const signalStr = String(signal || "").toUpperCase();
+  
+  // Determine signal config based on string matching for new types
+  const getConfig = () => {
+    if (signalStr.includes("STRONG")) {
+      return {
+        bg: "bg-gradient-to-r from-green-600/30 to-emerald-600/30",
+        border: "border-green-500",
+        text: "text-green-300",
+        icon: Zap,
+        label: "STRONG BUY",
+        pulse: true,
+      };
+    }
+    if (signalStr.includes("SPECULATIVE")) {
+      return {
+        bg: "bg-gradient-to-r from-yellow-600/30 to-amber-600/30",
+        border: "border-yellow-500",
+        text: "text-yellow-300",
+        icon: Sparkles,
+        label: "SPECULATIVE",
+        pulse: false,
+      };
+    }
+    if (signalStr === "BUY" || signalStr.includes("BUY")) {
+      return {
+        bg: "bg-emerald-500/20",
+        border: "border-emerald-500/50",
+        text: "text-emerald-400",
+        icon: TrendingUp,
+        label: "BUY",
+        pulse: false,
+      };
+    }
+    if (signalStr === "SELL") {
+      return {
+        bg: "bg-red-500/20",
+        border: "border-red-500/50",
+        text: "text-red-400",
+        icon: TrendingDown,
+        label: "SELL",
+        pulse: false,
+      };
+    }
+    return {
       bg: "bg-yellow-500/20",
       border: "border-yellow-500/50",
       text: "text-yellow-400",
       icon: Clock,
-    },
+      label: signalStr || "HOLD",
+      pulse: false,
+    };
   };
 
-  const { bg, border, text, icon: Icon } = config[signal];
+  const config = getConfig();
+  const Icon = config.icon;
 
   return (
     <div
-      className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full ${bg} border ${border}`}
+      className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full ${config.bg} border ${config.border} ${config.pulse ? 'animate-pulse' : ''}`}
     >
-      <Icon className={`w-3.5 h-3.5 ${text}`} />
-      <span className={`font-mono font-bold text-xs ${text}`}>{signal}</span>
+      <Icon className={`w-3.5 h-3.5 ${config.text}`} />
+      <span className={`font-mono font-bold text-xs ${config.text}`}>{config.label}</span>
     </div>
   );
 };
@@ -198,7 +234,7 @@ const ScreenerCard: React.FC<ScreenerCardProps> = ({
       {/* Reasoning */}
       <div className="mb-4">
         <p className={`text-gray-400 text-sm font-mono ${!isReasoningExpanded ? 'line-clamp-2' : ''}`}>
-          "{analysis.reasoning}"
+          "{analysis.reasoning?.replace(/Signal:.*?\|/g, '').replace(/Conf:.*?\|/g, '').replace(/RRR:.*?\|/g, '').trim()}"
         </p>
         {analysis.reasoning && analysis.reasoning.length > 100 && (
           <button
@@ -210,6 +246,20 @@ const ScreenerCard: React.FC<ScreenerCardProps> = ({
           </button>
         )}
       </div>
+
+      {/* RRR Badge */}
+      {(() => {
+        const rrrMatch = analysis.reasoning?.match(/RRR:\s*([\d.:]+)/);
+        const rrr = rrrMatch ? rrrMatch[1] : null;
+        return rrr ? (
+          <div className="mb-3 flex items-center gap-2">
+            <span className="text-xs text-gray-500 font-mono">Risk/Reward:</span>
+            <span className="text-sm font-mono font-bold text-cyan-400 bg-cyan-900/30 px-2 py-0.5 rounded border border-cyan-800">
+              {rrr}
+            </span>
+          </div>
+        ) : null;
+      })()}
 
       {/* Trade Plan */}
       <div className="grid grid-cols-3 gap-2 mb-4">

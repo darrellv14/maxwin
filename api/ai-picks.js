@@ -16,6 +16,16 @@ const ensureNullableUserId = async () => {
 };
 ensureNullableUserId().catch(() => {});
 
+// Helper: Calculate Risk-Reward Ratio
+const calculateRRR = (entry, tp1, sl) => {
+  if (!entry || !tp1 || !sl) return "N/A";
+  const risk = entry - sl;
+  const reward = tp1 - entry;
+  if (risk <= 0) return "N/A";
+  const ratio = (reward / risk).toFixed(1);
+  return `1:${ratio}`;
+};
+
 // =======================
 //  Helper: TECHNICALS
 // =======================
@@ -566,40 +576,87 @@ async function runScreener(req, res) {
     }
 
     const prompt = `
-      Anda adalah "The Oracle", algoritma hedge fund elit khusus IHSG (Indonesia).
-      
-      Tugas: Analisis kandidat berikut dan pilih TOP 7-10 saham untuk posisi SWING TRADE.
-      
-      DATA YANG DIBERIKAN UNTUK SETIAP SAHAM:
-      1. Indicators: RSI, MACD, Bollinger Bands, OBV Slope (Volume Flow).
-      2. ATR (Average True Range): Gunakan ini untuk menghitung Stop Loss yang aman dari noise pasar.
-      3. Recent Candles (Last 5 days): Analisis pola candlestick (Open, High, Low, Close, Volume).
+      ROLE: Anda adalah "THE ORACLE" - algoritma hedge fund kuantitatif elit khusus IHSG (Bursa Efek Indonesia).
 
-      ATURAN TRADING (STRATEGY):
-      1. **Price Action King**: Utamakan saham yang membentuk pola bullish (Hammer, Engulfing, Breakout) di 5 hari terakhir.
-      2. **Trend Follower**: Harga harus di atas SMA50 atau EMA200.
-      3. **Risk Management (WAJIB)**: 
-         - Stop Loss (SL) HARUS dihitung sebagai: Entry Price - (2 x ATR).
-         - Take Profit (TP1) minimal Risk:Reward 1:1.5.
-         - Take Profit (TP2) minimal Risk:Reward 1:3.
-         - Jangan set SL terlalu ketat jika ATR tinggi (saham volatile).
+      MISI: Analisis kandidat saham dan pilih TOP 7-10 saham TERBAIK untuk posisi SWING TRADE (hold 3-10 hari).
 
-      INPUT DATA:
+      ═══════════════════════════════════════════════════════════════
+      ▓▓ STRATEGI ANALISIS: THE KAIROS PROTOCOL ▓▓
+      ═══════════════════════════════════════════════════════════════
+
+      【1】 VPA (VOLUME PRICE ANALYSIS) - Bobot 35%
+      ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+      • Volume Spike: Cari candle dengan volume > 2x rata-rata 20 hari
+      • Accumulation Sign: Bullish candle + High Volume = Smart Money masuk
+      • Distribution Warning: Bearish candle + High Volume = Hindari
+      • OBV Slope: Positif = Akumulasi tersembunyi, Negatif = Distribusi
+
+      【2】 MOMENTUM & TREND CONFLUENCE - Bobot 30%
+      ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+      • RSI Sweet Spot: 40-60 (Momentum building), bukan overbought
+      • MACD Crossover: Histogram berubah dari negatif ke positif
+      • Price vs MA: Close > SMA50 = Uptrend confirmed
+      • Bollinger Squeeze: Band menyempit = Explosive move coming
+
+      【3】 PATTERN RECOGNITION - Bobot 20%
+      ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+      • Bullish Reversal: Hammer, Morning Star, Bullish Engulfing
+      • Continuation: Three White Soldiers, Rising Three Methods
+      • Breakout Setup: Close di atas resistance dengan volume tinggi
+      • Support Test: Bounce dari support kuat dengan volume meningkat
+
+      【4】 RISK ENGINEERING (CRITICAL) - Bobot 15%
+      ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+      • Stop Loss Formula: Entry - (1.5 × ATR) untuk swing trade
+      • TP1 Target: Risk:Reward minimal 1:1.5
+      • TP2 Target: Risk:Reward minimal 1:2.5 hingga 1:3
+      • Position Sizing: ATR tinggi = Ukuran posisi lebih kecil
+
+      ═══════════════════════════════════════════════════════════════
+      ▓▓ SIGNAL CLASSIFICATION ▓▓
+      ═══════════════════════════════════════════════════════════════
+      
+      🟢 STRONG BUY (Confidence 85-95%)
+         → Semua kriteria terpenuhi + Volume spike + Breakout pattern
+         → RRR minimal 1:2.5
+
+      🟡 BUY (Confidence 75-84%)
+         → Mayoritas kriteria terpenuhi + Trend aligned
+         → RRR minimal 1:2
+
+      🔵 SPECULATIVE BUY (Confidence 65-74%)
+         → Setup menarik tapi belum konfirmasi sempurna
+         → Potential high reward, higher risk
+         → RRR minimal 1:3 untuk kompensasi risiko
+
+      ═══════════════════════════════════════════════════════════════
+      ▓▓ INPUT DATA KANDIDAT ▓▓
+      ═══════════════════════════════════════════════════════════════
       ${JSON.stringify(topCandidates)}
 
-      OUTPUT JSON FORMAT (ARRAY):
+      ═══════════════════════════════════════════════════════════════
+      ▓▓ OUTPUT FORMAT (STRICT JSON ARRAY) ▓▓
+      ═══════════════════════════════════════════════════════════════
       [
         {
           "ticker": "KODE.JK",
-          "signal": "BUY",
+          "signal": "STRONG BUY" | "BUY" | "SPECULATIVE BUY",
           "confidence": 85,
           "entry": 1000,
-          "tp1": 1100,
-          "tp2": 1250,
+          "tp1": 1150,
+          "tp2": 1300,
           "stopLoss": 920,
-          "reasoning": "Breakout resistance dengan volume tinggi + Bullish Engulfing. ATR support di level xxx."
+          "rrr": "1:2.5",
+          "reasoning": "VPA: Volume spike 2.5x avg + Bullish Engulfing. MOMENTUM: RSI 52 rising, MACD cross bullish. PATTERN: Breakout resistance 980 confirmed. RISK: ATR 40, SL aman di 920 (2x ATR below entry)."
         }
       ]
+
+      INSTRUKSI PENTING:
+      1. Pilih HANYA 7-10 saham TERBAIK dengan setup paling meyakinkan
+      2. Reasoning HARUS mencakup analisis VPA, Momentum, dan Pattern
+      3. Hitung RRR aktual: (TP1 - Entry) / (Entry - SL)
+      4. Confidence score berdasarkan kualitas setup, BUKAN spekulasi
+      5. JANGAN pilih saham dengan OBV negatif atau volume menurun
     `;
 
     const model = genAI.getGenerativeModel({
@@ -615,10 +672,19 @@ async function runScreener(req, res) {
     const cleanPicks = Array.isArray(picks) ? picks : picks.picks || [];
 
     for (const p of cleanPicks) {
-      if (p.signal === "BUY" && p.confidence >= 75) {
+      // Accept all BUY signals: STRONG BUY, BUY, SPECULATIVE BUY
+      const isBuySignal = p.signal && (
+        p.signal.toUpperCase().includes("BUY") || 
+        p.signal === "STRONG BUY" || 
+        p.signal === "SPECULATIVE BUY"
+      );
+      
+      if (isBuySignal && p.confidence >= 65) {
         if (!p.ticker.includes(".JK")) continue;
 
-        const reasoning = `[AI-SCREENER] Conf=${p.confidence}% | ATR Based Risk | ${p.reasoning}`;
+        // Include RRR in reasoning for display
+        const rrr = p.rrr || calculateRRR(p.entry, p.tp1, p.stopLoss);
+        const reasoning = `[AI-SCREENER] Signal: ${p.signal} | Conf: ${p.confidence}% | RRR: ${rrr} | ${p.reasoning}`;
 
         const entry = Math.round(p.entry);
         const tp1 = Math.round(p.tp1);
@@ -630,7 +696,7 @@ async function runScreener(req, res) {
           `INSERT INTO analysis_history 
           (user_id, ticker, signal, entry_price, tp1, tp2, stop_loss, highest_price, lowest_price, status, reasoning, date_created)
           VALUES (NULL, $1, $2, $3, $4, $5, $6, $3, $3, 'ACTIVE', $7, NOW())`,
-          [p.ticker, "BUY", entry, tp1, tp2, sl, reasoning]
+          [p.ticker, p.signal.toUpperCase(), entry, tp1, tp2, sl, reasoning]
         );
         savedCount++;
       }
