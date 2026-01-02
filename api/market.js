@@ -564,12 +564,17 @@ async function getHistoricalData(req, res) {
       throw new Error("No data from any fallback source");
     } catch (fallbackError) {
       console.error(`Fallback failed for ${ticker}:`, fallbackError.message);
-      return res.status(404).json({
-        error: `Tidak dapat mengambil data untuk '${ticker}'. Symbol ini mungkin tidak tersedia di sumber data kami.`,
-        suggestion: "Coba gunakan GC=F (Gold Futures) atau EURUSD=X untuk forex.",
-        originalSymbol: ticker,
-        tvSymbol: tvConfig.tvSymbol,
-      });
+      // If it's a crypto pair like BTC-USD, let it fall through to Yahoo Finance
+      if (ticker.includes("BTC") || ticker.includes("ETH") || ticker.includes("USD")) {
+         console.log(`[Market API] TradingView failed for ${ticker}, falling back to Yahoo Finance`);
+      } else {
+        return res.status(404).json({
+          error: `Tidak dapat mengambil data untuk '${ticker}'. Symbol ini mungkin tidak tersedia di sumber data kami.`,
+          suggestion: "Coba gunakan GC=F (Gold Futures) atau EURUSD=X untuk forex.",
+          originalSymbol: ticker,
+          tvSymbol: tvConfig.tvSymbol,
+        });
+      }
     }
   }
 
