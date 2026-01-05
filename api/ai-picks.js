@@ -671,6 +671,15 @@ async function runScreener(req, res) {
     let savedCount = 0;
     const cleanPicks = Array.isArray(picks) ? picks : picks.picks || [];
 
+    // Helper: Normalize signal to fit varchar(10) limit in database
+    const normalizeSignal = (signal) => {
+      const s = (signal || "").toUpperCase();
+      if (s.includes("STRONG")) return "STRONG BUY";
+      if (s.includes("SPEC")) return "SPEC BUY"; // Shortened from "SPECULATIVE BUY"
+      if (s.includes("BUY")) return "BUY";
+      return "BUY";
+    };
+
     for (const p of cleanPicks) {
       // Accept all BUY signals: STRONG BUY, BUY, SPECULATIVE BUY
       const isBuySignal = p.signal && (
@@ -682,7 +691,10 @@ async function runScreener(req, res) {
       if (isBuySignal && p.confidence >= 65) {
         if (!p.ticker.includes(".JK")) continue;
 
-        // Include RRR in reasoning for display
+        // Normalize signal to fit database column (varchar 10)
+        const dbSignal = normalizeSignal(p.signal);
+        
+        // Include RRR in reasoning for display (keep original signal in reasoning)
         const rrr = p.rrr || calculateRRR(p.entry, p.tp1, p.stopLoss);
         const reasoning = `[AI-SCREENER] Signal: ${p.signal} | Conf: ${p.confidence}% | RRR: ${rrr} | ${p.reasoning}`;
 
@@ -696,7 +708,7 @@ async function runScreener(req, res) {
           `INSERT INTO analysis_history 
           (user_id, ticker, signal, entry_price, tp1, tp2, stop_loss, highest_price, lowest_price, status, reasoning, date_created)
           VALUES (NULL, $1, $2, $3, $4, $5, $6, $3, $3, 'ACTIVE', $7, NOW())`,
-          [p.ticker, p.signal.toUpperCase(), entry, tp1, tp2, sl, reasoning]
+          [p.ticker, dbSignal, entry, tp1, tp2, sl, reasoning]
         );
         savedCount++;
       }
