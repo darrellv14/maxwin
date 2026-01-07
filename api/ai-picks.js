@@ -817,7 +817,7 @@ async function runScreener(req, res) {
         // Then by techScore
         return b.techScore - a.techScore;
       })
-      .slice(0, 20); // Reduced from 25 to 20 for token efficiency
+      .slice(0, 25); // Reduced from 25 to 20 for token efficiency
     
     console.log(`[AI-ORACLE] Filtered candidates: ${topCandidates.length} (BOW: ${topCandidates.filter(c => c.setupType === 'BOW').length}, BOB: ${topCandidates.filter(c => c.setupType === 'BOB').length})`);
 
