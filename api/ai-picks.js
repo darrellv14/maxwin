@@ -70,9 +70,9 @@ const sendWhatsAppNotification = async (picks) => {
     message += `   🛡️ SL: ${Math.round(p.stopLoss)}\n`;
     message += `   📊 Conf: ${p.confidence}% | RRR: ${p.rrr || 'N/A'}\n`;
     
-    // Truncate reasoning jika terlalu panjang
-    const shortReason = (p.reasoning || '').substring(0, 100);
-    message += `   💡 _${p.setupType || 'SETUP'}: ${shortReason}${shortReason.length >= 100 ? '...' : ''}_\n\n`;
+    // Full reasoning tanpa truncate
+    const reasoning = p.reasoning || '';
+    message += `   💡 _${reasoning}_\n\n`;
   });
 
   message += `━━━━━━━━━━━━━━━━━━━━\n`;
