@@ -993,16 +993,25 @@ async function getWhatsAppGroups(req, res) {
   }
 
   try {
-    const response = await fetch('https://api.fonnte.com/get-groups', {
+    // Endpoint yang benar: /groups (bukan /get-groups)
+    const response = await fetch('https://api.fonnte.com/groups', {
       method: 'POST',
       headers: { 
-        'Authorization': token,
-        'Content-Type': 'application/x-www-form-urlencoded'
+        'Authorization': token
       }
     });
 
     const text = await response.text();
     console.log("[WA-GROUPS] Raw response:", text);
+
+    // Handle jika endpoint salah
+    if (text.includes("Cannot POST") || text.includes("Cannot GET")) {
+      return res.status(404).json({
+        error: "Endpoint Fonnte error",
+        raw_response: text.substring(0, 200),
+        hint: "Pastikan HP sudah terkoneksi di dashboard Fonnte (md.fonnte.com)"
+      });
+    }
 
     let data;
     try {
@@ -1023,12 +1032,14 @@ async function getWhatsAppGroups(req, res) {
       });
     }
 
-    // Format response agar mudah dibaca
-    const groups = data.data || data || [];
+    // Fonnte mengembalikan data grup di dalam properti data.data atau data
+    const groups = data.data || data;
+    
+    // Mapping agar output bersih
     const formattedGroups = Array.isArray(groups) ? groups.map(g => ({
-      name: g.name || g.subject,
+      name: g.name || g.subject || "No Name",
       id: g.id,
-      participants: g.participants || g.size || 'N/A'
+      participants: g.size || g.participantsCount || "N/A"
     })) : [];
 
     return res.status(200).json({
