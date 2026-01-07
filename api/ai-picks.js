@@ -826,7 +826,7 @@ async function runScreener(req, res) {
     }
 
     // ═══════════════════════════════════════════════════════════════
-    // ▓▓ OPTIMIZED PROMPT - TOKEN EFFICIENT ▓▓
+    // ▓▓ OPTIMIZED PROMPT - TOKEN EFFICIENT + HUMAN-READABLE ▓▓
     // ═══════════════════════════════════════════════════════════════
     const prompt = `
 ROLE: QUANT TRADER elit IHSG. Data sudah difilter (uptrend, liquid, active).
@@ -858,11 +858,24 @@ TUGAS: Pilih 7-10 setup TERBAIK untuk SWING TRADE (3-10 hari).
 • RSI > 75 (overbought)
 • distToResistance > 15% tanpa momentum kuat
 
+【REASONING FORMAT - PENTING!】
+Tulis reasoning dalam BAHASA INDONESIA yang natural dan mudah dibaca (bukan bullet points teknis).
+Format seperti ini:
+
+Contoh BOW:
+"Saham ini sedang berada di area support kuat di 950 yang sudah diuji 3 kali sebelumnya dan selalu mental. RSI di 52 menunjukkan belum overbought dengan volume 1.2x rata-rata. Potensi naik ke resistance 1150 dengan risk reward 1:1.9."
+
+Contoh BOB:
+"Harga sedang menguji resistance 1200 dengan volume melonjak 1.8x di atas rata-rata, sinyal breakout potensial. Momentum bullish dengan MACD positif dan OBV naik. Target breakout ke 1350 dengan risk terjaga."
+
+Contoh MOMENTUM:
+"Trend bullish kuat dengan harga di atas semua MA. RSI 58 masih sehat, MACD histogram positif, dan volume konsisten naik. Momentum bagus untuk swing trade dengan target resistance terdekat."
+
 DATA (Pre-filtered uptrend stocks):
 ${JSON.stringify(topCandidates)}
 
 OUTPUT (JSON Array):
-[{"ticker":"KODE.JK","signal":"BUY","confidence":80,"entry":1000,"tp1":1150,"tp2":1250,"stopLoss":920,"rrr":"1:1.9","setupType":"BOW","reasoning":"Near support 950 (3 hits), RSI 52, vol 1.2x, ATR 40. SL di 910."}]
+[{"ticker":"KODE.JK","signal":"BUY","confidence":80,"entry":1000,"tp1":1150,"tp2":1250,"stopLoss":920,"rrr":"1:1.9","setupType":"BOW","reasoning":"Saham ini sedang berada di area support kuat di 950 yang sudah diuji 3 kali sebelumnya. RSI di 52 belum overbought dengan volume 1.2x rata-rata. Potensi naik ke resistance 1150 dengan risk reward 1:1.9."}]
 `;
 
     const model = genAI.getGenerativeModel({
