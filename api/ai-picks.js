@@ -995,10 +995,25 @@ async function getWhatsAppGroups(req, res) {
   try {
     const response = await fetch('https://api.fonnte.com/get-groups', {
       method: 'POST',
-      headers: { 'Authorization': token }
+      headers: { 
+        'Authorization': token,
+        'Content-Type': 'application/x-www-form-urlencoded'
+      }
     });
 
-    const data = await response.json();
+    const text = await response.text();
+    console.log("[WA-GROUPS] Raw response:", text);
+
+    let data;
+    try {
+      data = JSON.parse(text);
+    } catch (parseErr) {
+      return res.status(500).json({
+        error: "Response dari Fonnte tidak valid JSON",
+        raw_response: text.substring(0, 500),
+        hint: "Pastikan HP sudah terkoneksi di dashboard Fonnte (md.fonnte.com) dan status Connected"
+      });
+    }
 
     if (data.status === false) {
       return res.status(400).json({ 
