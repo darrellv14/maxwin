@@ -985,6 +985,8 @@ export default async function handler(req, res) {
 // ============ GET WHATSAPP GROUPS ============
 async function getWhatsAppGroups(req, res) {
   const token = process.env.FONNTE_TOKEN;
+  const url = new URL(req.url, `http://${req.headers.host}`);
+  const subAction = url.searchParams.get("sub"); // Sub-action: fetch atau kosong
 
   if (!token) {
     return res.status(400).json({ 
@@ -993,12 +995,26 @@ async function getWhatsAppGroups(req, res) {
   }
 
   try {
-    // Endpoint yang benar: /groups (bukan /get-groups)
-    const response = await fetch('https://api.fonnte.com/groups', {
+    // LANGKAH 1: FETCH (Sinkronisasi Grup Baru)
+    // Jalankan ini sekali saja jika Anda baru join grup
+    if (subAction === "fetch") {
+      const response = await fetch('https://api.fonnte.com/fetch-group', {
+        method: 'POST',
+        headers: { 'Authorization': token }
+      });
+      const data = await response.json();
+      return res.status(200).json({
+        success: true,
+        message: "Proses sinkronisasi (fetch) dimulai. Tunggu 10-30 detik lalu jalankan tanpa sub=fetch.",
+        next_step: "Panggil ?action=wa-groups (tanpa &sub=fetch) untuk melihat daftar grup",
+        fonnte_response: data
+      });
+    }
+
+    // LANGKAH 2: GET LIST (Ambil ID Grup yang sudah tersinkron)
+    const response = await fetch('https://api.fonnte.com/get-whatsapp-group', {
       method: 'POST',
-      headers: { 
-        'Authorization': token
-      }
+      headers: { 'Authorization': token }
     });
 
     const text = await response.text();
@@ -1028,25 +1044,33 @@ async function getWhatsAppGroups(req, res) {
       return res.status(400).json({ 
         error: "Gagal mengambil daftar grup",
         reason: data.reason || data.detail,
-        hint: "Pastikan HP sudah terkoneksi di dashboard Fonnte (md.fonnte.com)"
+        hint: "Jalankan ?action=wa-groups&sub=fetch dulu untuk sinkronisasi"
       });
     }
 
-    // Fonnte mengembalikan data grup di dalam properti data.data atau data
-    const groups = data.data || data;
+    // Fonnte biasanya return array langsung atau di dalam properti data
+    const groups = Array.isArray(data) ? data : (data.data || []);
+
+    if (groups.length === 0) {
+      return res.status(200).json({
+        success: true,
+        message: "Grup tidak ditemukan. Pastikan sudah menjalankan ?action=wa-groups&sub=fetch terlebih dahulu.",
+        groups: []
+      });
+    }
     
     // Mapping agar output bersih
-    const formattedGroups = Array.isArray(groups) ? groups.map(g => ({
-      name: g.name || g.subject || "No Name",
-      id: g.id,
-      participants: g.size || g.participantsCount || "N/A"
-    })) : [];
+    const formattedGroups = groups.map(g => ({
+      name: g.name || g.subject || "Tanpa Nama",
+      id: g.id || g.group_id,
+      participants: g.participants || g.size || "N/A"
+    }));
 
     return res.status(200).json({
       success: true,
       total_groups: formattedGroups.length,
       groups: formattedGroups,
-      usage_hint: "Copy 'id' grup yang diinginkan, lalu set ke WA_TARGET di environment variables"
+      usage_hint: "Copy 'id' grup yang diinginkan (format: xxx@g.us), lalu set ke WA_TARGET di Vercel env"
     });
   } catch (error) {
     return res.status(500).json({ 
