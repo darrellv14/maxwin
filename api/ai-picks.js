@@ -27,6 +27,147 @@ const calculateRRR = (entry, tp1, sl) => {
 };
 
 // =======================
+//  Helper: WhatsApp Notification via Fonnte
+// =======================
+/**
+ * Mengirim notifikasi WhatsApp ke grup/nomor via Fonnte API
+ * Pastikan FONNTE_TOKEN dan WA_TARGET sudah diset di .env
+ */
+const sendWhatsAppNotification = async (picks) => {
+  const token = process.env.FONNTE_TOKEN;
+  const target = process.env.WA_TARGET; // Bisa nomor (08xx) atau Group ID (@g.us)
+
+  if (!token || !target) {
+    console.warn("[WA] FONNTE_TOKEN atau WA_TARGET belum di-set di environment variables.");
+    return { success: false, reason: "Missing credentials" };
+  }
+
+  if (!picks || picks.length === 0) {
+    console.warn("[WA] Tidak ada picks untuk dikirim.");
+    return { success: false, reason: "No picks" };
+  }
+
+  // Format tanggal Indonesia
+  const today = new Date().toLocaleDateString('id-ID', { 
+    weekday: 'long', 
+    year: 'numeric', 
+    month: 'long', 
+    day: 'numeric' 
+  });
+
+  // Membuat format pesan yang enak dibaca di HP
+  let message = `🚀 *MOOCUAN ORACLE REPORT* 🚀\n`;
+  message += `📅 ${today}\n`;
+  message += `━━━━━━━━━━━━━━━━━━━━\n\n`;
+
+  picks.forEach((p, i) => {
+    const signal = p.signal || 'BUY';
+    const emoji = signal.includes('STRONG') ? '🔥' : signal.includes('SPEC') ? '⚡' : '✅';
+    
+    message += `${i + 1}. ${emoji} *${p.ticker}* (${signal})\n`;
+    message += `   🎯 Entry: *${Math.round(p.entry)}*\n`;
+    message += `   💰 TP1: ${Math.round(p.tp1)} | TP2: ${Math.round(p.tp2 || p.tp1)}\n`;
+    message += `   🛡️ SL: ${Math.round(p.stopLoss)}\n`;
+    message += `   📊 Conf: ${p.confidence}% | RRR: ${p.rrr || 'N/A'}\n`;
+    
+    // Truncate reasoning jika terlalu panjang
+    const shortReason = (p.reasoning || '').substring(0, 100);
+    message += `   💡 _${p.setupType || 'SETUP'}: ${shortReason}${shortReason.length >= 100 ? '...' : ''}_\n\n`;
+  });
+
+  message += `━━━━━━━━━━━━━━━━━━━━\n`;
+  message += `📈 Total: *${picks.length} sinyal*\n`;
+  message += `_Powered by MooCuan AI Oracle_ 🐮`;
+
+  try {
+    const response = await fetch('https://api.fonnte.com/send', {
+      method: 'POST',
+      headers: {
+        'Authorization': token // Fonnte tidak pakai 'Bearer '
+      },
+      body: new URLSearchParams({
+        target: target,
+        message: message,
+        delay: '2', // Jeda 2 detik antar pesan jika kirim banyak
+        countryCode: '62'
+      })
+    });
+
+    const result = await response.json();
+    
+    if (result.status) {
+      console.log(`[WA] ✅ Berhasil kirim ${picks.length} sinyal ke:`, target);
+      return { success: true, target, count: picks.length };
+    } else {
+      console.error("[WA] ❌ Gagal kirim:", result.reason || result.detail);
+      return { success: false, reason: result.reason || result.detail };
+    }
+  } catch (error) {
+    console.error("[WA] ❌ Error koneksi ke Fonnte:", error.message);
+    return { success: false, reason: error.message };
+  }
+};
+
+// =======================
+//  Helper: ATR Calculation
+// =======================
+/**
+ * Menghitung ATR untuk menentukan volatilitas dan jarak Stop Loss yang logis
+ */
+const calculateATR = (high, low, close, period = 14) => {
+  const atrInput = { high, low, close, period };
+  const values = TI.ATR.calculate(atrInput);
+  return values[values.length - 1];
+};
+
+// =======================
+//  Helper: S/R Zones (Multiple Touchpoints)
+// =======================
+/**
+ * Mendeteksi zona S/R berdasarkan akumulasi sentuhan harga (Multiple Touchpoints)
+ */
+const calculateSRZones = (stockData, sensitivity = 0.02) => {
+  const highs = stockData.map(d => d.high);
+  const lows = stockData.map(d => d.low);
+  const currentPrice = stockData[stockData.length - 1].close;
+
+  const findPivots = (prices, type = 'high') => {
+    let pivots = [];
+    for (let i = 5; i < prices.length - 5; i++) {
+      const window = prices.slice(i - 5, i + 6);
+      const target = prices[i];
+      if (type === 'high' && target === Math.max(...window)) pivots.push(target);
+      if (type === 'low' && target === Math.min(...window)) pivots.push(target);
+    }
+    return pivots;
+  };
+
+  const clusterPrices = (pivots) => {
+    let zones = [];
+    pivots.forEach(price => {
+      let zone = zones.find(z => Math.abs(z.price - price) / price < sensitivity);
+      if (zone) {
+        zone.hits++;
+        zone.price = (zone.price + price) / 2;
+      } else {
+        zones.push({ price, hits: 1 });
+      }
+    });
+    return zones.sort((a, b) => b.hits - a.hits);
+  };
+
+  const supportZones = clusterPrices(findPivots(lows, 'low'));
+  const resistanceZones = clusterPrices(findPivots(highs, 'high'));
+
+  return {
+    nearestSupport: supportZones.find(z => z.price < currentPrice * 0.99) || { price: Math.min(...lows), hits: 1 },
+    nearestResistance: resistanceZones.find(z => z.price > currentPrice * 1.01) || { price: Math.max(...highs), hits: 1 },
+    allSupports: supportZones.slice(0, 3),
+    allResistances: resistanceZones.slice(0, 3)
+  };
+};
+
+// =======================
 //  Helper: TECHNICALS
 // =======================
 const calculateAdvancedIndicators = (stockData) => {
@@ -340,6 +481,38 @@ const IDX_UNIVERSE = [
   "BSSR.JK",
   "COAL.JK",
   "AKRA.JK",
+  // === COAL & ENERGY (WTE - Waste to Energy & Batubara) ===
+  "TOBA.JK",  // TBS Energi Utama (Coal & Energy)
+  "OASA.JK",  // Protech Mitra Perkasa (WTE)
+  "MHKI.JK",  // Multi Hanna Kreasindo (WTE)
+  "UNTR.JK",  // United Tractors (Coal contractor)
+  "SMDR.JK",  // Samudera Indonesia (Coal shipping)
+  "TPMA.JK",  // Trans Power Marine (Coal barging)
+  "MBSS.JK",  // Mitrabahtera Segara (Coal barging)
+  "SHIP.JK",  // Sillo Maritime (Shipping)
+  "RIGS.JK",  // Rig Tenders Indonesia
+  "BULL.JK",  // Buana Lintas Lautan (Tanker)
+  "HATM.JK",  // Habco Trans Maritima
+  "SGER.JK",  // Sumber Global Energy (Coal)
+  "KKGI.JK",  // Resource Alam Indonesia (Coal)
+  "GTBO.JK",  // Garda Tujuh Buana (Coal)
+  "BORN.JK",  // Borneo Lumbung Energi
+  "PKPK.JK",  // Perdana Karya Perkasa (Coal)
+  "SQMI.JK",  // Wilton Makmur Indonesia
+  "CGAS.JK",  // Citra Nusantara Gemilang (LPG)
+  "WOWS.JK",  // Ginting Jaya Energi (Coal)
+  "PGEO.JK",  // Pertamina Geothermal
+
+  // === INFRASTRUCTURE & LOGISTICS ===
+  "PIPA.JK",  // Citra Tubindo (Pipa baja)
+  "MMLP.JK",  // Mega Manunggal Property (Logistics/Warehouse)
+  "ESIP.JK",  // Sinergi Inti Plastindo
+  "ESTI.JK",  // Ever Shine Tex
+  "NINE.JK",  // Techno Nine Indonesia
+  "LAPD.JK",  // Leyand International (Logistics)
+  "MEJA.JK",  // Meja Lintas Properti
+  "TRUE.JK",  // True Wira (Tech)
+  "TRIN.JK",  // Perintis Triniti Property
 
   // === SAHAM GOCAP / THIRD LINER / SERING DITERBANGIN ===
   "ZATA.JK",
@@ -527,7 +700,7 @@ async function runScreener(req, res) {
           });
 
           const q = chartRes?.quotes ?? [];
-          if (!q.length) return null;
+          if (!q.length || q.length < 200) return null;
 
           const stockData = q
             .map((row) => ({
@@ -545,15 +718,81 @@ async function runScreener(req, res) {
 
           if (stockData.length < 200) return null;
 
-          const analysis = calculateAdvancedIndicators(stockData);
-          if (!analysis) return null;
+          // ═══════════════════════════════════════════════════════════════
+          // ▓▓ NODE.JS PRE-FILTER (TRASH FILTER) - Hemat Token API ▓▓
+          // ═══════════════════════════════════════════════════════════════
+          const closes = stockData.map(d => d.close);
+          const volumes = stockData.map(d => d.volume);
+          const highs = stockData.map(d => d.high);
+          const lows = stockData.map(d => d.low);
+          
+          const lastClose = closes[closes.length - 1];
+          const lastVol = volumes[volumes.length - 1];
+          const avgVol20 = TI.SMA.calculate({ period: 20, values: volumes });
+          const avgVol = avgVol20[avgVol20.length - 1];
+          const ema200Arr = TI.EMA.calculate({ period: 200, values: closes });
+          const ema200 = ema200Arr[ema200Arr.length - 1];
+          
+          // 1. TREND FILTER: Harus di atas EMA 200 (Long Term Uptrend)
+          if (lastClose < ema200) return null;
+          
+          // 2. LIQUIDITY FILTER: Transaksi harian minimal 500 Juta IDR (lebih fleksibel untuk small caps)
+          const dailyValue = lastClose * lastVol;
+          if (dailyValue < 500_000_000) return null;
 
+          // 3. ACTIVITY FILTER: Volume minimal 70% dari rata-rata (bukan saham tidur)
+          if (lastVol < (avgVol * 0.7)) return null;
+
+          // ═══════════════════════════════════════════════════════════════
+          // ▓▓ DATA PROCESSING FOR AI (Compact Summary) ▓▓
+          // ═══════════════════════════════════════════════════════════════
+          const sr = calculateSRZones(stockData);
+          const atr = calculateATR(highs, lows, closes);
+          const analysis = calculateAdvancedIndicators(stockData);
+          
+          if (!analysis) return null;
           if (analysis.technicalConfidence < 60) return null;
+
+          // Calculate distance to support/resistance
+          const distToSupport = ((lastClose - sr.nearestSupport.price) / lastClose * 100).toFixed(2);
+          const distToResistance = ((sr.nearestResistance.price - lastClose) / lastClose * 100).toFixed(2);
+          
+          // Determine setup type
+          let setupType = "NEUTRAL";
+          const volRatio = lastVol / avgVol;
+          if (parseFloat(distToSupport) < 3 && sr.nearestSupport.hits >= 2) {
+            setupType = "BOW"; // Buy On Weakness - near strong support
+          } else if (parseFloat(distToResistance) < 2 && volRatio > 1.5) {
+            setupType = "BOB"; // Buy On Breakout - breaking resistance with volume
+          } else if (analysis.technicalConfidence >= 75) {
+            setupType = "MOMENTUM";
+          }
 
           return {
             ticker: symbol,
-            lastClose: stockData[stockData.length - 1].close,
-            ...analysis,
+            lastClose: Math.round(lastClose),
+            ema200: Math.round(ema200),
+            atr: Math.round(atr),
+            // S/R Data (compact)
+            support: { price: Math.round(sr.nearestSupport.price), hits: sr.nearestSupport.hits },
+            resistance: { price: Math.round(sr.nearestResistance.price), hits: sr.nearestResistance.hits },
+            distToSupport: `${distToSupport}%`,
+            distToResistance: `${distToResistance}%`,
+            // Volume & Activity
+            volRatio: volRatio.toFixed(2),
+            dailyValueB: (dailyValue / 1_000_000_000).toFixed(2), // in Billions
+            // Setup Classification
+            setupType,
+            // Technical Summary (compact - tidak kirim raw data)
+            techScore: analysis.technicalConfidence,
+            rsi: Math.round(analysis.indicators.rsi),
+            macdSignal: analysis.indicators.macdHist > 0 ? "BULLISH" : "BEARISH",
+            obvTrend: analysis.indicators.obvSlope,
+            // Recent price action (last 3 candles only - hemat token)
+            last3Candles: analysis.recentCandles.slice(-3).map(c => ({
+              c: Math.round(c.c),
+              chg: (((c.c - c.o) / c.o) * 100).toFixed(1) + "%"
+            }))
           };
         } catch (err) {
           console.error(`Error processing ${symbol}:`, err.message);
@@ -567,97 +806,64 @@ async function runScreener(req, res) {
       });
     }
 
+    // Sort by techScore and prioritize BOW/BOB setups
     const topCandidates = processedData
-      .sort((a, b) => b.technicalConfidence - a.technicalConfidence)
-      .slice(0, 25);
+      .sort((a, b) => {
+        // Prioritize clear setups (BOW/BOB) over neutral
+        const setupPriority = { BOW: 10, BOB: 10, MOMENTUM: 5, NEUTRAL: 0 };
+        const aPriority = setupPriority[a.setupType] || 0;
+        const bPriority = setupPriority[b.setupType] || 0;
+        if (aPriority !== bPriority) return bPriority - aPriority;
+        // Then by techScore
+        return b.techScore - a.techScore;
+      })
+      .slice(0, 20); // Reduced from 25 to 20 for token efficiency
+    
+    console.log(`[AI-ORACLE] Filtered candidates: ${topCandidates.length} (BOW: ${topCandidates.filter(c => c.setupType === 'BOW').length}, BOB: ${topCandidates.filter(c => c.setupType === 'BOB').length})`);
 
     if (topCandidates.length === 0) {
       return res.status(200).json({ message: "Market bearish. No candidates passed filter." });
     }
 
+    // ═══════════════════════════════════════════════════════════════
+    // ▓▓ OPTIMIZED PROMPT - TOKEN EFFICIENT ▓▓
+    // ═══════════════════════════════════════════════════════════════
     const prompt = `
-      ROLE: Anda adalah "THE ORACLE" - algoritma hedge fund kuantitatif elit khusus IHSG (Bursa Efek Indonesia).
+ROLE: QUANT TRADER elit IHSG. Data sudah difilter (uptrend, liquid, active).
 
-      MISI: Analisis kandidat saham dan pilih TOP 7-10 saham TERBAIK untuk posisi SWING TRADE (hold 3-10 hari).
+TUGAS: Pilih 7-10 setup TERBAIK untuk SWING TRADE (3-10 hari).
 
-      ═══════════════════════════════════════════════════════════════
-      ▓▓ STRATEGI ANALISIS: THE KAIROS PROTOCOL ▓▓
-      ═══════════════════════════════════════════════════════════════
+【SETUP TYPES】
+• BOW (Buy On Weakness): distToSupport < 3%, support.hits >= 2, volRatio normal
+• BOB (Buy On Breakout): distToResistance < 2%, volRatio > 1.5x, momentum bullish  
+• MOMENTUM: techScore >= 75, RSI 40-65, MACD bullish, OBV UP
 
-      【1】 VPA (VOLUME PRICE ANALYSIS) - Bobot 35%
-      ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-      • Volume Spike: Cari candle dengan volume > 2x rata-rata 20 hari
-      • Accumulation Sign: Bullish candle + High Volume = Smart Money masuk
-      • Distribution Warning: Bearish candle + High Volume = Hindari
-      • OBV Slope: Positif = Akumulasi tersembunyi, Negatif = Distribusi
+【ENTRY RULES】
+• BOW: Entry = lastClose, SL = support.price - ATR
+• BOB: Entry = resistance.price, SL = Entry - (2 * ATR)
+• MOMENTUM: Entry = lastClose, SL = Entry - (1.5 * ATR)
 
-      【2】 MOMENTUM & TREND CONFLUENCE - Bobot 30%
-      ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-      • RSI Sweet Spot: 40-60 (Momentum building), bukan overbought
-      • MACD Crossover: Histogram berubah dari negatif ke positif
-      • Price vs MA: Close > SMA50 = Uptrend confirmed
-      • Bollinger Squeeze: Band menyempit = Explosive move coming
+【TARGET RULES】
+• TP1 = resistance.price (atau Entry + 2*ATR jika BOB)
+• TP2 = TP1 + ATR
+• RRR minimal 1:1.5
 
-      【3】 PATTERN RECOGNITION - Bobot 20%
-      ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-      • Bullish Reversal: Hammer, Morning Star, Bullish Engulfing
-      • Continuation: Three White Soldiers, Rising Three Methods
-      • Breakout Setup: Close di atas resistance dengan volume tinggi
-      • Support Test: Bounce dari support kuat dengan volume meningkat
+【CONFIDENCE SCORING】
+• 85-95 STRONG BUY: Setup sempurna + volume confirm + multi-indicator align
+• 75-84 BUY: Setup bagus + trend aligned
+• 65-74 SPEC BUY: Setup menarik tapi butuh konfirmasi
 
-      【4】 RISK ENGINEERING (CRITICAL) - Bobot 15%
-      ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-      • Stop Loss Formula: Entry - (1.5 × ATR) untuk swing trade
-      • TP1 Target: Risk:Reward minimal 1:1.5
-      • TP2 Target: Risk:Reward minimal 1:2.5 hingga 1:3
-      • Position Sizing: ATR tinggi = Ukuran posisi lebih kecil
+【REJECT IF】
+• OBV = BEARISH + volRatio < 1
+• RSI > 75 (overbought)
+• distToResistance > 15% tanpa momentum kuat
 
-      ═══════════════════════════════════════════════════════════════
-      ▓▓ SIGNAL CLASSIFICATION ▓▓
-      ═══════════════════════════════════════════════════════════════
-      
-      🟢 STRONG BUY (Confidence 85-95%)
-         → Semua kriteria terpenuhi + Volume spike + Breakout pattern
-         → RRR minimal 1:2.5
+DATA (Pre-filtered uptrend stocks):
+${JSON.stringify(topCandidates)}
 
-      🟡 BUY (Confidence 75-84%)
-         → Mayoritas kriteria terpenuhi + Trend aligned
-         → RRR minimal 1:2
-
-      🔵 SPECULATIVE BUY (Confidence 65-74%)
-         → Setup menarik tapi belum konfirmasi sempurna
-         → Potential high reward, higher risk
-         → RRR minimal 1:3 untuk kompensasi risiko
-
-      ═══════════════════════════════════════════════════════════════
-      ▓▓ INPUT DATA KANDIDAT ▓▓
-      ═══════════════════════════════════════════════════════════════
-      ${JSON.stringify(topCandidates)}
-
-      ═══════════════════════════════════════════════════════════════
-      ▓▓ OUTPUT FORMAT (STRICT JSON ARRAY) ▓▓
-      ═══════════════════════════════════════════════════════════════
-      [
-        {
-          "ticker": "KODE.JK",
-          "signal": "STRONG BUY" | "BUY" | "SPECULATIVE BUY",
-          "confidence": 85,
-          "entry": 1000,
-          "tp1": 1150,
-          "tp2": 1300,
-          "stopLoss": 920,
-          "rrr": "1:2.5",
-          "reasoning": "VPA: Volume spike 2.5x avg + Bullish Engulfing. MOMENTUM: RSI 52 rising, MACD cross bullish. PATTERN: Breakout resistance 980 confirmed. RISK: ATR 40, SL aman di 920 (2x ATR below entry)."
-        }
-      ]
-
-      INSTRUKSI PENTING:
-      1. Pilih HANYA 7-10 saham TERBAIK dengan setup paling meyakinkan
-      2. Reasoning HARUS mencakup analisis VPA, Momentum, dan Pattern
-      3. Hitung RRR aktual: (TP1 - Entry) / (Entry - SL)
-      4. Confidence score berdasarkan kualitas setup, BUKAN spekulasi
-      5. JANGAN pilih saham dengan OBV negatif atau volume menurun
-    `;
+OUTPUT (JSON Array):
+[{"ticker":"KODE.JK","signal":"BUY","confidence":80,"entry":1000,"tp1":1150,"tp2":1250,"stopLoss":920,"rrr":"1:1.9","setupType":"BOW","reasoning":"Near support 950 (3 hits), RSI 52, vol 1.2x, ATR 40. SL di 910."}]
+`;
 
     const model = genAI.getGenerativeModel({
       model: "gemini-2.5-flash",
@@ -670,6 +876,15 @@ async function runScreener(req, res) {
 
     let savedCount = 0;
     const cleanPicks = Array.isArray(picks) ? picks : picks.picks || [];
+
+    // ═══════════════════════════════════════════════════════════════
+    // ▓▓ SEND WHATSAPP NOTIFICATION via FONNTE ▓▓
+    // ═══════════════════════════════════════════════════════════════
+    let waResult = { success: false, reason: "Not attempted" };
+    if (cleanPicks.length > 0) {
+      console.log(`[AI-ORACLE] 📱 Mengirim ${cleanPicks.length} sinyal ke WhatsApp...`);
+      waResult = await sendWhatsAppNotification(cleanPicks);
+    }
 
     // Helper: Normalize signal to fit varchar(10) limit in database
     const normalizeSignal = (signal) => {
@@ -719,6 +934,7 @@ async function runScreener(req, res) {
       analyzed: processedData.length,
       candidates_sent_to_ai: topCandidates.length,
       signals_saved: savedCount,
+      whatsapp_notification: waResult,
       ai_response: cleanPicks,
     });
   } catch (error) {
@@ -753,5 +969,119 @@ export default async function handler(req, res) {
     return runScreener(req, res);
   }
 
+  // Route: GET /api/ai-picks?action=wa-groups - Get WhatsApp Group List
+  if (action === "wa-groups") {
+    return getWhatsAppGroups(req, res);
+  }
+
+  // Route: GET /api/ai-picks?action=wa-test - Test WhatsApp Connection
+  if (action === "wa-test") {
+    return testWhatsAppConnection(req, res);
+  }
+
   return res.status(404).json({ error: "Endpoint not found" });
+}
+
+// ============ GET WHATSAPP GROUPS ============
+async function getWhatsAppGroups(req, res) {
+  const token = process.env.FONNTE_TOKEN;
+
+  if (!token) {
+    return res.status(400).json({ 
+      error: "FONNTE_TOKEN belum di-set di environment variables" 
+    });
+  }
+
+  try {
+    const response = await fetch('https://api.fonnte.com/get-groups', {
+      method: 'POST',
+      headers: { 'Authorization': token }
+    });
+
+    const data = await response.json();
+
+    if (data.status === false) {
+      return res.status(400).json({ 
+        error: "Gagal mengambil daftar grup",
+        reason: data.reason || data.detail,
+        hint: "Pastikan HP sudah terkoneksi di dashboard Fonnte (md.fonnte.com)"
+      });
+    }
+
+    // Format response agar mudah dibaca
+    const groups = data.data || data || [];
+    const formattedGroups = Array.isArray(groups) ? groups.map(g => ({
+      name: g.name || g.subject,
+      id: g.id,
+      participants: g.participants || g.size || 'N/A'
+    })) : [];
+
+    return res.status(200).json({
+      success: true,
+      total_groups: formattedGroups.length,
+      groups: formattedGroups,
+      usage_hint: "Copy 'id' grup yang diinginkan, lalu set ke WA_TARGET di environment variables"
+    });
+  } catch (error) {
+    return res.status(500).json({ 
+      error: "Error koneksi ke Fonnte",
+      message: error.message 
+    });
+  }
+}
+
+// ============ TEST WHATSAPP CONNECTION ============
+async function testWhatsAppConnection(req, res) {
+  const token = process.env.FONNTE_TOKEN;
+  const target = process.env.WA_TARGET;
+
+  if (!token) {
+    return res.status(400).json({ 
+      error: "FONNTE_TOKEN belum di-set" 
+    });
+  }
+
+  if (!target) {
+    return res.status(400).json({ 
+      error: "WA_TARGET belum di-set",
+      hint: "Set WA_TARGET dengan nomor HP (08xx) atau Group ID dari ?action=wa-groups"
+    });
+  }
+
+  const testMessage = `🔔 *TEST KONEKSI MOOCUAN*\n\n✅ WhatsApp notification berhasil terhubung!\n\n📅 ${new Date().toLocaleString('id-ID')}\n_Pesan ini dikirim otomatis untuk testing._`;
+
+  try {
+    const response = await fetch('https://api.fonnte.com/send', {
+      method: 'POST',
+      headers: { 'Authorization': token },
+      body: new URLSearchParams({
+        target: target,
+        message: testMessage,
+        countryCode: '62'
+      })
+    });
+
+    const result = await response.json();
+
+    if (result.status) {
+      return res.status(200).json({
+        success: true,
+        message: "Test message berhasil dikirim!",
+        target: target,
+        fonnte_response: result
+      });
+    } else {
+      return res.status(400).json({
+        success: false,
+        error: "Gagal mengirim test message",
+        reason: result.reason || result.detail,
+        target: target
+      });
+    }
+  } catch (error) {
+    return res.status(500).json({ 
+      error: "Error koneksi ke Fonnte",
+      message: error.message 
+    });
+  }
 }
