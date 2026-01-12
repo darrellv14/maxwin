@@ -622,18 +622,18 @@ const IDX_UNIVERSE = [
 
 // ============ GET AI PICKS ============
 async function getAIPicks(req, res) {
-  const limit = parseInt(req.query.limit || "20", 10);
+  const limit = parseInt(req.query.limit || "100", 10);
 
   try {
-    // Get latest AI screener picks (public - no user filter)
+    // Get all AI screener picks from last 7 days (show all, not just unique tickers)
     const query = `
-      SELECT DISTINCT ON (ticker)
+      SELECT 
         id, ticker, signal, entry_price, tp1, tp2, stop_loss,
         highest_price, lowest_price, status, reasoning, date_created
       FROM analysis_history
       WHERE reasoning LIKE '[AI-SCREENER]%'
         AND date_created > NOW() - INTERVAL '7 days'
-      ORDER BY ticker, date_created DESC
+      ORDER BY date_created DESC
       LIMIT $1
     `;
 
